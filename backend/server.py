@@ -21,6 +21,7 @@ from pydantic import field_validator
 from download_file import router as download_router
 from passlib.context import CryptContext
 from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 
 
 
@@ -1696,7 +1697,7 @@ async def signup(request: SignupRequest):
     if existing:
         raise HTTPException(status_code=400, detail="User already exists")
 
-    hashed = pwd_context.hash(request.password)
+    hashed = pwd_context.hash(request.password[:72])
     
     # Set department: use provided or fallback to team
     dept = request.department if request.department else request.team
@@ -1814,7 +1815,7 @@ async def login(request: LoginRequest):
     password_hash = user.get("password_hash")
     if not password_hash:
         raise HTTPException(status_code=400, detail="Invalid credentials")
-    if not pwd_context.verify(request.password, password_hash):
+    if not pwd_context.verify(request.password[:72], password_hash):
         raise HTTPException(status_code=400, detail="Invalid credentials")
 
     # Set user status to online and broadcast it immediately upon successful login
@@ -2437,6 +2438,7 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
         await manager.disconnect(websocket, client_id)
         logging.info(f"User {client_id} connection handler finished.")
 
+# Corrected CORS middleware configuration
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:3000", "http://localhost:3001","https://showtime-consulting-employee-portal.onrender.com"
@@ -2445,6 +2447,7 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
+
 # Include the router in the main app
 app.include_router(api_router)
 app.include_router(download_router)  # Include the download file router

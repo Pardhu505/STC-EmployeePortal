@@ -1600,11 +1600,11 @@ async def change_password(user_id: str, request: PasswordChangeRequest):
         full_user_doc = await collection.find_one({"$or": [{"id": user_id}, {"email": user_id}]})
 
         # Verify the current password
-        if not pwd_context.verify(request.current_password, full_user_doc.get("password_hash")):
+        if not pwd_context.verify(request.current_password[:72], full_user_doc.get("password_hash")):
             raise HTTPException(status_code=400, detail="Incorrect current password")
 
         # Hash the new password
-        new_password_hash = pwd_context.hash(request.new_password)
+        new_password_hash = pwd_context.hash(request.new_password[:72])
 
         # Update the password in the database
         result = await collection.update_one(

@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YAVA Foundation - Our Impact</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f7fafc;
+        }
+        .nav-link {
+            transition: color 0.3s ease;
+        }
+        .nav-link.active-link {
+            font-weight: bold;
+            color: #f97316; /* orange-500 */
+        }
+        .card {
+            background-color: #ffffff;
+            transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+            min-height: 450px;
+        }
+        .card img {
+            height: 250px;
+            width: 100%;
+            object-fit: cover;
+        }
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+            border-color: #f97316; /* orange-500 */
+        }
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        .fade-in-up {
+            animation: fadeInUp 1s ease-out forwards;
+            opacity: 0;
+        }
+        .fade-in-up-1 { animation-delay: 0.2s; }
+        .fade-in-up-2 { animation-delay: 0.5s; }
+        .fade-in-up-3 { animation-delay: 0.7s; }
+        .fade-in-up-4 { animation-delay: 0.9s; }
+        .fade-in-up-5 { animation-delay: 1.2s; }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-900">
+
+     <nav class="bg-white text-black p-4 shadow-lg shadow-orange-100 fixed w-full z-20 top-0">
+        <div class="container mx-auto flex justify-between items-center">
+            <a href="/" class="flex items-center space-x-2">
+                <img src="css/logo-removebg-preview.png" alt="YUVA FOUNDATION logo"
+                    class="h-12 w-33">
+                <span class="font-bold text-xl tracking-wider hidden md:block">YUVA FOUNDATION</span>
+            </a>
+
+            <button id="menu-button"
+                class="lg:hidden p-2 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-white">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                    xmlns="http://www.w3.org/2000/svg">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7">
+                    </path>
+                </svg>
+            </button>
+
+            <div id="nav-links" class="hidden lg:flex lg:space-x-8">
+                <a href="index.html" class="nav-item p-2 block text-lg font-medium hover:text-orange-400 rounded-md">Home</a>
+                <a href="abhoutus.html" class="nav-item p-2 block text-lg font-medium hover:text-orange-400 rounded-md">About Us</a>
+                <a href="what-we-do.html" class="nav-item p-2 block text-lg font-medium hover:text-orange-400 rounded-md">What We Do</a>
+                <a href="impact.html"  class="nav-item p-2 block text-lg font-medium hover:text-orange-400 rounded-md">Our Impact</a>
+                <a href="help.html" class="nav-item p-2 block text-lg font-medium hover:text-orange-400 rounded-md">How to Help</a>
+                <a href="contact.html" class="nav-item p-2 block text-lg font-medium hover:text-orange-400 rounded-md">Contact</a>
+                
+            </div>
+        </div>
+    </nav>
+
+    <main class="pt-24 pb-12">
+        <!-- Our Impact Section -->
+        <section id="our-impact" class="container mx-auto px-4 py-16">
+            <h2 class="text-4xl md:text-5xl font-extrabold text-center text-black mb-4 fade-in-up text-orange-500">Our Impact</h2>
+            <p class="text-center text-lg text-gray-600 mb-12 max-w-2xl mx-auto fade-in-up fade-in-up-1">
+                Every life we touch has a story. These are just a few of them.
+            </p>
+            <div class="grid md:grid-cols-3 gap-8">
+                <div class="card rounded-xl shadow-lg p-6 border border-transparent flex flex-col items-center text-center fade-in-up fade-in-up-2">
+                    <img src="css/boy.jpg" alt="Boy in a classroom smiling" class="rounded-xl mb-4">
+                    <h3 class="text-2xl font-bold text-gray-800 mb-2 mt-6 text-orange-400"><i>From the Street to School</i></h3>
+                    <p class="text-gray-600">A 7-year-old boy who used to beg at bus stands is now in school and dreams of becoming a police officer.</p>
+                </div>
+                <div class="card rounded-xl shadow-lg p-6 border border-transparent flex flex-col items-center text-center fade-in-up fade-in-up-3">
+                    <img src="css/tailerw.jpg" alt="Woman sewing at a machine" class="rounded-xl mb-4">
+                    <h3 class="text-2xl font-bold text-gray-800 mt-6 mb-2 text-orange-400"><i>A Widow's New Beginning</i></h3>
+                    <p class="text-gray-600">A widow trained in tailoring now runs her own shop and has found the financial independence to educate her children.</p>
+                </div>
+                <div class="card rounded-xl shadow-lg p-6 border border-transparent flex flex-col items-center text-center fade-in-up fade-in-up-4">
+                    <img src="css/olaman.jpg" alt="Elderly man smiling in a group" class="rounded-xl mb-4">
+                    <h3 class="text-2xl font-bold text-gray-800 mb-2  mt-6 text-orange-400"><i>A Home Filled with Love</i></h3>
+                    <p class="text-gray-600">An elderly man, once abandoned, now smiles every morning, surrounded by love and care in our old age home.</p>
+                </div>
+            </div>
+            <div class="text-center mt-12 fade-in-up fade-in-up-5">
+                <p class="text-2xl md:text-3xl font-bold text-gray-800 mb-4 text-orange-400">Every story is written because someone cared.</p>
+                <a href="how_to_help.html" class="text-2xl bg-gradient-to-r from-orange-200 via-orange-250 to-orange-200 text-orange-600 px-8 py-4 rounded-full font-semibold shadow-lg hover:bg-orange-white transition-colors duration-300 text-lg"><i>You can be that someone today.</i></a>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-gray-100 text-gray-600 text-center p-6 mt-16 rounded-t-3xl">
+        <p>&copy; 2024 YUVA FOUNDATION. All rights reserved.</p>
+    </footer>
+
+    <script>
+        const menuButton = document.getElementById('menu-button');
+        const navLinks = document.getElementById('nav-links');
+        const navBar = document.querySelector('nav');
+        const body = document.body;
+
+        function setBodyPadding() {
+            const navHeight = navBar.offsetHeight;
+            body.style.paddingTop = navHeight + 'px';
+            document.documentElement.style.setProperty('--nav-height', navHeight + 'px');
+        }
+
+        window.addEventListener('load', setBodyPadding);
+        window.addEventListener('resize', setBodyPadding);
+
+        menuButton.addEventListener('click', () => {
+            navLinks.classList.toggle('hidden');
+            if (!navLinks.classList.contains('hidden')) {
+                navLinks.classList.add('flex', 'flex-col', 'absolute', 'top-16', 'left-0', 'w-full', 'bg-white', 'rounded-b-md', 'shadow-lg', 'p-4', 'items-center', 'space-y-4', 'lg:relative', 'lg:flex-row', 'lg:space-y-0');
+            } else {
+                navLinks.classList.remove('flex', 'flex-col', 'absolute', 'top-16', 'left-0', 'w-full', 'bg-white', 'rounded-b-md', 'shadow-lg', 'p-4', 'items-center', 'space-y-4');
+            }
+        });
+    </script>
+</body>
+</html>

@@ -59,6 +59,13 @@ app = FastAPI()
 # Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
 
+# --- Allowed Origins for CORS ---
+ALLOWED_ORIGINS = [
+    "http://localhost:3000",
+    "http://localhost:3001",
+    "https://showtime-consulting-employee-portal.onrender.com"
+]
+
 # --- Generic Exception Handler for unhandled errors ---
 @app.exception_handler(Exception)
 async def generic_exception_handler(request: Request, exc: Exception):
@@ -67,13 +74,16 @@ async def generic_exception_handler(request: Request, exc: Exception):
     This prevents the client from seeing a CORS error for unhandled exceptions.
     """
     logging.error(f"Unhandled exception: {exc}", exc_info=True)
+    origin = request.headers.get('origin')
+    headers = {}
+    if origin in ALLOWED_ORIGINS:
+        headers["Access-Control-Allow-Origin"] = origin
+        headers["Access-Control-Allow-Credentials"] = "true"
+
     return JSONResponse(
         status_code=500,
         content={"detail": "An internal server error occurred."},
-        headers={
-            "Access-Control-Allow-Origin": "http://localhost:3000",
-            "Access-Control-Allow-Credentials": "true",
-        },
+        headers=headers,
     )
 
 # --- Custom Exception Handler for CORS ---
@@ -82,13 +92,16 @@ async def http_exception_handler(request: Request, exc: HTTPException):
     """
     Custom exception handler to ensure CORS headers are added to all HTTP exceptions.
     """
+    origin = request.headers.get('origin')
+    headers = exc.headers or {}
+    if origin in ALLOWED_ORIGINS:
+        headers["Access-Control-Allow-Origin"] = origin
+        headers["Access-Control-Allow-Credentials"] = "true"
+
     return JSONResponse(
         status_code=exc.status_code,
         content={"detail": exc.detail},
-        headers={
-            "Access-Control-Allow-Origin": "http://localhost:3000",
-            "Access-Control-Allow-Credentials": "true",
-        },
+        headers=headers,
     )
 
 
@@ -1823,6 +1836,22 @@ async def login(request: LoginRequest):
     await manager.broadcast_status(user_id, "online")
 
     user_data = {k: v for k, v in user.items() if k != "password_hash"}
+# --- Generic Exception Handler for unhandled errors ---
+@app.exception_handler(Exception)
+async def generic_exception_handler(request: Request, exc: Exception):
+    """
+    Catch-all exception handler to return a 500 error with CORS headers.
+    This prevents the client from seeing a CORS error for unhandled exceptions.
+    """
+    logging.error(f"Unhandled exception: {exc}", exc_info=True)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "An internal server error occurred."},
+        headers={
+            "Access-Control-Allow-Origin": "http://localhost:3000",
+            "Access-Control-Allow-Credentials": "true",
+        },
+    )
     user_data = convert_objectid(user_data)
     
     # Ensure profilePicture is included, even if it's null
@@ -2441,8 +2470,7 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
 # Corrected CORS middleware configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:3001","https://showtime-consulting-employee-portal.onrender.com"
-], # Added 3001 for flexibility
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],

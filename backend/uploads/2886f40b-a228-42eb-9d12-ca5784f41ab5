@@ -1,0 +1,13 @@
+create database agriadvanz;
+use agriadvanz;
+
+create table farmer
+(
+id int primary key auto_increment,
+farmername varchar(100),
+phonenumber varchar(50) unique,
+password varchar(27),
+land int,
+income float,
+investment float
+)

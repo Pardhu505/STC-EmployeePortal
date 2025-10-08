@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YUVA FOUNDATION</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="css/style.css" rel="stylesheet">
+    
+</head>
+
+<body class="bg-gray-100 font-sans">
+
+    <nav class="bg-white text-black p-4 shadow-lg shadow-orange-100 fixed w-full z-20 top-0">
+        <div class="container mx-auto flex justify-between items-center">
+            <a href="/" class="flex items-center space-x-2">
+                <img src="css/logo-removebg-preview.png" alt="YUVA FOUNDATION logo"
+                    class="h-12 w-33">
+                <span class="font-bold text-xl tracking-wider hidden md:block">YUVA FOUNDATION</span>
+            </a>
+
+            <button id="menu-button"
+                class="lg:hidden p-2 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-white">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                    xmlns="http://www.w3.org/2000/svg">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7">
+                    </path>
+                </svg>
+            </button>
+
+            <div id="nav-links" class="hidden lg:flex lg:space-x-8">
+                <a href="index.html" class="nav-item p-2 block text-lg font-medium hover:text-orange-400 rounded-md">Home</a>
+                <a href="abhoutus.html" class="nav-item p-2 block text-lg font-medium hover:text-orange-400 rounded-md">About Us</a>
+                <a href="what-we-do.html" class="nav-item p-2 block text-lg font-medium hover:text-orange-400 rounded-md">What We Do</a>
+                <a href="impact.html"  class="nav-item p-2 block text-lg font-medium hover:text-orange-400 rounded-md">Our Impact</a>
+                <a href="help.html" class="nav-item p-2 block text-lg font-medium hover:text-orange-400 rounded-md">How to Help</a>
+                <a href="contact.html" class="nav-item p-2 block text-lg font-medium hover:text-orange-400 rounded-md">Contact</a>
+                
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Carousel Section -->
+    <div id="hero-carousel" class="hero-carousel">
+        <div class="slide active">
+            <img src="css/c1.jpeg" alt="People from diverse backgrounds helping each other" />
+        </div>
+        <div class="slide">
+            <img src="css/c3.jpeg" alt="A community garden with diverse volunteers" />
+        </div>
+        <div class="hero-overlay">
+            <div class="mt-8 text-center p-4">
+                <h1 class="text-4xl font-extrabold animate-fade-in-down text-orange-500">
+                    Restoring Hope, Rebuilding Lives, Raising Generations.
+                </h1>
+                <div class="mt-4 max-w-2xl mx-auto animate-fade-in" style="animation-delay: 0.8s;">
+                    <p class="text-lg text-white">
+                        At YUVA FOUNDATION, our heart beats for the forgotten, the broken, and the voiceless. We work with
+                        children who have no access to education, women who have lost all hope, youth who are misled and
+                        confused, and the elderly who are left alone. Our mission is simple: to love, to care, and to build
+                        lives with dignity and hope.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <div class="flex flex-col md:flex-row justify-center items-center mt-10 space-y-8 md:space-y-0 md:space-x-10">
+        <div class="flex flex-col items-center">
+            <div
+                class="w-48 h-48 p-1 rounded-lg shadow-lg bg-gradient-to-r from-orange-500 via-orange-400 to-yellow-500">
+                <img src="css/donate.jpeg" alt="Donate image"
+                    class="w-full h-full rounded-lg">
+            </div>
+            <button
+                class="mt-6 px-6 py-2 rounded-full font-bold text-white shadow-lg bg-gradient-to-r from-orange-500 via-orange-400 to-yellow-500 animate-bounce">
+                Donate
+            </button>
+        </div>
+
+        <div class="flex flex-col items-center">
+            <div
+                class="w-48 h-48 p-1 rounded-lg shadow-lg bg-gradient-to-r from-orange-500 via-orange-400 to-yellow-500">
+                <img src="css/voulnteer.jpeg" alt="Volunteer image"
+                    class="w-full h-full rounded-lg">
+            </div>
+            <button
+                class="mt-6 px-6 py-2 rounded-full font-bold text-white shadow-lg bg-gradient-to-r from-orange-500 via-orange-400 to-yellow-500 animate-bounce">
+                Volunteer
+            </button>
+        </div>
+    </div>
+    <!-- About Us Section -->
+    <div id="about" class="max-w-7xl mx-auto p-6 md:p-10 mt-16 ">
+        <h2 class="text-3xl sm:text-4xl font-bold text-orange-500 text-center mb-8 ">About Us</h2>
+        <!-- Flex container for side-by-side layout, centered vertically -->
+        <div class="flex flex-col md:flex-row items-center md:space-x-12 space-y-8 md:space-y-0">
+            <!-- Image container -->
+            <div
+                class="w-full md:w-1/2 flex justify-center p-1 rounded-2xl shadow-lg transform transition-transform duration-300 hover:scale-105 bg-gradient-to-r from-orange-500 via-orange-400 to-yellow-500">
+                <img src="css/abhoutus.jpeg"
+                    alt="A group of diverse people smiling and working together" class="w-full h-full object-cover rounded-xl">
+            </div>
+            <!-- Text container with flex-grow to balance space -->
+            <div class="w-full md:w-1/2 flex-grow space-y-4">
+                <div class="bg-white p-6 rounded-xl shadow-lg border-b-4 border-orange-500 animate-slide-in-up transform transition-transform duration-300 hover:scale-105"
+                    style="animation-delay: 0.2s;">
+                    <p class="text-gray-700 text-lg leading-relaxed">
+                        YUVA FOUNDATION is a non-profit, non-political, and humanitarian organization founded with a
+                        vision
+                        to uplift the underprivileged and give them a meaningful life.
+                    </p>
+                </div>
+                <div class="bg-white p-6 rounded-xl shadow-lg border-b-4 border-orange-500 animate-slide-in-up transform transition-transform duration-300 hover:scale-105"
+                    style="animation-delay: 0.4s;">
+                    <p class="text-gray-700 text-lg leading-relaxed">
+                        We strongly believe that every person matters. A child begging on the street, a widow abandoned
+                        by
+                        her family, a youth caught in addiction, or an elderly person left alone—all deserve love,
+                        respect,
+                        and a chance for a better tomorrow.
+                    </p>
+                </div>
+                <div class="bg-white p-6 rounded-xl shadow-lg border-b-4 border-orange-500 animate-slide-in-up transform transition-transform duration-300 hover:scale-105"
+                    style="animation-delay: 0.6s;">
+                    <p class="text-gray-700 text-lg leading-relaxed">
+                        Through education, skill development, care homes, rehabilitation, and volunteer partnerships, we
+                        are
+                        creating a movement of compassion that is transforming lives in Telangana and beyond.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- What We Do Section -->
+    <div id="what-we-do" class="max-w-7xl mx-auto p-6 md:p-10 mt-12 bg-white rounded-2xl shadow-2xl">
+        <h2 class="text-3xl sm:text-3xl font-bold text-orange-500 text-center mb-8">What We Do</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            <!-- Child Education & Care Card -->
+            <div class="flip-card h-64">
+                <div class="flip-card-inner">
+                    <div class="flip-card-front ">
+                        <h3 class="text-2xl font-bold text-orange-400 mb-2 flex items-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-2" fill="none" viewBox="0 0 24 24"
+                                stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M12 6.253v13m0-13C10.835 5.47 9.167 5 7.5 5c-2.485 0-4.5 2.015-4.5 4.5S5.015 14 7.5 14c.895 0 1.745-.25 2.5-.689m2.5-.311c1.558 0 3.003-.51 4.312-1.39M12 6.253c1.558 0 3.003.51 4.312 1.39M12 6.253V5.5c0-1.657 1.343-3 3-3s3 1.343 3 3v.753m-6 11.247v-4.5M12 14c1.558 0 3.003-.51 4.312-1.39M12 14.5c1.558 0 3.003-.51 4.312-1.39M12 19.5c-1.558 0-3.003-.51-4.312-1.39" />
+                            </svg>
+                            Child Education & Care
+                        </h3>
+                        <p class="text-gray-700 leading-relaxed text-sm">We provide free education, school materials,
+                            and
+                            holistic development programs.</p>
+                    </div>
+                    <div class="flip-card-back flex justify-center items-center">
+                        <img src="css/Child Education" alt="Child with book"
+                            class="rounded-xl w-full h-full object-cover">
+                    </div>
+                </div>
+            </div>
+            <!-- Volunteer & Partnership Programs Card -->
+            <div class="flip-card h-64">
+                <div class="flip-card-inner">
+                    <div class="flip-card-front ">
+                        <h3 class="text-2xl font-bold text-orange-400 mb-2 flex items-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-2" fill="none" viewBox="0 0 24 24"
+                                stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H2v-2a4 4 0 014-4h12c1.334 0 2.597.545 3.535 1.517M21 20H17m-1 0v-2m-8-8a4 4 0 100 8 4 4 0 000-8z" />
+                            </svg>
+                            Volunteer & Partnership Programs
+                        </h3>
+                        <p class="text-gray-700 leading-relaxed text-sm">We welcome local and foreign volunteers and
+                            partner
+                            with corporates, institutions, and individuals.</p>
+                    </div>
+                    <div class="flip-card-back flex justify-center items-center">
+                        <img src="css/vp.png" alt="Partnership image"
+                            class="rounded-xl w-full h-full object-cover">
+                    </div>
+                </div>
+            </div>
+            <!-- Women Empowerment Card -->
+            <div class="flip-card h-64">
+                <div class="flip-card-inner">
+                    <div class="flip-card-front">
+                        <h3 class="text-2xl font-bold text-orange-400 mb-2 flex items-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-2" fill="none" viewBox="0 0 24 24"
+                                stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H2v-2a4 4 0 014-4h12c1.334 0 2.597.545 3.535 1.517M21 20H17m-1 0v-2m-8-8a4 4 0 100 8 4 4 0 000-8z" />
+                            </svg>
+                            Women Empowerment
+                        </h3>
+                        <p class="text-gray-700 leading-relaxed text-sm">We provide skill training in tailoring,
+                            handicrafts, and computer skills so women can earn a living.</p>
+                    </div>
+                    <div class="flip-card-back flex justify-center items-center">
+                        <img src="css/women enp.jpeg" alt="Woman smiling"
+                            class="rounded-xl w-full h-full object-cover">
+                    </div>
+                </div>
+            </div>
+            <!-- Orphanages & Old Age Homes Card -->
+            <div class="flip-card h-64">
+                <div class="flip-card-inner">
+                    <div class="flip-card-front">
+                        <h3 class="text-2xl font-bold text-orange-400 mb-2 flex items-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-2" fill="none" viewBox="0 0 24 24"
+                                stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1h3a1 1 0 001-1v-4a1 1 0 01-1-1h-2a1 1 0 00-1-1h-2a1 1 0 00-1 1v4a1 1 0 001 1z" />
+                            </svg>
+                            Orphanages & Old Age Homes
+                        </h3>
+                        <p class="text-gray-700 leading-relaxed text-sm">Our homes provide shelter, food, education,
+                            healthcare, and above all—family.</p>
+                    </div>
+                    <div class="flip-card-back flex justify-center items-center">
+                        <img src="css/oldagehomes.jpeg" alt="People hugging"
+                            class="rounded-xl w-full h-full object-cover">
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Rehabilitation Centres Card -->
+            <div class="flip-card h-64">
+                <div class="flip-card-inner">
+                    <div class="flip-card-front">
+                        <h3 class="text-2xl font-bold text-orange-400 mb-2 flex items-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-2" fill="none" viewBox="0 0 24 24"
+                                stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M12 8c1.657 0 3 1.343 3 3v5a3 3 0 01-3 3c-1.657 0-3-1.343-3-3v-5a3 3 0 013-3z" />
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M12 8V4c-3.15 0-5.717 2.55-5.717 5.7S8.85 21 12 21s5.717-2.55 5.717-5.7S15.15 4 12 4z" />
+                            </svg>
+                            Rehabilitation Centres
+                        </h3>
+                        <p class="text-gray-700 leading-relaxed text-sm">We help individuals break free from addictions
+                            and
+                            destructive lifestyles.</p>
+                    </div>
+                    <div class="flip-card-back flex justify-center items-center">
+                        <img src="https://placehold.co/300x200/FDBA74/000?text=Rehabilitation"
+                            alt="Person receiving support" class="rounded-xl w-full h-full object-cover">
+                    </div>
+                </div>
+            </div>
+            <!-- Reaching the Unreached Card -->
+            <div class="flip-card h-64">
+                <div class="flip-card-inner">
+                    <div class="flip-card-front">
+                        <h3 class="text-2xl font-bold text-orange-400 mb-2 flex items-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-2" fill="none" viewBox="0 0 24 24"
+                                stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M3 12a9 9 0 1018 0 9 9 0 00-18 0z" />
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M12 2.25V5.5M12 18.5V21.75M12 5.5c-4.418 0-8 3.582-8 8s3.582 8 8 8 8-3.582 8-8-3.582-8-8-8z" />
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M12 12c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" />
+                            </svg>
+                            Reaching the Unreached
+                        </h3>
+                        <p class="text-gray-700 leading-relaxed text-sm">We serve remote villages lacking education,
+                            healthcare, and livelihood support.</p>
+                    </div>
+                    <div class="flip-card-back flex justify-center items-center">
+                        <img src="https://placehold.co/300x200/FDBA74/000?text=Support"
+                            alt="Community members in a village" class="rounded-xl w-full h-full object-cover">
+                    </div>
+                </div>
+            </div>
+           
+        </div>
+    </div>
+
+    <!-- Our Impact Section (Stories) -->
+    <section id="impact" class="max-w-6xl w-full mx-auto text-center p-6 md:p-10 mt-12">
+        <h2 class="text-4xl font-bold text-gray-800 mb-4 tracking-tight">Our Impact</h2>
+        <p class="text-lg text-gray-600 mb-12 max-w-2xl mx-auto">
+            These are not just numbers; they are lives transformed.
+        </p>
+
+        <!-- The main change: This container now uses flexbox to manage the responsive layout -->
+        <div class="flex flex-col lg:flex-row gap-8 mb-12">
+            <!-- Story Card 1 -->
+            <div class="impact-card impact-card-fade-in flex-1 bg-gradient-to-r from-orange-400 to-yellow-500 rounded-2xl shadow-xl p-8 ">
+                <p class="text-white text-lg font-medium leading-relaxed">
+                    A 7-year-old boy who used to beg at bus stands is now in school and dreams of becoming a police
+                    officer.
+                </p>
+            </div>
+
+            <!-- Story Card 2 -->
+            <div class="impact-card impact-card-fade-in flex-1 bg-gradient-to-r from-orange-400 to-yellow-500 rounded-2xl shadow-xl p-8 ">
+                <p class="text-white text-lg font-medium leading-relaxed">
+                    A widow trained in tailoring now runs her own shop and educates her children.
+                </p>
+            </div>
+
+            <!-- Story Card 3 -->
+            <div class="impact-card impact-card-fade-in flex-1 bg-gradient-to-r from-orange-400 to-yellow-500 rounded-2xl shadow-xl p-8 ">
+                <p class="text-white text-lg font-medium leading-relaxed">
+                    An elderly man, once abandoned, now smiles every morning surrounded by love and care in our old age
+                    home.
+                </p>
+            </div>
+        </div>
+
+        <!-- Final Call to Action -->
+        <div
+            class="bg-orange-100 p-6 rounded-xl shadow-lg border-b-4 border-orange-500 animate-slide-in-up transform transition-transform duration-300 hover:scale-105">
+            <p class="text-xl font-bold text-orange-600">
+                👉 Every story is written because someone cared. You can be that someone today.
+            </p>
+        </div>
+    </section>
+
+    <!-- How You Can Help Section (Carousel) -->
+    <div id="how-can-help" class="relative max-w-7xl mx-auto p-6 md:p-10 mt-8">
+        <div class="text-center mx-auto mb-12 max-w-2xl">
+            <h2 class="text-3xl sm:text-4xl font-bold text-orange-500 mb-6">How You Can Help</h2>
+            <p class="text-lg text-gray-600">
+                There are many ways to get involved and make a difference. Your support can change lives.
+            </p>
+        </div>
+
+        <!-- Carousel Container -->
+        <div class="carousel-container">
+            <div id="help-carousel-track" class="carousel-track">
+
+                <!-- Donate Card -->
+                <div class="flex flex-col items-center text-center">
+                    <img class="bg-white rounded-full p-2 mx-auto mb-4 w-48 h-48 object-cover"
+                        src="css/donate.jpeg" alt="A hand receiving a donation">
+                    <div class="bg-white rounded-xl p-6 shadow-md border border-orange-500">
+                        <h5 class="text-lg font-semibold text-gray-800 mb-1">Donate</h5>
+                        <p class="text-gray-600 italic">Your generosity provides food, education, shelter, and hope to
+                            those
+                            in need. Every contribution, big or small, makes a significant difference.</p>
+                    </div>
+                </div>
+
+                <!-- Volunteer Card -->
+                <div class="flex flex-col items-center text-center">
+                    <img class="bg-white rounded-full p-2 mx-auto mb-4 w-48 h-48 object-cover"
+                        src="css/vol"
+                        alt="A group of volunteers working together">
+                    <div class="bg-white rounded-xl p-6 shadow-md border border-orange-500">
+                        <h5 class="text-lg font-semibold text-gray-800 mb-1">Volunteer</h5>
+                        <p class="text-gray-600 italic">Share your time, skills, and love with those who need it most.
+                            Our
+                            programs thrive on the passion of our dedicated volunteers.</p>
+                    </div>
+                </div>
+
+                <!-- Partner With Us Card -->
+                <div class="flex flex-col items-center text-center">
+                    <img class="bg-white rounded-full p-2 mx-auto mb-4 w-48 h-48 object-cover"
+                        src="css/patner.jpeg" alt="Partners shaking hands">
+                    <div class="bg-white rounded-xl p-6 shadow-md border border-orange-500">
+                        <h5 class="text-lg font-semibold text-gray-800 mb-1">Partner With Us</h5>
+                        <p class="text-gray-600 italic">Organizations and businesses can join hands with us to create a
+                            bigger, more sustainable impact on our community.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Carousel Controls -->
+        <button id="help-prev-btn" class="carousel-control carousel-control-prev">
+            <svg class="w-6 h-6 text-gray-800" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                xmlns="http://www.w3.org/2000/svg">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+            </svg>
+        </button>
+        <button id="help-next-btn" class="carousel-control carousel-control-next">
+            <svg class="w-6 h-6 text-gray-800" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                xmlns="http://www.w3.org/2000/svg">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+            </svg>
+        </button>
+
+        <div class="text-center mt-6">
+        <button
+        class="px-6 py-2 align-self-center rounded-full font-bold text-white shadow-lg bg-gradient-to-r from-orange-500 via-orange-400 to-yellow-500 animate-bounce">
+                    Donate
+        </button>
+        </div>
+    </div>
+    <!-- Contact Us Section -->
+    <div id="contact" class="max-w-7xl mx-auto p-6 md:p-10  bg-white rounded-2xl shadow-2xl text-center">
+        <h2 class="text-3xl sm:text-4xl font-bold text-orange-500 mb-8">Contact Us</h2>
+
+        <div class="flex flex-col md:flex-row items-center justify-center space-y-6 mt-10 space-y-0 md:space-x-4">
+            <!-- Logo -->
+            <div class="flex justify-center md:w-auto">
+                <img src="css/logo-removebg-preview.png" alt="YUVA FOUNDATION logo"
+                    class="h-30 w-40">
+            </div>
+
+            <!-- Contact Info -->
+            <div class="text-gray-700 text-lg md:w-auto md:ml-1 text-left">
+                <p>📍 2-122/1, BC Colony, Nashkal Village, Chilpur Mandal,</p>
+                <p>Jangaon District, Telangana – 506144</p>
+                <p>📧 Email:
+                    <a href="mailto:info@yuvafoundation.org" class="text-blue-500 hover:underline">
+                        info@yuvafoundation.org
+                    </a>
+                </p>
+                <p>📞 Phone:
+                    <a href="tel:+911234567890" class="text-blue-500 hover:underline">
+                        +91 12345 67890
+                    </a>
+                </p>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- Footer -->
+    <footer class="bg-gray-100 text-gray-600 text-center p-6 mt-16 rounded-t-3xl">
+        <p class="text-sm">&copy; 2024 YUVA FOUNDATION. All rights reserved.</p>
+    </footer>
+
+
+    <script>
+        // --- Navbar functionality ---
+        const menuButton = document.getElementById('menu-button');
+        const navLinks = document.getElementById('nav-links');
+        const navBar = document.querySelector('nav');
+        const body = document.body;
+
+        function setBodyPadding() {
+            const navHeight = navBar.offsetHeight;
+            body.style.paddingTop = navHeight + 'px';
+            document.documentElement.style.setProperty('--nav-height', navHeight + 'px');
+        }
+
+        // Set padding on initial load and window resize
+        window.addEventListener('load', setBodyPadding);
+        window.addEventListener('resize', setBodyPadding);
+
+
+        menuButton.addEventListener('click', () => {
+            navLinks.classList.toggle('active');
+            if (navLinks.classList.contains('active')) {
+                // Add mobile styles on show
+                navLinks.classList.add('flex', 'flex-col', 'absolute', 'top-16', 'left-0', 'w-full', 'bg-white', 'rounded-b-md', 'shadow-lg', 'p-4', 'items-center', 'space-y-4', 'lg:relative', 'lg:flex-row', 'lg:space-y-0');
+                navLinks.classList.remove('hidden');
+            } else {
+                // Clean up mobile styles on hide
+                navLinks.classList.remove('flex', 'flex-col', 'absolute', 'top-16', 'left-0', 'w-full', 'bg-white', 'rounded-b-md', 'shadow-lg', 'p-4', 'items-center', 'space-y-4');
+                navLinks.classList.add('hidden');
+            }
+        });
+
+        // --- How You Can Help Carousel functionality ---
+        const helpCarouselTrack = document.getElementById('help-carousel-track');
+        const helpPrevBtn = document.getElementById('help-prev-btn');
+        const helpNextBtn = document.getElementById('help-next-btn');
+        const helpCards = helpCarouselTrack.querySelectorAll('.carousel-track > div');
+
+        let helpCurrentIndex = 0;
+        const helpTotalCards = helpCards.length;
+
+        function updateHelpCarousel() {
+            // Always show one card at a time, regardless of screen size
+            const itemsToShow = 1;
+
+            const cardsPerScroll = 1;
+            const cardWidth = helpCarouselTrack.children[0].clientWidth;
+            const gap = parseFloat(getComputedStyle(helpCarouselTrack).gap);
+            const totalItemWidth = cardWidth + gap;
+
+            const maxIndex = helpTotalCards - itemsToShow;
+            if (helpCurrentIndex < 0) {
+                helpCurrentIndex = 0;
+            } else if (helpCurrentIndex > maxIndex) {
+                helpCurrentIndex = maxIndex;
+            }
+
+            const offset = -helpCurrentIndex * totalItemWidth;
+            helpCarouselTrack.style.transform = `translateX(${offset}px)`;
+        }
+
+        // Add event listeners for the carousel buttons
+        helpPrevBtn.addEventListener('click', () => {
+            if (helpCurrentIndex > 0) {
+                helpCurrentIndex--;
+                updateHelpCarousel();
+            }
+        });
+
+        helpNextBtn.addEventListener('click', () => {
+            const itemsToShow = 1;
+            if (helpCurrentIndex < helpTotalCards - itemsToShow) {
+                helpCurrentIndex++;
+                updateHelpCarousel();
+            }
+        });
+
+        // Initial setup and update on window resize
+        window.addEventListener('resize', updateHelpCarousel);
+        window.onload = updateHelpCarousel;
+        
+        // --- Hero Carousel functionality ---
+        let heroSlideIndex = 0;
+        const heroSlides = document.querySelectorAll('.hero-carousel .slide');
+
+        function showHeroSlides() {
+            for (let i = 0; i < heroSlides.length; i++) {
+                heroSlides[i].classList.remove('active');
+            }
+            heroSlideIndex++;
+            if (heroSlideIndex > heroSlides.length) {
+                heroSlideIndex = 1;
+            }
+            heroSlides[heroSlideIndex - 1].classList.add('active');
+            setTimeout(showHeroSlides, 5000); // Change image every 5 seconds
+        }
+
+        window.addEventListener('load', showHeroSlides);
+        
+        // --- Our Impact Section Animation (new) ---
+        const impactSection = document.getElementById('impact');
+        const impactCards = document.querySelectorAll('.impact-card-fade-in');
+
+        const observer = new IntersectionObserver((entries, observer) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    impactCards.forEach(card => {
+                        card.style.animationPlayState = 'running';
+                    });
+                    observer.disconnect(); // Stop observing once the animation has played
+                }
+            });
+        }, { threshold: 0.1 }); // Trigger when 10% of the section is visible
+
+        observer.observe(impactSection);
+
+    </script>
+</body>
+</html>

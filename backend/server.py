@@ -2437,15 +2437,14 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
         await manager.disconnect(websocket, client_id)
         logging.info(f"User {client_id} connection handler finished.")
 
-# Corrected CORS middleware configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:3001"], # Added 3001 for flexibility
+    allow_origins=["http://localhost:3000", "http://localhost:3001","https://showtime-consulting-employee-portal.onrender.com"
+], # Added 3001 for flexibility
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
-
 # Include the router in the main app
 app.include_router(api_router)
 app.include_router(download_router)  # Include the download file router

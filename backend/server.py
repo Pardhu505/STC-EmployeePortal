@@ -1589,6 +1589,9 @@ async def change_password(user_id: str, request: PasswordChangeRequest):
     """
     Changes the password for a given user.
     """
+    if len(request.new_password) > 72:
+        raise HTTPException(status_code=400, detail="Password cannot exceed 72 characters.")
+
     try:
         # Find the user and their collection
         user, collection = await get_user_info_with_collection(stc_db, user_id)
@@ -1600,11 +1603,11 @@ async def change_password(user_id: str, request: PasswordChangeRequest):
         full_user_doc = await collection.find_one({"$or": [{"id": user_id}, {"email": user_id}]})
 
         # Verify the current password
-        if not pwd_context.verify(request.current_password[:72], full_user_doc.get("password_hash")):
+        if not pwd_context.verify(request.current_password, full_user_doc.get("password_hash")):
             raise HTTPException(status_code=400, detail="Incorrect current password")
 
         # Hash the new password
-        new_password_hash = pwd_context.hash(request.new_password[:72])
+        new_password_hash = pwd_context.hash(request.new_password)
 
         # Update the password in the database
         result = await collection.update_one(
@@ -1695,6 +1698,9 @@ async def update_user_profile(email: str, profile_data: UserProfileUpdate):
 
 @api_router.post("/signup")
 async def signup(request: SignupRequest):
+    if len(request.password) > 72:
+        raise HTTPException(status_code=400, detail="Password cannot exceed 72 characters.")
+
     if request.team not in TEAMS:
         raise HTTPException(status_code=400, detail=f"Invalid team. Must be one of: {', '.join(TEAMS)}")
 
@@ -1710,7 +1716,7 @@ async def signup(request: SignupRequest):
     if existing:
         raise HTTPException(status_code=400, detail="User already exists")
 
-    hashed = pwd_context.hash(request.password[:72])
+    hashed = pwd_context.hash(request.password)
     
     # Set department: use provided or fallback to team
     dept = request.department if request.department else request.team
@@ -1828,7 +1834,7 @@ async def login(request: LoginRequest):
     password_hash = user.get("password_hash")
     if not password_hash:
         raise HTTPException(status_code=400, detail="Invalid credentials")
-    if not pwd_context.verify(request.password[:72], password_hash):
+    if not pwd_context.verify(request.password, password_hash):
         raise HTTPException(status_code=400, detail="Invalid credentials")
 
     # Set user status to online and broadcast it immediately upon successful login

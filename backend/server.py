@@ -64,7 +64,7 @@ ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://localhost:3001",
     "https://showtime-consulting-employee-portal.onrender.com",
-    "http://stc-employee-portal-rn9t.vercel.app/"
+    "http://stc-employee-portal-rn9t.vercel.app"
 ]
 
 # --- Generic Exception Handler for unhandled errors ---

@@ -108,11 +108,25 @@ const UserProfile = () => {
 
   const handleSave = async () => {
     try {
-      // Use the new, more specific API endpoint for updating the user's own profile
-      const updatedUser = await updateUserProfile(user.email, formData);
+      let finalPayload = { ...formData };
+
+      // If a new profile picture is selected, convert it to base64 and add it to the payload.
+      if (selectedFile) {
+        const toBase64 = (file) =>
+          new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = (error) => reject(error);
+          });
+        finalPayload.profilePicture = await toBase64(selectedFile);
+      }
+
+      const updatedUser = await updateUserProfile(user.email, finalPayload);
       // Update the user in AuthContext and localStorage
       updateProfile(updatedUser);
       setIsEditing(false);
+      setSelectedFile(null); // Clear the selected file after a successful save
       toast({
         title: "Profile Updated",
         description: "Your profile information has been saved successfully.",
@@ -177,27 +191,6 @@ const UserProfile = () => {
   // Profile picture handlers
   const handleFileChange = (e) => {
     setSelectedFile(e.target.files[0]);
-  };
-
-  const handleUploadPicture = async () => {
-    if (!selectedFile) return;
-    setUploading(true);
-    try {
-      const base64 = await uploadProfilePicture(selectedFile);
-      updateProfile({ profilePicture: base64 });
-      toast({
-        title: "Profile Picture Updated",
-        description: "Your profile picture has been uploaded.",
-      });
-      setSelectedFile(null);
-    } catch (err) {
-      toast({
-        title: "Error",
-        description: "Failed to upload profile picture.",
-        variant: "destructive"
-      });
-    }
-    setUploading(false);
   };
 
   const handleRemovePicture = async () => {
@@ -309,16 +302,6 @@ const UserProfile = () => {
                     >
                       <Trash2 className="h-4 w-4 mr-1" />
                       Remove
-                    </Button>
-                  )}
-                  {selectedFile && (
-                    <Button
-                      size="sm"
-                      onClick={handleUploadPicture}
-                      disabled={uploading}
-                      className="bg-gradient-to-r from-[#225F8B] to-[#225F8B]/80 text-white"
-                    >
-                      {uploading ? "Uploading..." : "Save"}
                     </Button>
                   )}
                 </div>

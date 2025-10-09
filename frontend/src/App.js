@@ -40,7 +40,11 @@ function App() {
                   <Login />
                 </PublicRoute>
               } />
-              <Route path="/signup" element={<Signup />} />
+              <Route path="/signup" element={
+                <PublicRoute>
+                  <Signup />
+                </PublicRoute>
+              } />
               <Route path="/dashboard" element={
                 <ProtectedRoute>
                   <Dashboard />

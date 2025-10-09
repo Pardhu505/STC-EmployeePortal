@@ -69,7 +69,10 @@ const parseCsvData = (csvData) => {
 
       const dailyRecords = [];
       dates.forEach(({ day, index }) => {
-        const recordDate = new Date(Number(year), Number(month) - 1, Number(day), 0, 0, 0);
+        // Create a date object in UTC to avoid timezone issues.
+        // The backend will handle timezone conversion.
+        const recordDate = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day)));
+        
         const status = statusLine[index]?.trim() || '-';
         const inTimeStr = inTimeLine[index]?.trim() || '-';
         const outTimeStr = outTimeLine[index]?.trim() || '-';
@@ -88,7 +91,9 @@ const parseCsvData = (csvData) => {
         }
 
         dailyRecords.push({
-          date: recordDate.toISOString(),
+          // Format the date as YYYY-MM-DDTHH:mm:ss, which Pydantic can parse.
+          // The backend will correctly handle this as a datetime object.
+          date: recordDate.toISOString().split('.')[0],
           status,
           inTime: inTimeStr,
           outTime: outTimeStr,

@@ -65,11 +65,7 @@ ALLOWED_ORIGINS = [
     "http://localhost:3001",
     "https://showtime-consulting-employee-portal.onrender.com"
 ]
-# Corrected CORS middleware configuration
-@app.get("/")
-async def app_root():
-    """A simple endpoint for the root URL to confirm the server is running."""
-    return {"message": "Welcome to the STC Portal API. Visit /docs for documentation."}
+
 # --- Generic Exception Handler for unhandled errors ---
 @app.exception_handler(Exception)
 async def generic_exception_handler(request: Request, exc: Exception):
@@ -1845,23 +1841,7 @@ async def login(request: LoginRequest):
     user_id = user.get("email") or user.get("id")
     await manager.broadcast_status(user_id, "online")
 
-    user_data = {k: v for k, v in user.items() if k != "password_hash"}
-# --- Generic Exception Handler for unhandled errors ---
-@app.exception_handler(Exception)
-async def generic_exception_handler(request: Request, exc: Exception):
-    """
-    Catch-all exception handler to return a 500 error with CORS headers.
-    This prevents the client from seeing a CORS error for unhandled exceptions.
-    """
-    logging.error(f"Unhandled exception: {exc}", exc_info=True)
-    return JSONResponse(
-        status_code=500,
-        content={"detail": "An internal server error occurred."},
-        headers={
-            "Access-Control-Allow-Origin": "http://localhost:3000",
-            "Access-Control-Allow-Credentials": "true",
-        },
-    )
+    user_data = {k: v for k, v in user.items() if k != "password_hash"}    
     user_data = convert_objectid(user_data)
     
     # Ensure profilePicture is included, even if it's null
@@ -1893,8 +1873,11 @@ async def upload_file(request: Request):
             content = await file.read()
             buffer.write(content)
 
+        # Dynamically create the file URL
+        base_url = str(request.base_url)
+        file_url = f"{base_url}files/download/{unique_filename}"
+
         # Return file metadata
-        file_url = f"http://localhost:8000/files/download/{unique_filename}"
         return {
             "file_name": file.filename,
             "file_type": file.content_type,
@@ -2478,6 +2461,11 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
         logging.info(f"User {client_id} connection handler finished.")
 
 # Corrected CORS middleware configuration
+@app.get("/")
+async def app_root():
+    """A simple endpoint for the root URL to confirm the server is running."""
+    return {"message": "Welcome to the STC Portal API. Visit /docs for documentation."}
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,

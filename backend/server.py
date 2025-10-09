@@ -600,25 +600,21 @@ def get_department_from_team(team: str) -> str:
 
 
 async def get_user_info(stc_db, user_id: str) -> Optional[dict]:
-    """Get user info by id or email across all team collections, excluding password."""
-    collection_names = await stc_db.list_collection_names()
-    team_collections = [stc_db[name] for name in collection_names]
-    for collection in team_collections:
-        # Try by id first
-        user = await collection.find_one({"id": user_id}, {"password_hash": 0})
-        if user:
-            return user
-        # Then by email
-        user = await collection.find_one({"email": user_id}, {"password_hash": 0})
-        if user:
-            return user
-    return None
+    """
+    Get user info by id or email. This function is less efficient as it scans all collections.
+    Prefer get_user_info_with_collection where possible.
+    """
+    user, _ = await get_user_info_with_collection(stc_db, user_id)
+    return user
 
 
 async def get_user_info_with_collection(stc_db, user_id: str) -> tuple[Optional[dict], Optional[any]]:
     """Get user info and their collection by id or email."""
     collection_names = await stc_db.list_collection_names()
-    team_collections = [stc_db[name] for name in collection_names]
+    # Filter out system collections to avoid unnecessary queries
+    team_collection_names = [name for name in collection_names if not name.startswith('system.')]
+    team_collections = [stc_db[name] for name in team_collection_names]
+
     for collection in team_collections:
         # Try by id first
         user = await collection.find_one({"id": user_id}, {"password_hash": 0})
@@ -1910,47 +1906,32 @@ async def upload_file(request: Request):
         logging.error(f"File upload failed: {e}")
         raise HTTPException(status_code=500, detail="File upload failed")
     
-# In main.py
-# ... all other imports and code ...
-
 @api_router.post("/attendance-report")
 async def save_attendance_report(employees: List[EmployeeAttendance]):
     try:
         print(f"Received attendance data for {len(employees)} employees.")
-        # Convert Pydantic models to dictionaries
-        employees_dicts = [emp.model_dump() for emp in employees]
-
-        # Use the dedicated attendance database client and collection
-        # await attendance_db.Attendance.delete_many({})  # Clear existing data
-        await attendance_db.Attendance.insert_many(employees_dicts)
         
-        return {"message": "Attendance data saved successfully"}
+        for employee_data in employees:
+            # Use model_dump to convert Pydantic model to a dictionary
+            employee_dict = employee_data.model_dump()
+            
+            # Find existing employee record by empCode
+            existing_employee = await attendance_db.Attendance.find_one({"empCode": employee_data.empCode})
+            
+            if existing_employee:
+                # If employee exists, push new dailyRecords
+                await attendance_db.Attendance.update_one(
+                    {"empCode": employee_data.empCode},
+                    {"$push": {"dailyRecords": {"$each": employee_dict['dailyRecords']}}}
+                )
+            else:
+                # If employee does not exist, insert a new document
+                await attendance_db.Attendance.insert_one(employee_dict)
+
+        return {"message": "Attendance data saved or updated successfully"}
     except Exception as e:
         logging.error(f"Error saving attendance data: {e}")
         raise HTTPException(status_code=500, detail=f"Error saving data: {e}")
-
-@api_router.post("/save_attendance_report")
-async def append_attendance_report(report_data: AttendanceReportData):
-    try:
-        # Loop through each employee in the report data
-        for emp_code, employee_data in report_data.employees.items():
-            result = await attendance_db.Attendance.update_one(
-                {"empCode": emp_code},
-                {
-                    "$push": {
-                        "dailyRecords": {
-                            "$each": employee_data.dailyRecords
-                        }
-                    }
-                },
-                upsert=True
-            )
-            logging.info(f"Update result for {emp_code}: Matched: {result.matched_count}, Modified: {result.modified_count}, Upserted: {result.upserted_id}")
-            
-        return {"message": "Attendance report saved successfully."}
-    except Exception as e:
-        logging.error(f"Failed to save attendance report: {e}")
-        raise HTTPException(status_code=500, detail="Failed to save attendance report.")
 
 @api_router.get("/attendance-report")
 async def get_attendance_report():
@@ -2095,10 +2076,9 @@ async def find_manager_details_by_code(emp_code: str, stc_db):
     manager_name = manager.get("name") or manager.get("Name", "Unknown Manager")
     manager_designation = (manager.get("designation") or manager.get("Designation", "")).lower().strip()
 
-    # Find all employees who report to this manager
     team_list = []
 
-    # A user is considered a manager if their designation includes "manager"
+    # A user is considered a manager if their designation includes "manager", "director",
     # or if they are a reviewer for someone else.
     is_manager_by_designation = "manager" in manager_designation
 
@@ -2114,7 +2094,7 @@ async def find_manager_details_by_code(emp_code: str, stc_db):
             for emp in team_members:
                 # Ensure we don't add duplicates if an employee exists in multiple collections
                 emp_email = emp.get("email") or emp.get("Email ID")
-                # Use email to check for uniqueness as it's more reliable than empCode
+                # Use email for uniqueness check
                 if emp_email and not any(e.get("email") == emp_email for e in team_list):
                     team_list.append({
                         "Name": emp.get("name") or emp.get("Name"),
@@ -2125,10 +2105,11 @@ async def find_manager_details_by_code(emp_code: str, stc_db):
                     })
 
     # If the user is not a manager by designation and has no team members, they are not a manager.
-    if not is_manager_by_designation and not team_list:
+    # Allow users with "director" in their designation to be considered managers even with no direct reports.
+    if not is_manager_by_designation and not team_list and "director" not in manager_designation:
         logging.warning(f"User {emp_code} ({manager_name}) is not a manager. Designation: {manager_designation}")
         return {"managerName": None, "managerId": None, "team": []}
-    
+
     # Also include the manager in their own team list
     manager_id = manager.get("empCode") or manager.get("Emp code")
     if not any(e.get("empCode") == manager_id for e in team_list if e.get("empCode")):

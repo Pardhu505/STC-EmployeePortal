@@ -212,14 +212,10 @@ class ConnectionManager:
             missed_messages.sort(key=lambda m: m["timestamp"])
 
             if missed_messages:
-                def default_serializer(o):
-                    if isinstance(o, (datetime, date)):
-                        return o.isoformat()
-                    raise TypeError(f"Object of type {type(o).__name__} is not JSON serializable")
                 missed_messages_json = json.dumps({
                     "type": "missed_messages",
-                    "messages": missed_messages
-                }, default=default_serializer)
+                    "messages": serialize_document(missed_messages)
+                })
                 if user_id in self.active_connections:
                     for connection in self.active_connections[user_id]:
                         await connection.send_text(missed_messages_json)

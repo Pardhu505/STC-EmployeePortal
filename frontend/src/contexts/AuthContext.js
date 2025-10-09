@@ -14,15 +14,7 @@ export const useAuth = () => {
   }
   return context;
 };
-const [loading, setLoading] = useState(true);
 
-useEffect(() => {
-  const savedUser = localStorage.getItem("showtimeUser");
-  if (savedUser) {
-    setUser(JSON.parse(savedUser));
-  }
-  setLoading(false);
-}, []);
 
 
 export const AuthProvider = ({ children }) => {

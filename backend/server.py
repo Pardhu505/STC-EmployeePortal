@@ -212,10 +212,14 @@ class ConnectionManager:
             missed_messages.sort(key=lambda m: m["timestamp"])
 
             if missed_messages:
+                def default_serializer(o):
+                    if isinstance(o, (datetime, date)):
+                        return o.isoformat()
+                    raise TypeError(f"Object of type {type(o).__name__} is not JSON serializable")
                 missed_messages_json = json.dumps({
                     "type": "missed_messages",
                     "messages": missed_messages
-                }, default=str)
+                }, default=default_serializer)
                 if user_id in self.active_connections:
                     for connection in self.active_connections[user_id]:
                         await connection.send_text(missed_messages_json)
@@ -274,10 +278,15 @@ class ConnectionManager:
 
             if notifications:
                 for notification in notifications:
+                    def default_serializer(o):
+                        if isinstance(o, (datetime, date)):
+                            return o.isoformat()
+                        raise TypeError(f"Object of type {type(o).__name__} is not JSON serializable")
                     notification_json = json.dumps({
                         "type": "notification",
                         "notification": notification
-                    })
+                    }, default=default_serializer)
+
                     if user_id in self.active_connections:
                         for connection in self.active_connections[user_id]:
                             await connection.send_text(notification_json)
@@ -324,7 +333,7 @@ class ConnectionManager:
                 try:
                     await connection.send_text(message)
                 except Exception as e:
-                    logging.error(f"Failed to send message to {user_id}: {e}")
+                    logging.warning(f"Failed to send message to {user_id} (connection may be closed): {e}")
 
     async def broadcast_status(self, user_id: str, status: str):
         self.user_status[user_id] = status
@@ -335,7 +344,7 @@ class ConnectionManager:
                 try:
                     await connection.send_text(message)
                 except Exception as e:
-                    logging.error(f"Failed to broadcast status to {connection_user_id}: {e}")
+                    logging.warning(f"Failed to broadcast status to {connection_user_id} (connection may be closed): {e}")
 
     async def get_channel_members(self, channel_id: str, stc_db) -> List[str]:
         """Get list of user emails (user_ids) who are members of the channel"""
@@ -381,7 +390,7 @@ class ConnectionManager:
                     try:
                         await connection.send_text(message)
                     except Exception as e:
-                        logging.error(f"Failed to send message to {user_id} on connection {connection}: {e}")
+                        logging.warning(f"Failed to send message to {user_id} on connection {connection} (may be closed): {e}")
 
 manager = ConnectionManager()
 
@@ -2411,13 +2420,18 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
             )
 
             # Create message_json for notifications
+            def default_serializer(o):
+                if isinstance(o, (datetime, date)):
+                    return o.isoformat()
+                raise TypeError(f"Object of type {type(o).__name__} is not JSON serializable")
+
             message_json = json.dumps({
                 "type": msg_type, # Use the determined message type
                 "sender_id": message.sender_id,
                 "sender_name": message.sender_name,
                 "content": message.content,
                 "id": message.id,
-                "timestamp": message.timestamp.isoformat(),
+                "timestamp": message.timestamp,
                 "recipient_id": message.channel_id if msg_type == "channel_message" else message.recipient_id,
                 "channel_id": message.channel_id,
                 "file_name": message.file_name,
@@ -2425,7 +2439,7 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
                 "file_size": message.file_size,
                 "file_url": message.file_url,
                 "reactions": message.reactions,
-            })
+            }, default=default_serializer)
 
             # Create notifications for offline channel members if it's a channel message
             if msg_type == "channel_message":

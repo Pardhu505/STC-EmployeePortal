@@ -481,12 +481,20 @@ class DailyRecord(BaseModel):
     @field_validator('date', mode='before')
     @classmethod
     def validate_date(cls, v):
+        # Handle string input from the frontend CSV parser
+        if isinstance(v, str):
+            try:
+                # The frontend sends a string like 'YYYY-MM-DDTHH:MM:SS'
+                v = datetime.fromisoformat(v)
+            except ValueError:
+                raise ValueError(f"Invalid date format: {v}")
+
         if isinstance(v, datetime):
             if v.tzinfo is None:
-                v = v.replace(tzinfo=ist_tz)
-            v = v.astimezone(ist_tz)
-            date_part = v.date()
-            v = datetime.combine(date_part, time(0, 0, 0, 0))
+                # Assume UTC if no timezone is provided, as from the frontend
+                v = v.replace(tzinfo=timezone.utc)
+            # Normalize to just the date part at midnight UTC
+            v = datetime.combine(v.date(), time(0, 0, 0, tzinfo=timezone.utc))
         return v
 
 class EmployeeAttendance(BaseModel):

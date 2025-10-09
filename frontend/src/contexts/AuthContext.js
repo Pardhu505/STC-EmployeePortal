@@ -5,7 +5,7 @@ import { API_BASE_URL } from '../config/api';
 // Auto-detect WS URL with fallback
 const WS_URL = API_BASE_URL.replace(/^http/, 'ws') + "/api/ws";
 
-const AuthContext = createContext();
+const AuthContext = createContext(null);
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
@@ -14,8 +14,6 @@ export const useAuth = () => {
   }
   return context;
 };
-
-
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -562,35 +560,35 @@ export const AuthProvider = ({ children }) => {
     setChatNavigationTarget(target);
   };
 
-  const value = {
-    user,
-    login,
-    logout,
-    updateProfile,
-    removeProfilePicture,
-    loading,
-    webSocketRef,
-    sendWebSocketMessage,
-    userStatuses,
-    setUserStatuses,
-    signup,
-    uploadProfilePicture,
-    isConnected,
-    newMessages,
-    clearNewMessages,
-    setNewMessages, // Expose setNewMessages
-    currentChannel,
-    setCurrentChannel,
-    currentChatUser,
-    setCurrentChatUser,
-    notificationPermission,
-    showNotification,
-    requestNotificationPermission,
-  };
-  value.allChannels = allChannels;
-  value.allEmployees = allEmployees;
-  value.navigateToChat = navigateToChat;
-  value.chatNavigationTarget = chatNavigationTarget;
+  const value = React.useMemo(() => ({
+      user,
+      loading,
+      isConnected,
+      userStatuses,
+      newMessages,
+      currentChannel,
+      currentChatUser,
+      notificationPermission,
+      allChannels,
+      allEmployees,
+      chatNavigationTarget,
+      webSocketRef,
+      login,
+      logout,
+      signup,
+      updateProfile,
+      removeProfilePicture,
+      uploadProfilePicture,
+      sendWebSocketMessage,
+      setUserStatuses,
+      clearNewMessages,
+      setNewMessages,
+      setCurrentChannel,
+      setCurrentChatUser,
+      showNotification,
+      requestNotificationPermission,
+      navigateToChat,
+  }), [user, loading, isConnected, userStatuses, newMessages, currentChannel, currentChatUser, notificationPermission, allChannels, allEmployees, chatNavigationTarget]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

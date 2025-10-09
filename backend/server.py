@@ -65,7 +65,11 @@ ALLOWED_ORIGINS = [
     "http://localhost:3001",
     "https://showtime-consulting-employee-portal.onrender.com"
 ]
-
+# Corrected CORS middleware configuration
+@app.get("/")
+async def app_root():
+    """A simple endpoint for the root URL to confirm the server is running."""
+    return {"message": "Welcome to the STC Portal API. Visit /docs for documentation."}
 # --- Generic Exception Handler for unhandled errors ---
 @app.exception_handler(Exception)
 async def generic_exception_handler(request: Request, exc: Exception):

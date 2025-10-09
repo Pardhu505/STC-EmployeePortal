@@ -187,14 +187,20 @@ const AttendanceReport = () => {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to save data to the database.');
+        const errorData = await response.json().catch(() => ({ detail: 'Failed to save data to the database.' }));
+        throw new Error(errorData.detail || 'Failed to save data to the database.');
       }
 
       const result = await response.json();
       alert(result.message || 'Saved successfully');
     } catch (error) {
       console.error('Error saving data:', error);
-      alert('Failed to save data.');
+      // Display the specific error message from the backend if available
+      if (error.message.includes('Error saving data')) {
+        alert(error.message);
+      } else {
+        alert('Failed to save data. ' + error.message);
+      }
     } finally {
       setLoading(false);
     }

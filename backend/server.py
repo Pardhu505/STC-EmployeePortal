@@ -111,8 +111,6 @@ class ConnectionManager:
         # Change active_connections to map user_id to a set of WebSocket connections
         self.active_connections: Dict[str, set[WebSocket]] = {}
         self.user_status: Dict[str, str] = {}
-        self.db = None  # Will be set later
-        self.stc_db = None  # Will be set later
 
     async def connect(self, websocket: WebSocket, user_id: str):
         await websocket.accept()
@@ -123,13 +121,13 @@ class ConnectionManager:
         logging.info(f"User {user_id} connected. Total connections for user: {len(self.active_connections[user_id])}")
         await self.broadcast_status(user_id, "online")
         # Send any pending notifications to the user
-        await self.send_pending_notifications(user_id)
+        await self.send_pending_notifications(user_id, chat_db)
         # Send missed messages since last_online
-        await self.send_missed_messages(user_id)
+        await self.send_missed_messages(user_id, stc_db, chat_db)
         # Update last_online to current datetime after sending missed messages
         try:
             now = datetime.now(ist_tz)
-            user, collection = await get_user_info_with_collection(self.stc_db, user_id)
+            user, collection = await get_user_info_with_collection(stc_db, user_id)
             if user and collection is not None:
                 await collection.update_one(
                     {"$or": [{"id": user_id}, {"email": user_id}]},
@@ -165,12 +163,12 @@ class ConnectionManager:
         else:
             logging.info(f"User {user_id} is offline. Creating notification for later delivery.")
             # Create notification for offline user
-            await self.create_notification_from_message(message, user_id)
+            await self.create_notification_from_message(message, user_id, chat_db)
 
-    async def send_missed_messages(self, user_id: str):
+    async def send_missed_messages(self, user_id: str, stc_db, chat_db):
         """Query and send missed messages since last_online to the user"""
         try:
-            user = await get_user_info(self.stc_db, user_id)
+            user = await get_user_info(stc_db, user_id)
             if not user:
                 logging.warning(f"User {user_id} not found for missed messages")
                 return
@@ -194,7 +192,7 @@ class ConnectionManager:
 
             # Query channel messages for channels user is member of, timestamp > last_online
             # Get channels user is member of
-            channels = await self.get_user_channels(user_id)
+            channels = await self.get_user_channels(user_id, stc_db)
             channel_messages = []
             for channel_id in channels:
                 pipeline = [
@@ -228,11 +226,11 @@ class ConnectionManager:
         except Exception as e:
             logging.error(f"Failed to send missed messages to user {user_id}: {e}")
 
-    async def get_user_channels(self, user_id: str) -> List[str]:
+    async def get_user_channels(self, user_id: str, stc_db) -> List[str]:
         """Get list of channel IDs the user is a member of"""
         channels = ["general"]
         try:
-            user = await get_user_info(self.stc_db, user_id)
+            user = await get_user_info(stc_db, user_id)
             if user and user.get("team"):
                 dept = get_department_from_team(user["team"])
                 if dept:
@@ -245,7 +243,7 @@ class ConnectionManager:
             logging.error(f"Failed to get channels for user {user_id}: {e}")
         return channels
 
-    async def create_notification_from_message(self, message_json: str, user_id: str):
+    async def create_notification_from_message(self, message_json: str, user_id: str, db):
         """Create a notification from a message JSON string for an offline user"""
         try:
             message_data = json.loads(message_json)
@@ -261,15 +259,15 @@ class ConnectionManager:
                 timestamp=datetime.now(ist_tz),
                 is_read=False
             )
-            await self.db.Notifications.insert_one(notification.model_dump())
+            await db.Notifications.insert_one(notification.model_dump())
             logging.info(f"Notification created for offline user {user_id}")
         except Exception as e:
             logging.error(f"Failed to create notification for user {user_id}: {e}")
 
-    async def send_pending_notifications(self, user_id: str):
+    async def send_pending_notifications(self, user_id: str, db):
         """Send all unread notifications to a user when they connect"""
         try:
-            notifications = await self.db.Notifications.find(
+            notifications = await db.Notifications.find(
                 {"user_id": user_id, "is_read": False},
                 {"_id": 0}
             ).sort("timestamp", 1).to_list(length=None)
@@ -285,7 +283,7 @@ class ConnectionManager:
                             await connection.send_text(notification_json)
 
                 # Mark notifications as read after sending
-                await self.db.Notifications.update_many(
+                await db.Notifications.update_many(
                     {"user_id": user_id, "is_read": False},
                     {"$set": {"is_read": True}}
                 )
@@ -293,10 +291,10 @@ class ConnectionManager:
         except Exception as e:
             logging.error(f"Failed to send pending notifications to {user_id}: {e}")
 
-    async def create_channel_notifications(self, message_json: str, channel_id: str, sender_id: str):
+    async def create_channel_notifications(self, message_json: str, channel_id: str, sender_id: str, stc_db, chat_db):
         """Create notifications for offline channel members"""
         try:
-            channel_members = await self.get_channel_members(channel_id)
+            channel_members = await self.get_channel_members(channel_id, stc_db)
             message_data = json.loads(message_json)
 
             for member_id in channel_members:
@@ -312,7 +310,7 @@ class ConnectionManager:
                         timestamp=datetime.now(ist_tz),
                         is_read=False
                     )
-                    await self.db.Notifications.insert_one(notification.model_dump())
+                    await chat_db.Notifications.insert_one(notification.model_dump())
                     logging.info(f"Channel notification created for offline user {member_id} in channel {channel_id}")
         except Exception as e:
             logging.error(f"Failed to create channel notifications: {e}")
@@ -339,17 +337,17 @@ class ConnectionManager:
                 except Exception as e:
                     logging.error(f"Failed to broadcast status to {connection_user_id}: {e}")
 
-    async def get_channel_members(self, channel_id: str) -> List[str]:
+    async def get_channel_members(self, channel_id: str, stc_db) -> List[str]:
         """Get list of user emails (user_ids) who are members of the channel"""
         if channel_id == 'general':
             # All employees
-            members = await get_all_employees_emails(self.stc_db)
+            members = await get_all_employees_emails(stc_db)
             return members
         elif channel_id.startswith('dept-'):
             # Department channel, e.g., 'dept-data'
             dept_name_raw = channel_id.replace('dept-', '').replace('-', ' ')
             dept_name = dept_name_raw.upper() if dept_name_raw == 'dmc' else dept_name_raw.title()
-            members = await get_employees_by_department(self.stc_db, dept_name)
+            members = await get_employees_by_department(stc_db, dept_name)
             return members
         elif channel_id.startswith('team-'):
             # Team channel, e.g., 'team-research'
@@ -372,9 +370,9 @@ class ConnectionManager:
             logging.warning(f"Unknown channel_id: {channel_id}")
             return []
 
-    async def broadcast_to_channel(self, message: str, channel_id: str, sender_id: str = None):
+    async def broadcast_to_channel(self, message: str, channel_id: str, stc_db, sender_id: str = None):
         """Broadcast message to all members of the channel who are connected"""
-        channel_members = await self.get_channel_members(channel_id)
+        channel_members = await self.get_channel_members(channel_id, stc_db)
         for user_id in channel_members:
             if sender_id and user_id == sender_id:
                 continue  # Don't send the message back to the sender
@@ -744,7 +742,7 @@ async def get_messages(channel_id: str = None, recipient_id: str = None, sender_
     if channel_id:
         if user_id:
             # Check if user is member of the channel
-            channels = await manager.get_user_channels(user_id)
+            channels = await manager.get_user_channels(user_id, stc_db)
             if channel_id not in channels:
                 raise HTTPException(status_code=403, detail="Unauthorized to view this channel")
         query["channel_id"] = channel_id
@@ -754,7 +752,7 @@ async def get_messages(channel_id: str = None, recipient_id: str = None, sender_
             # Channel messages
             if user_id:
                 # Check if user is member of the channel
-                channels = await manager.get_user_channels(user_id)
+                channels = await manager.get_user_channels(user_id, stc_db)
                 if recipient_id not in channels:
                     raise HTTPException(status_code=403, detail="Unauthorized to view this channel")
             query["channel_id"] = recipient_id
@@ -826,7 +824,7 @@ async def get_channel_messages(channel_id: str, user_id: str = None, limit: int 
     """Get messages for a specific channel"""
     if user_id:
         # Check if user is member of the channel
-        channels = await manager.get_user_channels(user_id)
+        channels = await manager.get_user_channels(user_id, stc_db)
         if channel_id not in channels:
             raise HTTPException(status_code=403, detail="Unauthorized to view this channel")
     query = {"channel_id": channel_id}
@@ -1111,7 +1109,7 @@ async def delete_message_for_everyone(
         if is_channel_message:
             channel_id = message.get("channel_id")
             if channel_id:
-                await manager.broadcast_to_channel(update_json, channel_id)
+                await manager.broadcast_to_channel(update_json, channel_id, stc_db)
         else:
             # For direct messages, send only to the sender and recipient
             sender = message.get("sender_id")
@@ -2218,7 +2216,7 @@ async def get_channels(user_id: Optional[str] = None):
     """
     all_channels = []
     for i, channel_data in enumerate(HARDCODED_CHANNELS):
-        members = await manager.get_channel_members(channel_data["name"])
+        members = await manager.get_channel_members(channel_data["name"], stc_db)
         channel_info = {
             "id": i + 1,
             "name": channel_data["name"],
@@ -2231,13 +2229,13 @@ async def get_channels(user_id: Optional[str] = None):
         }
         all_channels.append(channel_info)
 
-    if user_id: # Filter for a specific user
+    if not user_id:
+        return all_channels
+    else: # Filter for a specific user
         # Filter channels based on user department and team
         user = await get_user_info(stc_db, user_id)
         if not user:
-            # If user not found for a specific request, return empty list instead of 404
-            # This is more graceful for the client.
-            return []
+            raise HTTPException(status_code=404, detail="User not found")
 
         user_dept = user.get('department')
         user_team = user.get('team')
@@ -2256,8 +2254,6 @@ async def get_channels(user_id: Optional[str] = None):
 
         logging.info(f"Filtered channels for user {user_id}: {len(user_channels)} channels")
         return user_channels
-    else: # No user_id provided, return all channels
-        return all_channels
 
 
 
@@ -2314,7 +2310,7 @@ async def handle_reaction_update(message_data, client_id):
 
         if message.get("channel_id"):
             # Broadcast to channel members
-            await manager.broadcast_to_channel(reaction_update_json, message["channel_id"])
+            await manager.broadcast_to_channel(reaction_update_json, message["channel_id"], stc_db)
         elif message.get("recipient_id"):
             # Send to both sender and recipient
             await manager.send_personal_message(reaction_update_json, message["sender_id"])
@@ -2415,7 +2411,7 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
 
             # Create notifications for offline channel members if it's a channel message
             if msg_type == "channel_message":
-                await manager.create_channel_notifications(message_json, message.channel_id, client_id)
+                await manager.create_channel_notifications(message_json, message.channel_id, client_id, stc_db, chat_db)
 
             # Try to store the message in the database, but don't fail if DB is unavailable
             try:
@@ -2437,7 +2433,7 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
             # Send message based on type
             if msg_type == "channel_message":
                 # Broadcast to channel members
-                await manager.broadcast_to_channel(message_json, message.channel_id, sender_id=client_id)
+                await manager.broadcast_to_channel(message_json, message.channel_id, stc_db, sender_id=client_id)
             elif isinstance(message.recipient_id, list):
                 # Group message: send to all recipients in the list
                 for recipient in message.recipient_id:
@@ -2495,8 +2491,6 @@ async def startup_event():
     try:
         await main_client.admin.command('ping')
         await attendance_client.admin.command('ping')
-        manager.db = chat_db  # Set the database reference for the connection manager to Internal_communication DB
-        manager.stc_db = stc_db  # Set the STC_Employees database reference
         logger.info("MongoDB connections successful.")
     except Exception as e:
         logger.error(f"MongoDB connection failed: {e}")

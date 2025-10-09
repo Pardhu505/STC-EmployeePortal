@@ -295,6 +295,7 @@ export const AuthProvider = ({ children }) => {
           setUserChannels(channels || []);
         } catch (error) {
           console.error("Failed to fetch user channels for AuthContext:", error);
+          setUserChannels([]); // Set to empty array on error
         }
       }
     };
@@ -325,6 +326,8 @@ export const AuthProvider = ({ children }) => {
           }
         } catch (error) {
           console.error("Failed to fetch global data:", error);
+          setAllChannels([]); // Set to empty array on error
+          setAllEmployees([]); // Set to empty array on error
         }
       }
     };

@@ -2231,13 +2231,13 @@ async def get_channels(user_id: Optional[str] = None):
         }
         all_channels.append(channel_info)
 
-    if not user_id:
-        return all_channels
-    else: # Filter for a specific user
+    if user_id: # Filter for a specific user
         # Filter channels based on user department and team
         user = await get_user_info(stc_db, user_id)
         if not user:
-            raise HTTPException(status_code=404, detail="User not found")
+            # If user not found for a specific request, return empty list instead of 404
+            # This is more graceful for the client.
+            return []
 
         user_dept = user.get('department')
         user_team = user.get('team')
@@ -2256,6 +2256,8 @@ async def get_channels(user_id: Optional[str] = None):
 
         logging.info(f"Filtered channels for user {user_id}: {len(user_channels)} channels")
         return user_channels
+    else: # No user_id provided, return all channels
+        return all_channels
 
 
 

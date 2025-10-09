@@ -57,7 +57,11 @@ export const AuthProvider = ({ children }) => {
       // Fetch all user statuses via HTTP API upon connection
       const fetchAllStatuses = async () => {
         try {
-          const response = await fetch(`${API_BASE_URL}/api/users/status`);
+          const token = JSON.parse(localStorage.getItem("showtimeUser"))?.token;
+          const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+          const response = await fetch(`${API_BASE_URL}/api/users/status`, {
+            headers: headers,
+          });
           if (response.ok) {
             const statuses = await response.json();
             const statusMap = statuses.reduce((acc, curr) => {
@@ -290,7 +294,11 @@ export const AuthProvider = ({ children }) => {
     const fetchUserChannels = async () => {
       if (user?.email) {
         try {
-          const response = await fetch(`${API_BASE_URL}/api/channels?user_id=${user.email}`);
+          const token = JSON.parse(localStorage.getItem("showtimeUser"))?.token;
+          const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+          const response = await fetch(`${API_BASE_URL}/api/channels?user_id=${user.email}`, {
+            headers: headers,
+          });
           const channels = await response.json();
           setUserChannels(channels || []);
         } catch (error) {
@@ -306,8 +314,11 @@ export const AuthProvider = ({ children }) => {
     const fetchGlobalData = async () => {
       if (user?.email) {
         try {
+          const token = JSON.parse(localStorage.getItem("showtimeUser"))?.token;
+          const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+
           // Fetch all channels
-          const channelsResponse = await fetch(`${API_BASE_URL}/api/channels`);
+          const channelsResponse = await fetch(`${API_BASE_URL}/api/channels`, { headers });
           if (channelsResponse.ok) {
             const channels = await channelsResponse.json();
             setAllChannels(channels);
@@ -316,7 +327,7 @@ export const AuthProvider = ({ children }) => {
           }
 
           // Fetch all employees
-          const employeesResponse = await fetch(`${API_BASE_URL}/api/employees`);
+          const employeesResponse = await fetch(`${API_BASE_URL}/api/employees`, { headers });
           if (employeesResponse.ok) {
             const employees = await employeesResponse.json();
             setAllEmployees(employees);
@@ -505,8 +516,11 @@ export const AuthProvider = ({ children }) => {
     }
     try {
       // Make a DELETE request to the new endpoint
+      const token = JSON.parse(localStorage.getItem("showtimeUser"))?.token;
+      const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
       const response = await fetch(`${API_BASE_URL}/api/employees/${encodeURIComponent(user.email)}/profile-picture`, {
         method: 'DELETE',
+        headers: headers,
       });
 
       if (!response.ok) {

@@ -437,6 +437,23 @@ class Employee(BaseModel):
     profilePicture: str | None = None
     active: bool = True
 
+class EmployeeCreate(BaseModel):
+    """Model for creating a new employee, without database-generated fields."""
+    id: str
+    name: str
+    email: str
+    designation: str
+    department: str
+    team: str
+    empCode: str
+    password_hash: str
+    reviewer: str | None = None
+    phone: str | None = None
+    emergency_contact: str | None = None
+    date_of_birth: datetime | None = None
+    profilePicture: str | None = None
+
+
 class StatusCheck(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     client_name: str
@@ -1636,6 +1653,7 @@ async def update_user_profile(email: str, profile_data: UserProfileUpdate):
             raise HTTPException(status_code=404, detail="User not found")
 
         # Create an update payload with only the fields that were provided
+        # Use exclude_unset=True to only include fields explicitly sent by the client.
         update_data = profile_data.model_dump(exclude_unset=True)
 
         # Convert date_of_birth string to datetime object if present
@@ -1775,7 +1793,7 @@ async def signup(request: SignupRequest):
         except ValueError:
             logging.warning(f"Invalid date_of_birth format during signup: {request.date_of_birth}")
 
-    employee = Employee(
+    employee_data = EmployeeCreate(
         id=request.email,
         name=request.name,
         email=request.email,
@@ -1793,7 +1811,7 @@ async def signup(request: SignupRequest):
     
     # Insert into team-specific collection (auto-creates if missing)
     team_collection = stc_db[sanitize_team(request.team)]
-    await team_collection.insert_one(employee.model_dump())
+    await team_collection.insert_one(employee_data.model_dump())
 
     return {"message": "User created successfully"}
 

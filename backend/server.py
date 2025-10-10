@@ -1915,29 +1915,21 @@ async def upload_file(request: Request):
         raise HTTPException(status_code=500, detail="File upload failed")
     
 @api_router.post("/attendance-report")
-async def save_attendance_report(request: Request):
+async def save_attendance_report(employees: List[EmployeeAttendance] = Body(...)):
     try:
-        employees = await request.json()
         print(f"Received attendance data for {len(employees)} employees.")
         
         for employee_data in employees:
-            # Validate each employee record with the Pydantic model
-            try:
-                validated_employee = EmployeeAttendance.model_validate(employee_data)
-            except Exception as validation_error:
-                logging.error(f"Validation failed for employee data: {employee_data}. Error: {validation_error}")
-                # Skip this record and continue with the next
-                continue
-
-            employee_dict = validated_employee.model_dump()
-
+            # Use model_dump to convert Pydantic model to a dictionary
+            employee_dict = employee_data.model_dump()
+            
             # Find existing employee record by empCode
-            existing_employee = await attendance_db.Attendance.find_one({"empCode": validated_employee.empCode})
+            existing_employee = await attendance_db.Attendance.find_one({"empCode": employee_data.empCode})
             
             if existing_employee:
                 # If employee exists, push new dailyRecords
                 await attendance_db.Attendance.update_one(
-                    {"empCode": validated_employee.empCode},
+                    {"empCode": employee_data.empCode},
                     {"$push": {"dailyRecords": {"$each": employee_dict['dailyRecords']}}}
                 )
             else:

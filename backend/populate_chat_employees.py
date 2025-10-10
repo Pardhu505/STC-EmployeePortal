@@ -3,8 +3,12 @@ from dotenv import load_dotenv
 from motor.motor_asyncio import AsyncIOMotorClient
 from mock_data_module import DEPARTMENT_DATA
 
-# MongoDB connection for Internal_communication database
-attendance_mongo_url = "mongodb+srv://poori420:5imYVGkw7F0cE5K2@cluster0.53oeybd.mongodb.net/"
+# Load environment variables
+ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
+load_dotenv(os.path.join(ROOT_DIR, '.env'))
+
+# MongoDB connection for Internal_communication database (your Atlas connection)
+attendance_mongo_url = os.environ.get("ATTENDANCE_MONGO_URL")
 attendance_client = AsyncIOMotorClient(attendance_mongo_url, tlsAllowInvalidCertificates=True)
 chat_db = attendance_client['Internal_communication']
 

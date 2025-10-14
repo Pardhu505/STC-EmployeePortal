@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext'; // Added navigateToChat
 import { Card, CardContent } from './ui/card';
 import { Button } from './ui/button';
@@ -10,29 +10,36 @@ const NotificationSystem = ({
   newAnnouncements = [],
   onNotificationClick,
   onClearAll,
-  clearNewMessages,
-  setNewMessages // Receive setNewMessages
+  clearNewMessages, // This is for messages
+  setNewMessages, // This is for messages
+  setNewAnnouncements, // This is for announcements
+  onSectionChange
 }) => {
-  const { user, navigateToChat } = useAuth(); // navigateToChat is already here
+  const { user, navigateToChat, getReadAnnouncementIds, markAnnouncementAsRead, getReadMessageIds, markMessageAsRead } = useAuth(); // navigateToChat is already here
   const [notifications, setNotifications] = useState([]);
   const [showPanel, setShowPanel] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
-  const [isCleared, setIsCleared] = useState(false);
+  const [isLocallyCleared, setIsLocallyCleared] = useState(false);
+  const notifiedRef = useRef(new Set());
 
   // Combine all notifications with proper filtering
   useEffect(() => {
     // console.log("NotificationSystem - newMessages received:", newMessages);
     // console.log("NotificationSystem - user:", user);
 
-    // If cleared, don't process new messages
-    if (isCleared) {
+    // If the user has locally cleared their notifications, show nothing.
+    if (isLocallyCleared) {
       setNotifications([]);
       setUnreadCount(0);
       return;
     }
 
+    // Get read message IDs from localStorage
+    const readMessageIds = getReadMessageIds();
+
     // Filter messages to ensure they belong to current user
     const messageNotifications = (newMessages || [])
+      .filter(msg => !readMessageIds.includes(msg.id)) // Filter out read messages
       .filter(msg => { // This filter is primarily to prevent self-notifications
         // Ensure user is logged in
         if (!user?.email) {
@@ -58,15 +65,20 @@ const NotificationSystem = ({
         data: msg
       }));
 
-    const announcementNotifications = (newAnnouncements || []).map(ann => ({
-      id: `ann_${ann.id}`,
-      type: 'announcement',
-      title: 'New Announcement',
-      message: `${ann.title} - ${ann.priority} priority`,
-      timestamp: ann.date,
-      read: false,
-      data: ann
-    }));
+    // Get read announcement IDs from localStorage
+    const readAnnouncementIds = getReadAnnouncementIds();
+
+    const announcementNotifications = (newAnnouncements || [])
+      .filter(ann => !readAnnouncementIds.includes(ann.id)) // Filter out read announcements
+      .map(ann => ({
+        id: `ann_${ann.id}`,
+        type: 'announcement',
+        title: `📢 ${ann.title}`,
+        message: `Priority: ${ann.priority.charAt(0).toUpperCase() + ann.priority.slice(1)}`,
+        timestamp: ann.date,
+        read: false, // All announcements that get through the filter are unread
+        data: ann
+      }));
 
     const allNotifications = [...messageNotifications, ...announcementNotifications];
     setNotifications(allNotifications);
@@ -74,9 +86,9 @@ const NotificationSystem = ({
 
     // Reset cleared state if there are new messages
     if (allNotifications.length > 0) {
-      setIsCleared(false);
+      setIsLocallyCleared(false);
     }
-  }, [newMessages, newAnnouncements, user, isCleared]);
+  }, [newMessages, newAnnouncements, user, isLocallyCleared, getReadAnnouncementIds, getReadMessageIds]);
 
   // Browser notification permission
   useEffect(() => {
@@ -87,27 +99,22 @@ const NotificationSystem = ({
 
   // Send browser notifications (excluding message types, but allowing missed_message)
   useEffect(() => {
-    if (notifications.length > 0 && 'Notification' in window && Notification.permission === 'granted') {
-      const unreadNotifications = notifications.filter(n => !n.read && n.type !== 'message');
-      if (unreadNotifications.length > 0) {
-        const latestUnread = unreadNotifications[unreadNotifications.length - 1];
-        // Only show notification if we haven't shown it before
-        if (!latestUnread.notified) {
-          new Notification(latestUnread.title, {
-            body: latestUnread.message,
-            icon: '/favicon.ico',
-            tag: latestUnread.id
+    if ('Notification' in window && Notification.permission === 'granted') {
+      const unreadNotifications = notifications.filter(n => !n.read);
+
+      unreadNotifications.forEach(notification => {
+        // Only show a browser notification if we haven't shown it before for this session.
+        if (!notifiedRef.current.has(notification.id)) {
+          new Notification(notification.title, {
+            body: notification.message,
+            icon: '/favicon.ico', // Ensure this icon exists in your public folder
+            tag: notification.id, // Use a unique tag to prevent multiple popups for the same notification
           });
-          // Mark as notified to prevent duplicate notifications
-          setNotifications(prev =>
-            prev.map(n =>
-              n.id === latestUnread.id ? { ...n, notified: true } : n
-            )
-          );
+          notifiedRef.current.add(notification.id); // Mark as notified
         }
+      });
       }
-    }
-  }, [notifications.length]); // Only depend on length to avoid infinite loops
+  }, [notifications]);
 
   const handleNotificationClick = (notification) => {
     // Mark as read
@@ -122,19 +129,23 @@ const NotificationSystem = ({
       onNotificationClick(notification);
     }
 
-    // Remove the clicked message from the global newMessages state in AuthContext
+    // Persist the read state for the clicked message
     if (notification.type.includes('message') && setNewMessages) {
-      setNewMessages(prev =>
-        prev.filter(msg => msg.id !== notification.data.id)
-      );
+      markMessageAsRead(notification.data.id);
+      setNewMessages(prev => prev.filter(msg => msg.id !== notification.data.id));
     }
     
-    // New navigation logic
-    if (notification.data) {
-      if (notification.data.channel) {
+    // Navigation logic
+    if (notification.type === 'announcement') {
+      if (onSectionChange) {
+        // Persist the read state
+        markAnnouncementAsRead(notification.data.id);
+        onSectionChange('announcements');
+      }
+    } else if (notification.data) { // Handle chat navigation
+      if (notification.data.channel) { // Channel message
         navigateToChat({ type: 'channel', id: notification.data.channel });
-      } else if (notification.data.isDirectMessage) {
-        // For a DM, the target is the sender of the message
+      } else if (notification.data.isDirectMessage) { // Direct message
         navigateToChat({ type: 'dm', id: notification.data.senderName });
       }
     }
@@ -143,15 +154,20 @@ const NotificationSystem = ({
   };
 
   const handleClearAll = () => {
-    setNotifications([]);
-    setUnreadCount(0);
-    setIsCleared(true);
-    if (onClearAll) {
-      onClearAll();
-    }
-    if (clearNewMessages) {
-      clearNewMessages();
-    }
+    // Mark all visible notifications as read in localStorage
+    notifications.forEach(notification => {
+      if (notification.type === 'announcement') {
+        markAnnouncementAsRead(notification.data.id);
+      } else if (notification.type.includes('message')) {
+        markMessageAsRead(notification.data.id);
+      }
+    });
+
+    // Also clear the global states in AuthContext to remove them from the source
+    clearNewMessages(); // This clears the newMessages array
+    // We can't just clear newAnnouncements as it's a global list, but they are now marked as read.
+
+    setIsLocallyCleared(true);
   };
 
   const formatTime = (timestamp) => {

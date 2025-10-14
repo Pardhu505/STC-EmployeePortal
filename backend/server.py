@@ -8,6 +8,7 @@ import logging
 from pathlib import Path
 from pydantic import BaseModel, Field
 from typing import List, Dict, Union
+import base64
 import uuid
 from datetime import datetime, timedelta, timezone, time, date
 import json
@@ -15,11 +16,12 @@ import re
 from bson.json_util import dumps
 from typing import Optional, Any
 # from mock_data_module import DEPARTMENT_DATA
-import urllib.parse
+import urllib.parse 
 from bson import ObjectId
 from pydantic import field_validator
 from download_file import router as download_router
 from passlib.context import CryptContext
+from fastapi import Depends, Header
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -105,6 +107,143 @@ async def http_exception_handler(request: Request, exc: HTTPException):
         headers=headers,
     )
 
+async def get_current_admin_user(authorization: str = Header(None, alias="Authorization")):
+    """
+    Dependency to get and validate the current admin user from a token.
+    This checks if the user associated with the token is an admin.
+    """
+    if not authorization or not authorization.startswith("Bearer "):
+        logging.warning("Admin auth failed: Missing or malformed Authorization header")
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    token_str = authorization.split(" ")[1]
+    logging.info(f"Admin auth attempt with token: {token_str[:100]}...") # Log token safely
+
+    user_email_from_token = None
+    try:
+        # The token is a Base64-encoded JSON string of the user object.
+        # First, decode from Base64, then parse the JSON.
+        decoded_token = base64.b64decode(token_str).decode('utf-8')
+        user_data_from_token = json.loads(decoded_token)
+        user_email_from_token = user_data_from_token.get("email") if isinstance(user_data_from_token, dict) else None
+    except (json.JSONDecodeError, base64.binascii.Error, AttributeError, TypeError) as e:
+        logging.warning(f"Admin auth failed: Could not decode or parse token. Error: {e}. Token: {token_str[:100]}...")
+        raise HTTPException(status_code=401, detail="Invalid token format.")
+
+    if not user_email_from_token:
+        logging.warning("Admin auth failed: Could not extract email from token.")
+        raise HTTPException(status_code=401, detail="Invalid token: email missing.")
+
+    user, _ = await get_user_info_with_collection(stc_db, user_email_from_token)
+
+    if not user:
+        logging.warning(f"Admin auth failed: User '{user_email_from_token}' not found in database")
+        raise HTTPException(status_code=401, detail="User not found or token is invalid")
+
+    # Check if the user exists and has an admin designation.
+    # Also check the 'isAdmin' flag for robustness.
+    designation = user.get("designation", "").lower().strip()
+    if user.get("isAdmin") or "admin" in designation or "director" in designation:
+        logging.info(f"Admin access granted for user: {user_email_from_token}")
+        return user
+
+    raise HTTPException(status_code=403, detail="User is not an administrator")
+
+
+# --- Admin Routes ---
+
+class AdminUserUpdate(BaseModel):
+    """
+    Pydantic model for admin updates. All fields are optional.
+    """
+    name: Optional[str] = None
+    email: Optional[str] = None
+    designation: Optional[str] = None
+    department: Optional[str] = None
+    team: Optional[str] = None
+    empCode: Optional[str] = None
+
+    class Config:
+        extra = 'ignore'
+
+class AdminPasswordReset(BaseModel):
+    new_password: str
+
+@api_router.put("/admin/users/{original_email}/details")
+async def admin_update_user_details(
+    original_email: str, 
+    user_data: AdminUserUpdate, 
+    admin_user: dict = Depends(get_current_admin_user)
+):
+    """
+    Admin endpoint to update a user's details.
+    """
+    decoded_email = urllib.parse.unquote(original_email)
+    user, collection = await get_user_info_with_collection(stc_db, decoded_email)
+
+    if not user or collection is None:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    update_payload = user_data.model_dump(exclude_unset=True)
+
+    if not update_payload:
+        raise HTTPException(status_code=400, detail="No update data provided.")
+
+    # If email is being changed, we need to handle it carefully
+    new_email = update_payload.get("email")
+    if new_email and new_email.lower() != decoded_email.lower():
+        # Check if the new email is already taken
+        existing_user, _ = await get_user_info_with_collection(stc_db, new_email)
+        if existing_user:
+            raise HTTPException(status_code=400, detail="New email is already in use.")
+        # Update the 'id' field as well if it's based on email
+        update_payload['id'] = new_email
+
+    await collection.update_one(
+        {"email": re.compile(f"^{re.escape(decoded_email)}$", re.IGNORECASE)},
+        {"$set": update_payload}
+    )
+
+    logging.info(f"Admin '{admin_user.get('email')}' updated details for user '{decoded_email}'.")
+    return {"message": f"User {decoded_email} updated successfully."}
+
+@api_router.delete("/admin/users/{email}")
+async def admin_delete_user(email: str, admin_user: dict = Depends(get_current_admin_user)):
+    """
+    Admin endpoint to permanently delete a user.
+    """
+    decoded_email = urllib.parse.unquote(email)
+    user, collection = await get_user_info_with_collection(stc_db, decoded_email)
+
+    if not user or collection is None:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    result = await collection.delete_one({"email": re.compile(f"^{re.escape(decoded_email)}$", re.IGNORECASE)})
+
+    if result.deleted_count > 0:
+        logging.info(f"Admin '{admin_user.get('email')}' permanently deleted user '{decoded_email}'.")
+        return {"message": f"User {decoded_email} has been permanently deleted."}
+    
+    raise HTTPException(status_code=500, detail="Failed to delete user.")
+
+@api_router.post("/admin/users/{email}/reset-password")
+async def admin_reset_password(
+    email: str, 
+    password_data: AdminPasswordReset, 
+    admin_user: dict = Depends(get_current_admin_user)
+):
+    """
+    Admin endpoint to reset a user's password.
+    """
+    decoded_email = urllib.parse.unquote(email)
+    # We pass an empty current_password because the check will be bypassed by is_admin_reset=True
+    # The admin_user dependency ensures this is an authorized action.
+    response = await change_password(
+        user_id=decoded_email,
+        request=PasswordChangeRequest(current_password="", new_password=password_data.new_password),
+        admin_user=admin_user
+    )
+    return response
 
 # --- WebSocket Connection Manager ---
 class ConnectionManager:
@@ -426,6 +565,19 @@ class Notification(BaseModel):
     timestamp: datetime = Field(default_factory=lambda: datetime.now(ist_tz))
     is_read: bool = False
 
+class Announcement(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    title: str
+    content: str
+    priority: str
+    author: str
+    date: datetime = Field(default_factory=lambda: datetime.now(ist_tz))
+
+class AnnouncementCreate(BaseModel):
+    title: str
+    content: str
+    priority: str
+
 class Employee(BaseModel):
     id: str
     name: str
@@ -616,22 +768,32 @@ async def get_user_info(stc_db, user_id: str) -> Optional[dict]:
     return user
 
 
-async def get_user_info_with_collection(stc_db, user_id: str) -> tuple[Optional[dict], Optional[any]]:
-    """Get user info and their collection by id or email."""
-    collection_names = await stc_db.list_collection_names()
-    # Filter out system collections to avoid unnecessary queries
-    team_collection_names = [name for name in collection_names if not name.startswith('system.')]
-    team_collections = [stc_db[name] for name in team_collection_names]
+async def get_user_info_with_collection(stc_db, user_id: str, include_hash: bool = False) -> tuple[Optional[dict], Optional[any]]:
+    """
+    Get user info and their collection by id or email with a case-insensitive search.
+    This function is now more robust and searches across all defined team collections.
+    """
+    # Fetch all non-system collections directly from the database for robustness.
+    all_collection_names = await stc_db.list_collection_names()
+    team_collection_names = [name for name in all_collection_names if not name.startswith('system.')]
 
-    for collection in team_collections:
-        # Try by id first
-        user = await collection.find_one({"id": user_id}, {"password_hash": 0})
-        if user:
-            return user, collection
-        # Then by email
-        user = await collection.find_one({"email": user_id}, {"password_hash": 0})
-        if user:
-            return user, collection
+    projection = None if include_hash else {"password_hash": 0}
+    
+    # Use a case-insensitive regex for both id and email search
+    # The user_id might be URL-encoded, so decode it first.
+    decoded_user_id = urllib.parse.unquote(user_id)
+    search_regex = re.compile(f"^{re.escape(decoded_user_id)}$", re.IGNORECASE)
+
+    for collection_name in team_collection_names:
+        try:
+            collection = stc_db[collection_name]
+            # Search by 'email' field case-insensitively
+            user = await collection.find_one({"email": search_regex}, projection)
+
+            if user:
+                return user, collection
+        except Exception as e:
+            logging.warning(f"Could not search in collection {collection_name}: {e}")
     return None, None
 
 
@@ -951,44 +1113,6 @@ async def delete_all_messages():
         logging.error(f"Error deleting all messages: {e}")
         raise HTTPException(status_code=500, detail="Failed to delete messages")
 
-@api_router.delete("/messages/{message_id}")
-async def delete_message(message_id: str):
-    """Delete a specific message by ID"""
-    try:
-        # Try deleting from Channel_chat first
-        result = await chat_db.Channel_chat.delete_one({"id": message_id})
-        if result.deleted_count == 0:
-            # If not found in Channel_chat, try Direct_chat
-            result = await chat_db.Direct_chat.delete_one({"id": message_id})
-            if result.deleted_count == 0:
-                raise HTTPException(status_code=404, detail="Message not found")
-        return {"message": "Message deleted successfully"}
-    except HTTPException:
-        raise
-    except Exception as e:
-        logging.error(f"Error deleting message {message_id}: {e}")
-        raise HTTPException(status_code=500, detail="Failed to delete message")
-
-@api_router.post("/messages/{message_id}/delete")
-async def mark_message_deleted_for_user(message_id: str, user_id: str):
-    """Mark a message as deleted for a specific user"""
-    try:
-        deleted_message = DeletedMessage(user_id=user_id, message_id=message_id)
-        await chat_db.DeletedMessages.insert_one(deleted_message.model_dump())
-
-        # Broadcast message_hidden to the user
-        hidden_json = json.dumps({
-            "type": "message_hidden",
-            "message_id": message_id,
-            "user_id": user_id
-        })
-        await manager.send_personal_message(hidden_json, user_id)
-
-        return {"message": "Message marked as deleted for user"}
-    except Exception as e:
-        logging.error(f"Error marking message {message_id} as deleted for user {user_id}: {e}")
-        raise HTTPException(status_code=500, detail="Failed to mark message as deleted")
-
 
 from fastapi import Query
 from datetime import datetime
@@ -1050,10 +1174,6 @@ async def clear_channel_messages_for_user(
 # DELETE FOR ME
 # ---------------------------
 
-class DeletedMessage(BaseModel):
-    user_id: str
-    message_id: str
-    created_at: datetime = Field(default_factory=lambda: datetime.now(ist_tz))
 
 @api_router.post("/messages/{message_id}/delete")
 async def mark_message_deleted_for_user(
@@ -1064,7 +1184,7 @@ async def mark_message_deleted_for_user(
     Mark a message as deleted only for the requesting user.
     """
     try:
-        deleted_message = DeletedMessage(user_id=user_id, message_id=message_id)
+        deleted_message = DeletedMessage(user_id=user_id, message_id=message_id, created_at=datetime.now(ist_tz))
         await chat_db.DeletedMessages.insert_one(deleted_message.model_dump())
 
         # Optionally notify just this user
@@ -1085,6 +1205,24 @@ async def mark_message_deleted_for_user(
 # DELETE FOR EVERYONE
 # ---------------------------
 
+@api_router.delete("/messages/{message_id}")
+async def delete_message_permanently(message_id: str, admin_user: dict = Depends(get_current_admin_user)):
+    """
+    (Admin Only) Permanently delete a specific message by ID from the database.
+    """
+    try:
+        # Try deleting from Channel_chat first
+        result_channel = await chat_db.Channel_chat.delete_one({"id": message_id})
+        # Then try Direct_chat
+        result_direct = await chat_db.Direct_chat.delete_one({"id": message_id})
+
+        if result_channel.deleted_count == 0 and result_direct.deleted_count == 0:
+            raise HTTPException(status_code=404, detail="Message not found")
+        
+        logging.info(f"Admin '{admin_user.get('email')}' permanently deleted message '{message_id}'.")
+        return {"message": "Message permanently deleted successfully"}
+    except HTTPException:
+        raise
 # In server.py
 
 @api_router.post("/messages/{message_id}/delete-everyone")
@@ -1575,73 +1713,72 @@ async def remove_profile_picture(employee_id: str):
         raise HTTPException(status_code=500, detail="Failed to remove profile picture.")
 
 @api_router.put("/employees/{employeeId}/deactivate")
-async def deactivate_employee(employeeId: str):
+async def deactivate_employee(employeeId: str, admin_user: dict = Depends(get_current_admin_user) ):
     try:
         # Find the user and their collection across all teams
-        user, collection = await get_user_info_with_collection(stc_db, employeeId)
+        decoded_employee_id = urllib.parse.unquote(employeeId)
+        user, collection = await get_user_info_with_collection(stc_db, decoded_employee_id)
 
         if not user or collection is None:
             raise HTTPException(status_code=404, detail="Employee not found")
-
-        # Permanently delete the user from their collection
-        result = await collection.delete_one(
-            {"$or": [{"id": employeeId}, {"email": employeeId}]},
+        
+        # Soft delete: Mark the user as inactive instead of deleting them.
+        result = await collection.update_one(
+            {"email": re.compile(f"^{re.escape(decoded_employee_id)}$", re.IGNORECASE)},
+            {"$set": {"active": False}}
         )
 
-        if result.deleted_count > 0:
-            logging.info(f"Employee {employeeId} permanently deleted.")
-            return {"message": "Employee account permanently deleted."}
-        # This case should ideally not be hit if the user was found before.
-        raise HTTPException(status_code=404, detail="Employee could not be deleted.")
+        if result.modified_count > 0:
+            logging.info(f"Employee {decoded_employee_id} deactivated by admin {admin_user.get('email')}.")
+            return {"message": "Employee account has been deactivated."}
+        
+        raise HTTPException(status_code=404, detail="Employee was found but could not be deactivated.")
     except HTTPException:
         raise  # Re-raise HTTPException to preserve status code and detail
     except Exception as e:
-        logging.error(f"Error deactivating employee: {e}")
+        logging.error(f"Error deactivating employee {employeeId}: {e}")
         raise HTTPException(status_code=500, detail="Error deactivating employee")
-
-@api_router.put("/users/{user_id}/deactivate")
-async def deactivate_user_alias(user_id: str):
-    """Alias for the deactivate_employee endpoint to match frontend calls."""
-    decoded_user_id = urllib.parse.unquote(user_id)
-    return await deactivate_employee(decoded_user_id)
 
 class PasswordChangeRequest(BaseModel):
     current_password: str
     new_password: str
 
 @api_router.put("/users/{user_id}/change-password")
-async def change_password(user_id: str, request: PasswordChangeRequest):
+async def change_password(user_id: str, request: PasswordChangeRequest, admin_user: Optional[dict] = None) -> JSONResponse:
     """
     Changes the password for a given user.
+    If is_admin_reset is True, it bypasses the current password check.
     """
     if len(request.new_password) > 72:
         raise HTTPException(status_code=400, detail="Password cannot exceed 72 characters.")
 
     try:
         # Find the user and their collection
-        user, collection = await get_user_info_with_collection(stc_db, user_id)
+        # We need the password hash, so we must set include_hash=True
+        user, collection = await get_user_info_with_collection(stc_db, user_id, include_hash=True)
 
         if not user or collection is None:
             raise HTTPException(status_code=404, detail="User not found")
 
-        # We need the full user document to get the password hash
-        full_user_doc = await collection.find_one({"$or": [{"id": user_id}, {"email": user_id}]})
-
-        # Verify the current password
-        if not pwd_context.verify(request.current_password, full_user_doc.get("password_hash")):
-            raise HTTPException(status_code=400, detail="Incorrect current password")
+        # Verify the current password, unless it's an admin reset
+        if not admin_user: # This is a regular user changing their own password
+            password_hash = user.get("password_hash")
+            if not password_hash or not pwd_context.verify(request.current_password, password_hash):
+                raise HTTPException(status_code=400, detail="Incorrect current password")
 
         # Hash the new password
         new_password_hash = pwd_context.hash(request.new_password)
 
         # Update the password in the database
         result = await collection.update_one(
-            {"$or": [{"id": user_id}, {"email": user_id}]},
+            {"email": re.compile(f"^{re.escape(user_id)}$", re.IGNORECASE)},
             {"$set": {"password_hash": new_password_hash}}
         )
 
         if result.modified_count > 0:
-            return {"message": "Password updated successfully"}
+            if admin_user:
+                logging.info(f"Admin '{admin_user.get('email')}' reset password for user '{user_id}'.")
+            return JSONResponse(content={"message": "Password updated successfully"})
         raise HTTPException(status_code=500, detail="Failed to update password")
     except HTTPException:
         raise
@@ -1725,6 +1862,10 @@ async def update_user_profile(email: str, profile_data: UserProfileUpdate):
 @api_router.post("/signup")
 async def signup(request: SignupRequest):
     if len(request.password) > 72:
+        raise HTTPException(status_code=400, detail="Password cannot exceed 72 characters.")
+
+    # Add validation for email format
+    if not re.match(r"[^@]+@[^@]+\.[^@]+", request.email):
         raise HTTPException(status_code=400, detail="Password cannot exceed 72 characters.")
 
     if request.team not in TEAMS:
@@ -1862,6 +2003,11 @@ async def login(request: LoginRequest):
         raise HTTPException(status_code=400, detail="Invalid credentials")
     if not pwd_context.verify(request.password, password_hash):
         raise HTTPException(status_code=400, detail="Invalid credentials")
+
+    # --- ADDED: Check if the user account is active ---
+    # If 'active' is False, deny login. Treat missing 'active' field as active.
+    if user.get("active") is False:
+        raise HTTPException(status_code=403, detail="Account is deactivated. Please contact an administrator.")
 
     # Set user status to online and broadcast it immediately upon successful login
     user_id = user.get("email") or user.get("id")
@@ -2268,6 +2414,81 @@ async def get_channels(user_id: Optional[str] = None):
         logging.info(f"Filtered channels for user {user_id}: {len(user_channels)} channels")
         return user_channels
 
+@api_router.get("/announcements", response_model=List[Announcement])
+async def get_announcements():
+    """
+    Fetch all announcements from the database.
+    """
+    try:
+        announcements = await chat_db.Announcements.find().sort("date", -1).to_list(length=None)
+        return serialize_document(announcements)
+    except Exception as e:
+        logging.error(f"Error fetching announcements: {e}")
+        raise HTTPException(status_code=500, detail="Failed to fetch announcements.")
+
+@api_router.post("/announcements", response_model=Announcement)
+async def create_announcement(
+    announcement_data: AnnouncementCreate,
+    admin_user: dict = Depends(get_current_admin_user)
+):
+    """
+    (Admin Only) Create a new announcement.
+    """
+    try:
+        announcement = Announcement(
+            **announcement_data.model_dump(),
+            author=admin_user.get("name", "Admin")
+        )
+        await chat_db.Announcements.insert_one(announcement.model_dump())
+
+        # --- Create notifications for offline users ---
+        all_employee_emails = await get_all_employees_emails(stc_db)
+        offline_users = [email for email in all_employee_emails if email not in manager.active_connections]
+
+        if offline_users:
+            notifications_to_create = []
+            for user_id in offline_users:
+                # Avoid creating a notification for the admin who sent it, if they are somehow offline
+                if user_id == admin_user.get("email"):
+                    continue
+                
+                notification = Notification(
+                    user_id=user_id,
+                    sender_id=admin_user.get("email", "admin"),
+                    sender_name=announcement.author,
+                    message_id=announcement.id,
+                    message_content=announcement.title,
+                    type="announcement" # Specific type for announcements
+                )
+                notifications_to_create.append(notification.model_dump())
+            if notifications_to_create:
+                await chat_db.Notifications.insert_many(notifications_to_create)
+                logging.info(f"Created {len(notifications_to_create)} offline notifications for new announcement.")
+
+        # Broadcast the new announcement to all connected clients
+        broadcast_payload = {
+            "type": "new_announcement",
+            "data": serialize_document(announcement.model_dump())
+        }
+        # We don't exclude the sender, so the admin also sees the real-time update.
+        await manager.broadcast(json.dumps(broadcast_payload))
+
+        logging.info(f"Admin '{admin_user.get('email')}' created announcement: '{announcement.title}'")
+        return announcement
+    except Exception as e:
+        logging.error(f"Error creating announcement: {e}")
+        raise HTTPException(status_code=500, detail="Failed to create announcement.")
+
+@api_router.delete("/announcements/{announcement_id}", status_code=204)
+async def delete_announcement(announcement_id: str, admin_user: dict = Depends(get_current_admin_user)):
+    """
+    (Admin Only) Delete an announcement by its ID.
+    """
+    result = await chat_db.Announcements.delete_one({"id": announcement_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Announcement not found")
+    logging.info(f"Admin '{admin_user.get('email')}' deleted announcement ID: {announcement_id}")
+    return
 
 
 async def handle_reaction_update(message_data, client_id):
@@ -2486,8 +2707,8 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allow_headers=["*"],
+    allow_methods=["*"],
+    allow_headers=["*", "Authorization"],
 )
 
 # Include the router in the main app
@@ -2513,4 +2734,3 @@ async def startup_event():
     except Exception as e:
         logger.error(f"MongoDB connection failed: {e}")
         logger.info("Continuing without MongoDB - WebSocket functionality will work without database persistence")
-        # Don't raise the exception, just log it and continue

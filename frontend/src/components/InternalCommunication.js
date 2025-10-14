@@ -45,7 +45,7 @@ import DirectChat from './DirectChat'; // This component will handle the 1-on-1 
 import ChatInput from './ChatInput'; // Extracted input logic for reusability
 
 const InternalCommunication = () => {
-  const { user, sendWebSocketMessage, userStatuses, setCurrentChannel, setCurrentChatUser, showNotification, requestNotificationPermission, newMessages, setNewMessages, allChannels, allEmployees, chatNavigationTarget } = useAuth();
+  const { user, sendWebSocketMessage, userStatuses, setCurrentChannel, setCurrentChatUser, showNotification, requestNotificationPermission, newMessages, setNewMessages, allChannels, allEmployees, navigationTarget } = useAuth();
   const [selectedChannel, setSelectedChannel] = useState(null);
   const [channels, setChannels] = useState([]);
   const [messages, setMessages] = useState([]); // Messages will come from WebSocket and API
@@ -157,18 +157,19 @@ const InternalCommunication = () => {
 
   // Handle navigation from notifications
   useEffect(() => {
-    if (chatNavigationTarget && channels.length > 0 && allEmployeesList.length > 0) {
-      if (chatNavigationTarget.type === 'channel') {
-        const channelToSelect = channels.find(c => c.name === chatNavigationTarget.id);
+    // This effect handles navigation from the notification system.
+    if (navigationTarget && navigationTarget.section === 'communication' && channels.length > 0 && allEmployeesList.length > 0) {
+      if (navigationTarget.type === 'channel') {
+        const channelToSelect = channels.find(c => c.name === navigationTarget.id);
         if (channelToSelect) {
           setViewMode('channels');
           setActiveTab('channels');
           setSelectedChannel(channelToSelect);
           fetchMessagesForChannel(channelToSelect);
         }
-      } else if (chatNavigationTarget.type === 'dm') {
+      } else if (navigationTarget.type === 'dm') {
         // The ID from the notification is the sender's name. We need to find the employee object.
-        const employeeToSelect = allEmployeesList.find(e => e.name === chatNavigationTarget.id);
+        const employeeToSelect = allEmployeesList.find(e => e.name === navigationTarget.id);
         if (employeeToSelect) {
           setViewMode('directChat');
           setActiveTab('people');
@@ -178,7 +179,7 @@ const InternalCommunication = () => {
       // It's important to clear the target after navigation to prevent re-triggering
       // This can be done in AuthContext, but for simplicity, we assume it's a one-time event.
     }
-  }, [chatNavigationTarget, channels, allEmployeesList]);
+  }, [navigationTarget, channels, allEmployeesList]);
 
   // Current user's status from AuthContext, default to 'offline' if not found
   const currentUserStatus = userStatuses[user?.email] || MOCK_USER_STATUS.OFFLINE;

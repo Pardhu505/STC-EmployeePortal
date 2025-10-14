@@ -35,8 +35,8 @@ import {
   AlertTriangle
 } from 'lucide-react';
 
-const Header = ({ onSectionChange }) => {
-  const { user, logout, newMessages, newAnnouncements, clearNewMessages, setNewMessages, setNewAnnouncements } = useAuth();
+const Header = ({ onSectionChange, newAnnouncements, onReadAnnouncement }) => {
+  const { user, logout, newMessages, clearNewMessages, setNewMessages } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [showDeactivateDialog, setShowDeactivateDialog] = useState(false);
@@ -116,12 +116,9 @@ const Header = ({ onSectionChange }) => {
           <div className="flex items-center space-x-4">
             <NotificationSystem 
               newMessages={newMessages} 
-              newAnnouncements={newAnnouncements}
-              clearNewMessages={clearNewMessages} 
-              setNewMessages={setNewMessages}
-              setNewAnnouncements={setNewAnnouncements}
-              onSectionChange={onSectionChange}
-            />
+              newAnnouncements={newAnnouncements} 
+              onReadAnnouncement={onReadAnnouncement}
+              setNewMessages={setNewMessages} />
             
             {/* User Menu */}
             <DropdownMenu>

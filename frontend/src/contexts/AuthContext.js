@@ -26,6 +26,7 @@ export const AuthProvider = ({ children }) => {
   const reconnectAttempts = useRef(0);
   const maxReconnectAttempts = 5;
   const pingIntervalRef = useRef(null);
+  const [newAnnouncements, setNewAnnouncements] = useState([]);
   const [newMessages, setNewMessages] = useState([]);
   const [currentChannel, setCurrentChannel] = useState(null);
   const [currentChatUser, setCurrentChatUser] = useState(null);
@@ -219,6 +220,14 @@ export const AuthProvider = ({ children }) => {
   // Still dispatch to components for local message handling
   const customEvent = new CustomEvent('websocket-message', { detail: message });
   window.dispatchEvent(customEvent);
+} else if (message.type === "new_announcement") {
+  // Handle new announcements globally
+  setNewAnnouncements(prev => {
+    // Prevent duplicate announcements from being added
+    if (prev.some(ann => ann.id === message.data.id)) return prev;
+    return [message.data, ...prev];
+  });
+  messageHandled = true;
 }
 
         // For unhandled message types (like missed_messages), dispatch a custom event
@@ -563,12 +572,49 @@ export const AuthProvider = ({ children }) => {
     setChatNavigationTarget(target);
   };
 
+  // --- Announcement Read Status Persistence ---
+  const getReadAnnouncementIds = () => {
+    if (!user?.email) return [];
+    const key = `readAnnouncements_${user.email}`;
+    const readIds = localStorage.getItem(key);
+    return readIds ? JSON.parse(readIds) : [];
+  };
+
+  const markAnnouncementAsRead = (announcementId) => {
+    if (!user?.email) return;
+    const key = `readAnnouncements_${user.email}`;
+    const readIds = getReadAnnouncementIds();
+    if (!readIds.includes(announcementId)) {
+      const updatedReadIds = [...readIds, announcementId];
+      localStorage.setItem(key, JSON.stringify(updatedReadIds));
+    }
+  };
+
+  const getReadMessageIds = () => {
+    if (!user?.email) return [];
+    const key = `readMessages_${user.email}`;
+    const readIds = localStorage.getItem(key);
+    return readIds ? JSON.parse(readIds) : [];
+  };
+
+  const markMessageAsRead = (messageId) => {
+    if (!user?.email) return;
+    const key = `readMessages_${user.email}`;
+    const readIds = getReadMessageIds();
+    if (!readIds.includes(messageId)) {
+      const updatedReadIds = [...readIds, messageId];
+      localStorage.setItem(key, JSON.stringify(updatedReadIds));
+    }
+  };
+
   const value = React.useMemo(() => ({
       user,
       loading,
       isConnected,
       userStatuses,
       newMessages,
+      newAnnouncements,
+      setNewAnnouncements,
       currentChannel,
       currentChatUser,
       notificationPermission,
@@ -591,7 +637,15 @@ export const AuthProvider = ({ children }) => {
       showNotification,
       requestNotificationPermission,
       navigateToChat,
-  }), [user, loading, isConnected, userStatuses, newMessages, currentChannel, currentChatUser, notificationPermission, allChannels, allEmployees, chatNavigationTarget]);
+  }), [user, loading, isConnected, userStatuses, newMessages, newAnnouncements, currentChannel, currentChatUser, notificationPermission, allChannels, allEmployees, chatNavigationTarget]);
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return <AuthContext.Provider value={{
+    ...value, 
+    getReadAnnouncementIds, 
+    markAnnouncementAsRead,
+    getReadMessageIds,
+    markMessageAsRead
+  }}>
+    {children}
+  </AuthContext.Provider>;
 };

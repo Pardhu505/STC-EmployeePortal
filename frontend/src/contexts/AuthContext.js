@@ -15,6 +15,28 @@ export const useAuth = () => {
   return context;
 };
 
+// --- LocalStorage Helpers for Read Message IDs ---
+const getReadMessageIds = () => {
+  const saved = localStorage.getItem('readMessageIds');
+  // To prevent this from growing indefinitely, we could add a timestamp and prune old entries,
+  // but for now, this fulfills the requirement.
+  return saved ? new Set(JSON.parse(saved)) : new Set();
+};
+
+const addReadMessageId = (messageId) => {
+  if (!messageId) return;
+  const readIds = getReadMessageIds();
+  readIds.add(messageId);
+  localStorage.setItem('readMessageIds', JSON.stringify(Array.from(readIds)));
+};
+
+const addMultipleReadMessageIds = (messageIds) => {
+  if (!messageIds || messageIds.length === 0) return;
+  const readIds = getReadMessageIds();
+  messageIds.forEach(id => id && readIds.add(id));
+  localStorage.setItem('readMessageIds', JSON.stringify(Array.from(readIds)));
+};
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -26,7 +48,6 @@ export const AuthProvider = ({ children }) => {
   const reconnectAttempts = useRef(0);
   const maxReconnectAttempts = 5;
   const pingIntervalRef = useRef(null);
-  const [newAnnouncements, setNewAnnouncements] = useState([]);
   const [newMessages, setNewMessages] = useState([]);
   const [currentChannel, setCurrentChannel] = useState(null);
   const [currentChatUser, setCurrentChatUser] = useState(null);
@@ -34,7 +55,7 @@ export const AuthProvider = ({ children }) => {
   const [userChannels, setUserChannels] = useState([]);
   const [allChannels, setAllChannels] = useState([]);
   const [allEmployees, setAllEmployees] = useState([]);
-  const [chatNavigationTarget, setChatNavigationTarget] = useState(null);
+  const [navigationTarget, setNavigationTarget] = useState(null);
 
   // WebSocket Connect
   const connectWebSocket = (userId) => {
@@ -124,6 +145,12 @@ export const AuthProvider = ({ children }) => {
             }
 
     if (shouldNotify) {
+      // Before adding, check if the message has already been read/dismissed
+      const readMessageIds = getReadMessageIds();
+      if (message.id && readMessageIds.has(message.id)) {
+        return; // Don't add already read messages to the notification list
+      }
+
       setNewMessages((prev) => {
         // Avoid duplicate messages if server echoes back
         // Check by id, or by content + timestamp if id is missing
@@ -171,6 +198,11 @@ export const AuthProvider = ({ children }) => {
   // The backend sends this to a specific user, but this client-side check adds a layer of safety.
   const currentUserMissedMsgs = missedMsgs.filter(msg => {
     // It's a direct message to me OR it's a channel message for a channel I'm in.
+    const readMessageIds = getReadMessageIds();
+    if (msg.id && readMessageIds.has(msg.id)) {
+      return false; // Filter out already read messages
+    }
+
     const isMyDirectMessage = msg.recipient_id === userId;
     const isMyChannelMessage = msg.channel_id && userChannels.some(ch => ch.name === msg.channel_id);
     return isMyDirectMessage || isMyChannelMessage;
@@ -220,14 +252,6 @@ export const AuthProvider = ({ children }) => {
   // Still dispatch to components for local message handling
   const customEvent = new CustomEvent('websocket-message', { detail: message });
   window.dispatchEvent(customEvent);
-} else if (message.type === "new_announcement") {
-  // Handle new announcements globally
-  setNewAnnouncements(prev => {
-    // Prevent duplicate announcements from being added
-    if (prev.some(ann => ann.id === message.data.id)) return prev;
-    return [message.data, ...prev];
-  });
-  messageHandled = true;
 }
 
         // For unhandled message types (like missed_messages), dispatch a custom event
@@ -454,6 +478,8 @@ export const AuthProvider = ({ children }) => {
   };
 
   const clearNewMessages = () => {
+    // Also mark all current new messages as read in localStorage
+    addMultipleReadMessageIds(newMessages.map(msg => msg.id));
     setNewMessages([]);
   };
 
@@ -567,44 +593,9 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const navigateToChat = (target) => {
-    // Target will be an object like { type: 'channel', id: 'general' } or { type: 'dm', id: 'user@email.com' }
-    setChatNavigationTarget(target);
-  };
-
-  // --- Announcement Read Status Persistence ---
-  const getReadAnnouncementIds = () => {
-    if (!user?.email) return [];
-    const key = `readAnnouncements_${user.email}`;
-    const readIds = localStorage.getItem(key);
-    return readIds ? JSON.parse(readIds) : [];
-  };
-
-  const markAnnouncementAsRead = (announcementId) => {
-    if (!user?.email) return;
-    const key = `readAnnouncements_${user.email}`;
-    const readIds = getReadAnnouncementIds();
-    if (!readIds.includes(announcementId)) {
-      const updatedReadIds = [...readIds, announcementId];
-      localStorage.setItem(key, JSON.stringify(updatedReadIds));
-    }
-  };
-
-  const getReadMessageIds = () => {
-    if (!user?.email) return [];
-    const key = `readMessages_${user.email}`;
-    const readIds = localStorage.getItem(key);
-    return readIds ? JSON.parse(readIds) : [];
-  };
-
-  const markMessageAsRead = (messageId) => {
-    if (!user?.email) return;
-    const key = `readMessages_${user.email}`;
-    const readIds = getReadMessageIds();
-    if (!readIds.includes(messageId)) {
-      const updatedReadIds = [...readIds, messageId];
-      localStorage.setItem(key, JSON.stringify(updatedReadIds));
-    }
+  const navigateTo = (target) => {
+    // Target can be { section: 'announcements' } or { section: 'communication', type: 'channel', id: 'general' }
+    setNavigationTarget(target);
   };
 
   const value = React.useMemo(() => ({
@@ -613,14 +604,12 @@ export const AuthProvider = ({ children }) => {
       isConnected,
       userStatuses,
       newMessages,
-      newAnnouncements,
-      setNewAnnouncements,
       currentChannel,
       currentChatUser,
       notificationPermission,
       allChannels,
       allEmployees,
-      chatNavigationTarget,
+      navigationTarget,
       webSocketRef,
       login,
       logout,
@@ -636,16 +625,8 @@ export const AuthProvider = ({ children }) => {
       setCurrentChatUser,
       showNotification,
       requestNotificationPermission,
-      navigateToChat,
-  }), [user, loading, isConnected, userStatuses, newMessages, newAnnouncements, currentChannel, currentChatUser, notificationPermission, allChannels, allEmployees, chatNavigationTarget]);
+      navigateTo,
+  }), [user, loading, isConnected, userStatuses, newMessages, currentChannel, currentChatUser, notificationPermission, allChannels, allEmployees, navigationTarget]);
 
-  return <AuthContext.Provider value={{
-    ...value, 
-    getReadAnnouncementIds, 
-    markAnnouncementAsRead,
-    getReadMessageIds,
-    markMessageAsRead
-  }}>
-    {children}
-  </AuthContext.Provider>;
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

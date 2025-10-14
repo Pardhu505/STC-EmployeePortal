@@ -7,14 +7,15 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { Calendar, User, AlertCircle, Info, CheckCircle, Plus, Send, Shield } from 'lucide-react';
-import { ANNOUNCEMENTS_DATA } from '../data/mock';
+import { Calendar, User, AlertCircle, Info, CheckCircle, Plus, Send, Shield, Trash2, X, Loader2 } from 'lucide-react';
 import { useToast } from '../hooks/use-toast';
+import { API_BASE_URL } from '../config/api';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
 
 const Announcements = ({ initialAnnouncements = [] }) => {
-  const { user } = useAuth();
+  const { user, showNotification } = useAuth();
   const [selectedPriority, setSelectedPriority] = useState('all');
-  const [announcements, setAnnouncements] = useState([...initialAnnouncements, ...ANNOUNCEMENTS_DATA]);
+  const [announcements, setAnnouncements] = useState([]);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [newAnnouncement, setNewAnnouncement] = useState({
     title: '',
@@ -23,18 +24,61 @@ const Announcements = ({ initialAnnouncements = [] }) => {
     author: user?.name || 'Admin'
   });
   const { toast } = useToast();
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [announcementToDelete, setAnnouncementToDelete] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   // Check if user is admin
   const isAdmin = user?.isAdmin || user?.email === 'admin@showtimeconsulting.in';
 
-  // Update announcements when new birthday announcements are passed
-  useEffect(() => {
-    if (initialAnnouncements.length > 0) {
-      setAnnouncements(prev => {
-        const existing = prev.filter(ann => !ann.type || ann.type !== 'birthday');
-        return [...initialAnnouncements, ...existing];
+  const fetchAnnouncements = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/announcements`);
+      if (!response.ok) throw new Error('Failed to fetch announcements');
+      const data = await response.json();
+      
+      // Combine fetched announcements with birthday announcements
+      const existing = data.filter(ann => !ann.type || ann.type !== 'birthday');
+      setAnnouncements([...initialAnnouncements, ...existing]);
+
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error.message || "Could not load announcements.",
+        variant: "destructive"
       });
+    } finally {
+      setLoading(false);
     }
+  };
+
+  // Fetch announcements on component mount
+  useEffect(() => {
+    fetchAnnouncements();
+
+    const handleNewAnnouncement = (event) => {
+      const message = event.detail;
+      if (message.type === 'new_announcement') {
+        const newAnn = message.data;
+        console.log("Announcements.js: New announcement received via WebSocket:", newAnn);
+        
+        // Add to the top of the list
+        setAnnouncements(prev => [newAnn, ...prev.filter(a => a.id !== newAnn.id)]);
+
+        // The global AuthContext and NotificationSystem now handle showing the toast and browser notification.
+      }
+    };
+    
+    window.addEventListener('websocket-message', handleNewAnnouncement);
+    return () => window.removeEventListener('websocket-message', handleNewAnnouncement);
+  }, []);
+
+  // Re-fetch or update when birthday announcements change
+  useEffect(() => {
+    // This ensures birthday announcements are always at the top and fresh
+    const nonBirthdayAnnouncements = announcements.filter(ann => !ann.type || ann.type !== 'birthday');
+    setAnnouncements([...initialAnnouncements, ...nonBirthdayAnnouncements]);
   }, [initialAnnouncements]);
 
   const priorityColors = {
@@ -53,7 +97,7 @@ const Announcements = ({ initialAnnouncements = [] }) => {
     ? announcements 
     : announcements.filter(ann => ann.priority === selectedPriority);
 
-  const handleCreateAnnouncement = () => {
+  const handleCreateAnnouncement = async () => {
     if (!isAdmin) {
       toast({
         title: "Access Denied",
@@ -72,28 +116,73 @@ const Announcements = ({ initialAnnouncements = [] }) => {
       return;
     }
 
-    const announcement = {
-      id: announcements.length + 1,
-      title: newAnnouncement.title,
-      content: newAnnouncement.content,
-      priority: newAnnouncement.priority,
-      author: user?.name || 'Admin',
-      date: new Date().toISOString().split('T')[0]
-    };
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/announcements`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${btoa(JSON.stringify(user))}`
+        },
+        body: JSON.stringify({
+          title: newAnnouncement.title,
+          content: newAnnouncement.content,
+          priority: newAnnouncement.priority,
+        })
+      });
 
-    setAnnouncements([announcement, ...announcements]);
-    setNewAnnouncement({
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to create announcement.');
+      }
+
+      const createdAnnouncement = await response.json();
+      setAnnouncements([createdAnnouncement, ...announcements]);
+
+      toast({
+        title: "Announcement Created",
+        description: "Your announcement has been published successfully.",
+      });
+    } catch (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    }
+
+    setNewAnnouncement({ // Reset form regardless of success/fail
       title: '',
       content: '',
       priority: 'medium',
       author: user?.name || 'Admin'
     });
     setShowCreateForm(false);
-    
-    toast({
-      title: "Announcement Created",
-      description: "Your announcement has been published successfully.",
-    });
+  };
+
+  const handleDeleteAnnouncement = async () => {
+    if (!isAdmin || !announcementToDelete) return;
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/announcements/${announcementToDelete.id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${btoa(JSON.stringify(user))}`
+        }
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to delete announcement.');
+      }
+
+      setAnnouncements(prev => prev.filter(ann => ann.id !== announcementToDelete.id));
+      toast({
+        title: "Announcement Deleted",
+        description: `The announcement "${announcementToDelete.title}" has been removed.`,
+      });
+
+    } catch (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    }
+    // Close dialog
+    setShowDeleteDialog(false);
+    setAnnouncementToDelete(null);
   };
 
   const formatDate = (dateString) => {
@@ -232,7 +321,15 @@ const Announcements = ({ initialAnnouncements = [] }) => {
 
       {/* Announcements List */}
       <div className="space-y-4">
-        {filteredAnnouncements.length > 0 ? (
+        {loading ? (
+          <div className="flex justify-center items-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-[#225F8B]" />
+            <span className="ml-2 text-gray-600">Loading Announcements...</span>
+          </div>
+        ) :
+        
+        
+        filteredAnnouncements.length > 0 ? (
           filteredAnnouncements.map((announcement) => {
             const PriorityIcon = priorityIcons[announcement.priority];
             return (
@@ -262,12 +359,24 @@ const Announcements = ({ initialAnnouncements = [] }) => {
                         </div>
                       </div>
                     </div>
-                    <Badge 
-                      variant="outline" 
-                      className={priorityColors[announcement.priority]}
-                    >
-                      {announcement.priority}
-                    </Badge>
+                    <div className="flex flex-col items-end space-y-2">
+                      <Badge 
+                        variant="outline" 
+                        className={priorityColors[announcement.priority]}
+                      >
+                        {announcement.priority}
+                      </Badge>
+                      {isAdmin && announcement.type !== 'birthday' && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-red-500 hover:text-red-700 h-7 w-7 p-1"
+                          onClick={() => { setAnnouncementToDelete(announcement); setShowDeleteDialog(true); }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent>
@@ -292,6 +401,32 @@ const Announcements = ({ initialAnnouncements = [] }) => {
           </Card>
         )}
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-red-600" />
+              Delete Announcement
+            </DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete the announcement "<strong>{announcementToDelete?.title}</strong>"? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowDeleteDialog(false)}
+            >
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleDeleteAnnouncement}>
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Quick Stats */}
       <Card className="bg-gradient-to-r from-[#225F8B]/5 to-[#225F8B]/10 border-[#225F8B]/20">

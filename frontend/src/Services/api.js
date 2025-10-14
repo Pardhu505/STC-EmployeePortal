@@ -172,6 +172,53 @@ export const employeeAPI = {
       throw error;
     }
   },
+
+  // Admin-specific API functions
+  admin: {
+    updateUserDetails: async (originalEmail, userData, userObject) => {
+      try {
+        const response = await api.put(`/admin/users/${encodeURIComponent(originalEmail)}/details`, userData, {
+          headers: {
+            'Authorization': `Bearer ${btoa(JSON.stringify(userObject))}`
+          }
+        });
+        return response.data;
+      } catch (error) {
+        console.error('Error updating user details (admin):', error);
+        throw error.response?.data || { detail: error.message };
+      }
+    },
+    
+    deleteUser: async (email, userObject) => {
+      try {
+        const response = await api.delete(`/admin/users/${encodeURIComponent(email)}`, {
+          headers: {
+            'Authorization': `Bearer ${btoa(JSON.stringify(userObject))}`
+          }
+        });
+        return response.data;
+      } catch (error) {
+        console.error('Error deleting user (admin):', error);
+        throw error.response?.data || { detail: error.message };
+      }
+    },
+    
+    resetPassword: async (email, newPassword, userObject) => {
+      try {
+        const response = await api.post(`/admin/users/${encodeURIComponent(email)}/reset-password`, {
+          new_password: newPassword,
+        }, {
+          headers: {
+            'Authorization': `Bearer ${btoa(JSON.stringify(userObject))}`
+          }
+        });
+        return response.data;
+      } catch (error) {
+        console.error('Error resetting password (admin):', error);
+        throw error.response?.data || { detail: error.message };
+      }
+    },
+  }
 };
 
 

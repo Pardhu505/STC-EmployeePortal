@@ -36,7 +36,7 @@ import {
 } from 'lucide-react';
 
 const Header = ({ onSectionChange }) => {
-  const { user, logout, newMessages, clearNewMessages, setNewMessages } = useAuth();
+  const { user, logout, newMessages, newAnnouncements, clearNewMessages, setNewMessages, setNewAnnouncements } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [showDeactivateDialog, setShowDeactivateDialog] = useState(false);
@@ -114,7 +114,14 @@ const Header = ({ onSectionChange }) => {
 
           {/* Right Side - Notifications and User Menu */}
           <div className="flex items-center space-x-4">
-            <NotificationSystem newMessages={newMessages} clearNewMessages={clearNewMessages} setNewMessages={setNewMessages} />
+            <NotificationSystem 
+              newMessages={newMessages} 
+              newAnnouncements={newAnnouncements}
+              clearNewMessages={clearNewMessages} 
+              setNewMessages={setNewMessages}
+              setNewAnnouncements={setNewAnnouncements}
+              onSectionChange={onSectionChange}
+            />
             
             {/* User Menu */}
             <DropdownMenu>

@@ -12,10 +12,9 @@ import { useToast } from '../hooks/use-toast';
 import { API_BASE_URL } from '../config/api';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
 
-const Announcements = ({ initialAnnouncements = [] }) => {
+const Announcements = ({ announcements, setAnnouncements }) => {
   const { user, showNotification } = useAuth();
   const [selectedPriority, setSelectedPriority] = useState('all');
-  const [announcements, setAnnouncements] = useState([]);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [newAnnouncement, setNewAnnouncement] = useState({
     title: '',
@@ -31,55 +30,10 @@ const Announcements = ({ initialAnnouncements = [] }) => {
   // Check if user is admin
   const isAdmin = user?.isAdmin || user?.email === 'admin@showtimeconsulting.in';
 
-  const fetchAnnouncements = async () => {
-    setLoading(true);
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/announcements`);
-      if (!response.ok) throw new Error('Failed to fetch announcements');
-      const data = await response.json();
-      
-      // Combine fetched announcements with birthday announcements
-      const existing = data.filter(ann => !ann.type || ann.type !== 'birthday');
-      setAnnouncements([...initialAnnouncements, ...existing]);
-
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: error.message || "Could not load announcements.",
-        variant: "destructive"
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Fetch announcements on component mount
   useEffect(() => {
-    fetchAnnouncements();
-
-    const handleNewAnnouncement = (event) => {
-      const message = event.detail;
-      if (message.type === 'new_announcement') {
-        const newAnn = message.data;
-        console.log("Announcements.js: New announcement received via WebSocket:", newAnn);
-        
-        // Add to the top of the list
-        setAnnouncements(prev => [newAnn, ...prev.filter(a => a.id !== newAnn.id)]);
-
-        // The global AuthContext and NotificationSystem now handle showing the toast and browser notification.
-      }
-    };
-    
-    window.addEventListener('websocket-message', handleNewAnnouncement);
-    return () => window.removeEventListener('websocket-message', handleNewAnnouncement);
-  }, []);
-
-  // Re-fetch or update when birthday announcements change
-  useEffect(() => {
-    // This ensures birthday announcements are always at the top and fresh
-    const nonBirthdayAnnouncements = announcements.filter(ann => !ann.type || ann.type !== 'birthday');
-    setAnnouncements([...initialAnnouncements, ...nonBirthdayAnnouncements]);
-  }, [initialAnnouncements]);
+    // When announcements prop updates, stop loading
+    if (announcements) setLoading(false);
+  }, [announcements]);
 
   const priorityColors = {
     high: 'bg-red-100 text-red-800 border-red-200',
@@ -135,12 +89,14 @@ const Announcements = ({ initialAnnouncements = [] }) => {
         throw new Error(errorData.detail || 'Failed to create announcement.');
       }
 
-      const createdAnnouncement = await response.json();
-      setAnnouncements([createdAnnouncement, ...announcements]);
+      // The backend broadcasts the new announcement. The listener in Dashboard.js
+      // will catch it and update the state, which flows back down here.
+      // No manual state update is needed here.
+      // So, we don't need to manually add it here.
 
       toast({
         title: "Announcement Created",
-        description: "Your announcement has been published successfully.",
+        description: "Your announcement has been published to all employees.",
       });
     } catch (error) {
       toast({ title: "Error", description: error.message, variant: "destructive" });

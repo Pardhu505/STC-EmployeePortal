@@ -1001,12 +1001,12 @@ const handleDeleteMessages = async () => {
                           {!(message.deleted || message.deleted_for_me) && (message.file || message.file_url) && (
                             <div className="mt-2 p-2 bg-gray-100 rounded border ">
                               {message.file_url && (
-                                <button
-                                  onClick={() => window.open(message.file_url, '_blank')}
+                                <a
+                                  href={message.file_url}
                                   className="text-xs text-blue-600 hover:text-blue-800 mt-1 inline-block"
                                 >
                                   Download File
-                                </button>
+                                </a>
                               )}
                             </div>
                           )}

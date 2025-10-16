@@ -70,22 +70,37 @@ const NotificationSystem = ({
 
   // Send browser notifications (excluding message types, but allowing missed_message)
   useEffect(() => {
-    if ('Notification' in window && Notification.permission === 'granted') {
-      const unreadAnnouncements = notifications.filter(
-        n => n.type === 'announcement' && 
-        !notifiedIds.has(n.id)
-      );
-      
-      unreadAnnouncements.forEach(notification => {
-        new Notification(notification.title, {
-          body: notification.message,
-          icon: '/favicon.ico',
-          tag: notification.id
-        });
-        // Add the ID to the set of notified IDs to prevent duplicates
-        setNotifiedIds(prev => new Set(prev).add(notification.id));
-      });
-    }
+    const showBrowserNotification = async (notification) => {
+      if ('Notification' in window && Notification.permission === 'granted') {
+        try {
+          // Use Service Worker to show notification if available (best practice for mobile)
+          const registration = await navigator.serviceWorker.getRegistration();
+          if (registration) {
+            registration.showNotification(notification.title, {
+              body: notification.message,
+              icon: '/favicon.ico',
+              tag: notification.id,
+            });
+          } else {
+            // Fallback for environments without a service worker
+            new Notification(notification.title, {
+              body: notification.message,
+              icon: '/favicon.ico',
+              tag: notification.id,
+            });
+          }
+          setNotifiedIds(prev => new Set(prev).add(notification.id));
+        } catch (error) {
+          console.error('Error showing notification:', error);
+        }
+      }
+    };
+
+    const unreadAnnouncements = notifications.filter(
+      n => n.type === 'announcement' && !notifiedIds.has(n.id)
+    );
+
+    unreadAnnouncements.forEach(showBrowserNotification);
   }, [notifications, notifiedIds]);
 
   const handleNotificationClick = (notification) => {

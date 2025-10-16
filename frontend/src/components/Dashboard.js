@@ -121,7 +121,7 @@ const Dashboard = () => {
       {/* ... (rest of the component is unchanged) ... */}
       <div className="absolute inset-0 opacity-10">
         <img 
-          src="/images/thm-shape1.png" 
+          src="https://showtimeconsulting.in/web/images/thm-shape1.png" 
           alt="Background Shape" 
           className="w-full h-full object-cover object-center"
           loading="lazy"

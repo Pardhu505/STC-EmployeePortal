@@ -20,10 +20,7 @@ import AttendanceReport from './AttedenceReport';
 const Dashboard = () => {
   const { user, loading: authLoading, navigationTarget } = useAuth();
   const [activeSection, setActiveSection] = useState('portals');
-  const [readAnnouncementIds, setReadAnnouncementIds] = useState(() => {
-    const saved = localStorage.getItem('readAnnouncementIds');
-    return saved ? new Set(JSON.parse(saved)) : new Set();
-  });
+  const [readAnnouncementIds, setReadAnnouncementIds] = useState(new Set());
   const [announcements, setAnnouncements] = useState([]);
 
   const fetchAnnouncements = async () => {
@@ -50,7 +47,13 @@ const Dashboard = () => {
     const handleNewAnnouncement = (event) => {
       const message = event.detail;
       if (message.type === 'new_announcement') {
-        setAnnouncements(prev => [message.data, ...prev]);
+        setAnnouncements(prev => {
+          // Prevent adding duplicate announcements
+          if (prev.some(ann => ann.id === message.data.id)) {
+            return prev;
+          }
+          return [message.data, ...prev];
+        });
       }
     };
     
@@ -58,10 +61,20 @@ const Dashboard = () => {
     return () => window.removeEventListener('websocket-message', handleNewAnnouncement);
   }, []);
 
+  // Load and manage user-specific read announcement IDs
+  useEffect(() => {
+    if (user?.email) {
+      const saved = localStorage.getItem(`readAnnouncementIds_${user.email}`);
+      setReadAnnouncementIds(saved ? new Set(JSON.parse(saved)) : new Set());
+    }
+  }, [user?.email]);
+
   const handleReadAnnouncement = (announcementId) => {
+    if (!user?.email) return; // Do not save if user is not identified
+
     setReadAnnouncementIds(prev => {
       const newSet = new Set(prev).add(announcementId);
-      localStorage.setItem('readAnnouncementIds', JSON.stringify(Array.from(newSet)));
+      localStorage.setItem(`readAnnouncementIds_${user.email}`, JSON.stringify(Array.from(newSet)));
       return newSet;
     });
   };

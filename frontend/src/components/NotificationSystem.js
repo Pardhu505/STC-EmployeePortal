@@ -15,6 +15,7 @@ const NotificationSystem = ({
   const [notifications, setNotifications] = useState([]);
   const [showPanel, setShowPanel] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [notifiedIds, setNotifiedIds] = useState(new Set()); // Track IDs of notifications already shown
 
   // Combine all notifications with proper filtering
   useEffect(() => {
@@ -69,27 +70,23 @@ const NotificationSystem = ({
 
   // Send browser notifications (excluding message types, but allowing missed_message)
   useEffect(() => {
-    if (notifications.length > 0 && 'Notification' in window && Notification.permission === 'granted') {
-      const unreadNotifications = notifications.filter(n => !n.read && n.type !== 'message');
-      if (unreadNotifications.length > 0) {
-        const latestUnread = unreadNotifications[unreadNotifications.length - 1];
-        // Only show notification if we haven't shown it before
-        if (!latestUnread.notified) {
-          new Notification(latestUnread.title, {
-            body: latestUnread.message,
-            icon: '/favicon.ico',
-            tag: latestUnread.id
-          });
-          // Mark as notified to prevent duplicate notifications
-          setNotifications(prev =>
-            prev.map(n =>
-              n.id === latestUnread.id ? { ...n, notified: true } : n
-            )
-          );
-        }
-      }
+    if ('Notification' in window && Notification.permission === 'granted') {
+      const unreadAnnouncements = notifications.filter(
+        n => n.type === 'announcement' && 
+        !notifiedIds.has(n.id)
+      );
+      
+      unreadAnnouncements.forEach(notification => {
+        new Notification(notification.title, {
+          body: notification.message,
+          icon: '/favicon.ico',
+          tag: notification.id
+        });
+        // Add the ID to the set of notified IDs to prevent duplicates
+        setNotifiedIds(prev => new Set(prev).add(notification.id));
+      });
     }
-  }, [notifications.length]); // Only depend on length to avoid infinite loops
+  }, [notifications, notifiedIds]);
 
   const handleNotificationClick = (notification) => {
     // Remove the clicked notification from its source of truth.

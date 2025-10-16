@@ -707,12 +707,13 @@ const handleClearChat = async () => {
                                         {message.file?.type || message.file_type}
                                       </p> */}
                                       {message.file_url && (
-                                        <button
-                                          onClick={() => downloadFile(message.file_url, message.file_name)}
+                                        <a
+                                          href={message.file_url}
+                                          download={message.file_name}
                                           className="text-xs text-blue-600 hover:text-blue-800 mt-1 inline-block"
                                         >
                                           Download File
-                                        </button>
+                                        </a>
                                       )}
                                     </div>
                                   )}
@@ -835,12 +836,13 @@ const handleClearChat = async () => {
                                         {message.file?.type || message.file_type}
                                       </p>
                                       {message.file_url && (
-                                        <button
-                                          onClick={() => downloadFile(message.file_url, message.file_name)}
+                                        <a
+                                          href={message.file_url}
+                                          download={message.file_name}
                                           className="text-xs text-blue-600 hover:text-blue-800 mt-1 inline-block"
                                         >
                                           Download File
-                                        </button>
+                                        </a>
                                       )}
                                     </div>
                                   )}

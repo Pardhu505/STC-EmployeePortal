@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, WebSocket, WebSocketDisconnect, HTTPException, Request,Body
+from fastapi import FastAPI, APIRouter, WebSocket, WebSocketDisconnect, HTTPException, Request, Body, File, UploadFile
 from fastapi.responses import FileResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
@@ -6,6 +6,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import logging
 from pathlib import Path
+from motor.motor_asyncio import AsyncIOMotorGridFSBucket
 from pydantic import BaseModel, Field
 from typing import List, Dict, Union
 import base64
@@ -48,6 +49,9 @@ chat_db=attendance_client['Internal_communication']
 
 # STC_Employees database for user authentication
 stc_db = attendance_client['STC_Employees']
+
+# GridFS bucket for file storage in the chat database
+grid_fs = AsyncIOMotorGridFSBucket(chat_db)
 
 # DeletedMessages
 # Messages
@@ -2024,36 +2028,33 @@ async def login(request: LoginRequest):
 
 # File upload endpoint
 @api_router.post("/files/upload")
-async def upload_file(request: Request):
+async def upload_file(request: Request, file: UploadFile = File(...)):
     try:
-        form = await request.form()
-        file = form.get("file")
         if not file:
             raise HTTPException(status_code=400, detail="No file provided")
 
-        # Create uploads directory if it doesn't exist
-        uploads_dir = ROOT_DIR / "uploads"
-        uploads_dir.mkdir(exist_ok=True)
+        # Read file content into memory to get size and for uploading
+        content = await file.read()
+        file_size = len(content)
 
-        # Generate unique filename
-        file_extension = file.filename.split('.')[-1] if '.' in file.filename else ''
-        unique_filename = f"{uuid.uuid4()}.{file_extension}"
-        file_path = uploads_dir / unique_filename
-
-        # Save file
-        with open(file_path, "wb") as buffer:
-            content = await file.read()
-            buffer.write(content)
+        # Upload file to GridFS
+        file_id = await grid_fs.upload_from_stream(
+            file.filename,
+            content,
+            metadata={"contentType": file.content_type}
+        )
 
         # Dynamically create the file URL
         base_url = str(request.base_url)
-        file_url = f"{base_url}files/download/{unique_filename}"
+        # The URL now points to the new download endpoint with the GridFS file ID
+        file_url = f"{base_url}api/files/download/{str(file_id)}"
 
         # Return file metadata
         return {
+            "id": str(file_id),
             "file_name": file.filename,
             "file_type": file.content_type,
-            "file_size": len(content),
+            "file_size": file_size,
             "file_url": file_url
         }
     except Exception as e:
@@ -2716,8 +2717,8 @@ app.include_router(api_router)
 app.include_router(download_router)  # Include the download file router
 
 # Mount static files for uploads
-from fastapi.staticfiles import StaticFiles
-app.mount("/uploads", StaticFiles(directory=str(ROOT_DIR / "uploads")), name="uploads")
+# from fastapi.staticfiles import StaticFiles
+# app.mount("/uploads", StaticFiles(directory=str(ROOT_DIR / "uploads")), name="uploads") # This is no longer needed
 
 logging.basicConfig(
     level=logging.INFO,

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { API_BASE_URL } from '../config/api';
+import * as XLSX from 'xlsx';
 
 // Helper function to parse time strings like "10:40" into minutes
 const parseTime = (timeStr) => {
@@ -76,20 +77,14 @@ const parseCsvData = (csvData) => {
         const status = statusLine[index]?.trim() || '-';
         const inTimeStr = inTimeLine[index]?.trim() || '-';
         const outTimeStr = outTimeLine[index]?.trim() || '-';
+        const totalTimeStr = totalTimeLine[index]?.trim() || '-';
 
         let lateBy = '00:00';
         const inMinutes = parseTime(inTimeStr);
         if (inMinutes > 600 && status === 'P') { // >10AM
           lateBy = formatMinutesToTime(inMinutes - 600);
         }
-
-        let totalWorkingHours = '-';
-        if (inTimeStr !== '-' && outTimeStr !== '-') {
-          const inMin = parseTime(inTimeStr);
-          const outMin = parseTime(outTimeStr);
-          totalWorkingHours = formatMinutesToTime(outMin - inMin);
-        }
-
+        
         dailyRecords.push({
           // Format the date as YYYY-MM-DDTHH:mm:ss, which Pydantic can parse.
           // The backend will correctly handle this as a datetime object.
@@ -98,7 +93,7 @@ const parseCsvData = (csvData) => {
           inTime: inTimeStr,
           outTime: outTimeStr,
           lateBy,
-          totalWorkingHours,
+          totalWorkingHours: totalTimeStr,
         });
       });
 
@@ -123,6 +118,45 @@ const AttendanceReport = () => {
   const [showNameDropdown, setShowNameDropdown] = useState(false);
   const [showCodeDropdown, setShowCodeDropdown] = useState(false);
   // Initialize employeeData when file uploaded
+
+  const handleFileChange = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    setLoading(true);
+    // Reset dropdowns on new file selection
+    setShowNameDropdown(false);
+    setShowCodeDropdown(false);
+
+    const reader = new FileReader();
+
+    reader.onload = (e) => {
+      const fileContent = e.target.result;
+      const fileExtension = file.name.split('.').pop().toLowerCase();
+
+      if (fileExtension === 'xls' || fileExtension === 'xlsx') {
+        // Handle Excel file
+        const workbook = XLSX.read(fileContent, { type: 'binary' });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const csvData = XLSX.utils.sheet_to_csv(worksheet);
+        setUploadedFileContent(csvData);
+      } else {
+        // Handle CSV file (as before)
+        setUploadedFileContent(fileContent);
+      }
+      setLoading(false);
+    };
+
+    reader.onerror = (error) => {
+      console.error("Error reading file:", error);
+      setLoading(false);
+    };
+
+    // For Excel, read as binary string. For CSV, read as text. readAsBinaryString works for both here.
+    reader.readAsBinaryString(file);
+  };
+
   useEffect(() => {
     if (uploadedFileContent) {
       try {
@@ -375,6 +409,9 @@ const AttendanceReport = () => {
     if (reportType === 'day') {
       return (
         <div className="p-6 rounded-xl overflow-x-auto">
+          <div className="text-right text-sm text-slate-500 mb-2 pr-2">
+            Note: All time values are in HH:MM format.
+          </div>
           <table className="w-full table-auto text-left">
             <thead>
               <tr className="bg-sky-100">
@@ -502,6 +539,9 @@ const AttendanceReport = () => {
     if (reportType === 'month') {
       return (
         <div className="p-6 rounded-xl overflow-x-auto">
+         <div className="text-right text-sm text-[#225F8B] mb-2 pr-2">
+            Note: All time values are in HH:MM format.
+          </div>
           <table className="w-full table-auto text-left">
             <thead>
               <tr className="bg-sky-100">
@@ -624,22 +664,7 @@ const AttendanceReport = () => {
           <label htmlFor="file-upload" className="cursor-pointer bg-gradient-to-r from-[#225F8B] to-[#225F8B]/80 text-white font-semibold py-2 px-6 rounded-lg shadow-md transition-colors duration-200">
             Choose File
           </label>
-          <input id="file-upload" type="file" accept=".csv" onChange={(e) => {
-            // reset dropdowns when new file selected
-            setShowNameDropdown(false);
-            setShowCodeDropdown(false);
-            // read file
-            const file = e.target.files[0];
-            if (file) {
-              setLoading(true);
-              const reader = new FileReader();
-              reader.onload = (ev) => {
-                setUploadedFileContent(ev.target.result);
-                setLoading(false);
-              };
-              reader.readAsText(file);
-            }
-          }} className="hidden" />
+          <input id="file-upload" type="file" accept=".csv, .xls, .xlsx" onChange={handleFileChange} className="hidden" />
         </div>
 
         {uploadedFileContent && (

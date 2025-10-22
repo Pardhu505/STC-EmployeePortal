@@ -2333,7 +2333,7 @@ async def get_manager_attendance_report(request: ManagerReportRequest):
                         "inTime": "$dailyRecords.inTime",
                         "outTime": "$dailyRecords.outTime",
                         "lateBy": "$dailyRecords.lateBy",
-                        "total": "$dailyRecords.totalWorkingHours",
+                        "totalWorkingHours": "$dailyRecords.totalWorkingHours",
                     }
                 }
             ]

@@ -91,29 +91,14 @@ useEffect(() => {
     const dayData = attendanceData[0];
     const formattedDate = selectedDate.toLocaleDateString();
     let status = 'Not Recorded';
-    let inTime = null;
-    let outTime = null;
-    let totalMinutes = 0;
+    let inTime = dayData?.inTime || null;
+    let outTime = dayData?.outTime || null;
+    let totalWorkingHours = dayData?.totalWorkingHours || '00:00';
 
     if (dayData) {
       if (dayData.status === 'P') status = 'Present';
       else if (dayData.status === 'A') status = 'Absent';
       else if (dayData.status === 'WO') status = 'Week Off';
-
-      inTime = dayData.inTime || null;
-      outTime = dayData.outTime || null;
-
-      if (inTime && outTime) {
-        const [inH, inM] = inTime.split(':').map(Number);
-        const [outH, outM] = outTime.split(':').map(Number);
-
-        const startTime = new Date(selectedDate);
-        startTime.setHours(inH, inM, 0, 0);
-        const endTime = new Date(selectedDate);
-        endTime.setHours(outH, outM, 0, 0);
-
-        totalMinutes = (endTime - startTime) / (1000 * 60);
-      }
     }
 
     return {
@@ -121,7 +106,7 @@ useEffect(() => {
       status,
       inTime,
       outTime,
-      totalWorkingHours: formatMinutesToHoursMinutes(totalMinutes),
+      totalWorkingHours: totalWorkingHours,
       lateBy: formatMinutesToHoursMinutes(calculateLateBy(inTime)),
     };
   }, [attendanceData, viewType, selectedDate]);
@@ -185,6 +170,9 @@ useEffect(() => {
     return (
       <>
         <div className="overflow-x-auto">
+          <div className="text-right text-sm text-[#225F8B] mb-2 pr-2">
+            Note: All time values are in HH:MM format.
+          </div>
           <h3 className="text-xl font-semibold mb-4 text-center">Day-wise Report for {dailyStats.formattedDate}</h3>
           <table className="min-w-full bg-white rounded-lg shadow-md overflow-hidden">
             <thead className="bg-sky-100">
@@ -217,6 +205,9 @@ useEffect(() => {
     return (
       <>
         <div className="overflow-x-auto">
+          <div className="text-right text-sm text-[#225F8B] mb-2 pr-2">
+            Note: All time values are in HH:MM format.
+          </div>
           <h3 className="text-xl font-semibold mb-4 text-center">Month-wise Report for {monthlyStats.selectedMonth}</h3>
           <table className="min-w-full bg-white rounded-lg shadow-md overflow-hidden">
             <thead className="bg-sky-100">

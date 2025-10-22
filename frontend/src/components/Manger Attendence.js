@@ -110,7 +110,7 @@ const ReportingManagerReport = () => {
             inTime: empData?.inTime ?? "-",
             outTime: empData?.outTime ?? "-",
             lateBy: empData?.lateBy ?? "00:00",
-            total: empData?.totalWorkingHours ?? "-",
+            totalWorkingHours: empData?.totalWorkingHours ?? "-",
           };
         });
 
@@ -160,7 +160,7 @@ const ReportingManagerReport = () => {
       inTime: e.inTime || "-",
       outTime: e.outTime || "-",
       lateBy: fmt(calcLateBy(e.inTime)),
-      total: fmt(calcWorkMins(e.inTime, e.outTime)),
+      totalWorkingHours: e.totalWorkingHours || "00:00",
       P: Number(e.P ?? 0),
       A: Number(e.A ?? 0),
       L: Number(e.L ?? 0),
@@ -288,6 +288,9 @@ const ReportingManagerReport = () => {
 
             {/* TABLES */}
             <div className="p-6 rounded-xl overflow-x-auto">
+              <div className="text-right text-sm text-[#225F8B] mb-2 pr-2">
+                Note: All time values are in HH:MM format.
+              </div>
               <table className="w-full table-auto text-left">
                 <thead>
                   <tr className="bg-sky-100">
@@ -321,7 +324,7 @@ const ReportingManagerReport = () => {
                           <td className="px-4 py-3 text-slate-600 font-bold text-center">{e.inTime}</td>
                           <td className="px-4 py-3 text-slate-600 font-bold text-center">{e.outTime}</td>
                           <td className="px-4 py-3 text-red-500 font-bold text-center">{e.lateBy}</td>
-                          <td className="px-4 py-3 text-slate-600 font-bold text-center">{e.total}</td>
+                          <td className="px-4 py-3 text-slate-600 font-bold text-center">{e.totalWorkingHours}</td>
                         </>
                       ) : (
                         <>

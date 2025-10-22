@@ -1020,8 +1020,24 @@ export const PORTAL_DATA = [
     ),
     gradient: "from-gray-700 to-gray-900",
     category: "Analytics • Social Media"
-  }
+  },
+   {
+    id: 7,
+    title: "Central Repository",
+    description: "Centralized, secure data repository that unifies all departmental information for streamlined access and collaboration.",
+    url: "https://stc-central-data-repository.vercel.app/",
+    icon: (
+      <img
+        src="https://www.pngaaa.com/api-download/7004777"
+        alt="Repository"
+        className="w-8 h-8"
+      />
+    ),
+    gradient: "from-blue-400 to-blue-600 border border-blue-500",
+    category: "Analytics"
+  },
 ];
+
 
 
 export const ANNOUNCEMENTS_DATA = [

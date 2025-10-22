@@ -1034,7 +1034,7 @@ export const PORTAL_DATA = [
       />
     ),
     gradient: "from-blue-400 to-blue-600 border border-blue-500",
-    category: "Analytics"
+    category: "Data Management"
   },
 ];
 

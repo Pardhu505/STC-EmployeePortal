@@ -9,19 +9,64 @@ import InternalCommunication from './InternalCommunication';
 import AdminPanel from './AdminPanel';
 import PayslipManagement from './PayslipManagement';
 
-import { Card, CardContent } from './ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Calendar, Users, BarChart3, Bell, MessageSquare, Gift, Shield, FileText, CalendarCheck } from 'lucide-react';
-import { checkBirthdays, generateBirthdayAnnouncements } from '../data/mock';
 import EAttendance from './Attence1';
 import ManagerReport from './Manger Attendence';
 import AttendanceReport from './AttedenceReport';
+import { employeeAPI } from '@/Services/api';
 
 const Dashboard = () => {
   const { user, loading: authLoading, navigationTarget } = useAuth();
   const [activeSection, setActiveSection] = useState('portals');
   const [readAnnouncementIds, setReadAnnouncementIds] = useState(new Set());
   const [announcements, setAnnouncements] = useState([]);
+  const [allEmployees, setAllEmployees] = useState([]);
+
+  // Helper to check for birthdays
+  const checkBirthdays = (employees) => {
+    const today = new Date();
+    const todayMonth = today.getMonth() + 1; // JS months are 0-indexed
+    const todayDay = today.getDate();
+
+    return employees.filter(employee => {
+      if (!employee.date_of_birth) return false;
+      const dob = new Date(employee.date_of_birth);
+      const dobMonth = dob.getMonth() + 1;
+      const dobDay = dob.getDate();
+      return dobMonth === todayMonth && dobDay === todayDay;
+    });
+  };
+
+  // Helper to generate birthday announcements
+  const generateBirthdayAnnouncements = (birthdayEmployees, currentUser) => {
+    return birthdayEmployees.map(employee => {
+      // Check if the current user is the one having a birthday
+      if (currentUser && currentUser.email === employee.email) {
+        // Message for the birthday person
+        return {
+          id: `birthday-personal-${employee.email}`,
+          type: 'birthday-personal',
+          title: `Happy Birthday, ${employee.name}!`,
+          content: `We wish you all the best on your special day. Thank you for being a valuable part of our team. Have a wonderful celebration! 🎂`,
+          author: 'Showtime Consulting',
+          date: new Date().toISOString(),
+          priority: 'high',
+        };
+      }
+      // Message for everyone else
+      return {
+        id: `birthday-announcement-${employee.email}`,
+        type: 'birthday',
+        title: `It's ${employee.name}'s Birthday!`,
+        content: `Join us in wishing ${employee.name} a very happy birthday today! 🎉`,
+        author: 'Showtime HR',
+        date: new Date().toISOString(),
+        priority: 'medium',
+      };
+    });
+  };
 
   const fetchAnnouncements = async () => {
     try {
@@ -29,12 +74,16 @@ const Dashboard = () => {
       if (!response.ok) throw new Error('Failed to fetch announcements');
       const data = await response.json();
       
+      // Fetch all employees to check for birthdays
+      const employees = await employeeAPI.getAllEmployees();
+      setAllEmployees(employees);
+
       // Generate birthday announcements
-      const birthdayEmployees = checkBirthdays();
-      const birthdayAnns = generateBirthdayAnnouncements(birthdayEmployees);
+      const birthdayEmployees = checkBirthdays(employees, user);
+      const birthdayAnns = generateBirthdayAnnouncements(birthdayEmployees, user);
 
       // Combine fetched announcements with birthday announcements
-      setAnnouncements([...birthdayAnns, ...data]);
+      setAnnouncements([...data, ...birthdayAnns]);
 
     } catch (error) {
       console.error("Dashboard: Failed to fetch announcements", error);

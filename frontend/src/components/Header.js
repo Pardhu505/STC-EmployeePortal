@@ -54,25 +54,26 @@ const Header = ({ onSectionChange, newAnnouncements, onReadAnnouncement }) => {
 
   const handleDeactivateAccount = async () => {
     try {
-      // Correcting the API call to match the backend endpoint
-      const response = await fetch(`${API_BASE_URL}/api/users/${user.email}/deactivate`, {
+      // The user object is used to create the auth token.
+      const token = btoa(JSON.stringify(user));
+
+      const response = await fetch(`${API_BASE_URL}/api/users/me/deactivate`, {
         method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
       });
 
       if (!response.ok) {
-        // Handle specific case where user is already inactive
-        if (response.status === 400) {
-          const errorData = await response.json();
-          toast({
-            title: "Info",
-            description: errorData.detail || "Account is already inactive.",
-          });
-          // Still log out the user
-          logout();
-          navigate('/login');
-          return; // Stop further execution
-        }
-        throw new Error(`Server responded with status: ${response.status}`);
+        const errorData = await response.json();
+        // The backend might return a 403 if the account is already inactive via the login check.
+        // Or a custom message. We handle it gracefully.
+        toast({
+          title: "Deactivation Failed",
+          description: errorData.detail || `Server responded with status: ${response.status}`,
+          variant: "destructive",
+        });
+        return;
       }
       toast({
         title: "Account Deactivated",
@@ -90,8 +91,6 @@ const Header = ({ onSectionChange, newAnnouncements, onReadAnnouncement }) => {
     }
     setShowDeactivateDialog(false);
   };
-
-
 
   return (
     <header className="bg-white/80 backdrop-blur-md shadow-sm border-b border-gray-200 sticky top-0 z-50">

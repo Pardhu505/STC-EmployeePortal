@@ -1743,12 +1743,6 @@ async def deactivate_employee(employeeId: str, admin_user: dict = Depends(get_cu
         logging.error(f"Error deactivating employee {employeeId}: {e}")
         raise HTTPException(status_code=500, detail="Error deactivating employee")
 
-class PasswordChangeRequest(BaseModel):
-    current_password: str
-    new_password: str
-        logging.error(f"Error deactivating employee {employeeId}: {e}")
-        raise HTTPException(status_code=500, detail="Error deactivating employee")
-
 @api_router.put("/users/me/deactivate")
 async def deactivate_self(
     authorization: str = Header(..., alias="Authorization"),
@@ -1781,7 +1775,6 @@ async def deactivate_self(
 class PasswordChangeRequest(BaseModel):
     current_password: str
     new_password: str
-
 
 @api_router.put("/users/{user_id}/change-password")
 async def change_password(user_id: str, request: PasswordChangeRequest, admin_user: Optional[dict] = None) -> JSONResponse:

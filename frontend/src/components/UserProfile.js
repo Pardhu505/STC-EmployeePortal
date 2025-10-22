@@ -42,6 +42,7 @@ const UserProfile = () => {
   const [userDetails, setUserDetails] = useState(null);
   const [allEmployees, setAllEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loginTime, setLoginTime] = useState(null);
   
   // Fetch user and employee data from API
   useEffect(() => {
@@ -76,6 +77,12 @@ const UserProfile = () => {
           }
       };
       fetchData();
+
+      // Fetch login time from localStorage
+      const storedLoginTime = localStorage.getItem('loginTime');
+      if (storedLoginTime) {
+        setLoginTime(storedLoginTime);
+      }
   }, [user?.email, toast]);
 
   // Sync formData with userDetails from API or user from AuthContext
@@ -594,7 +601,7 @@ const UserProfile = () => {
             <div>
               <p className="text-sm font-medium text-gray-700">Last Login</p>
               <p className="text-sm text-gray-900">
-                {user?.loginTime ? new Date(user.loginTime).toLocaleString() : 'Just now'}
+               {loginTime ? new Date(loginTime).toLocaleString() : 'Just now'}
               </p>
             </div>
           </div>

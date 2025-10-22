@@ -5,7 +5,7 @@ import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
-import { Textarea } from './ui/textarea';
+import { Textarea } from './ui/textarea'; // Corrected import
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Calendar, User, AlertCircle, Info, CheckCircle, Plus, Send, Shield, Trash2, X, Loader2 } from 'lucide-react';
 import { useToast } from '../hooks/use-toast';
@@ -288,6 +288,69 @@ const Announcements = ({ announcements, setAnnouncements }) => {
         filteredAnnouncements.length > 0 ? (
           filteredAnnouncements.map((announcement) => {
             const PriorityIcon = priorityIcons[announcement.priority];
+
+            if (announcement.type === 'birthday-personal') {
+              return (
+                <Card
+                  key={announcement.id}
+                  className="border-0 bg-gradient-to-r from-purple-50 via-pink-50 to-rose-50 hover:shadow-lg transition-all duration-300"
+                >
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-lg font-semibold text-rose-800">
+                        🎉 {announcement.title}
+                      </CardTitle>
+                      <Badge variant="outline" className="bg-pink-200 text-pink-800 border-pink-300">
+                        Your Birthday!
+                      </Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-rose-700 leading-relaxed">
+                      {announcement.content}
+                    </p>
+                    <div className="flex items-center space-x-4 text-sm text-rose-600 mt-3">
+                      <div className="flex items-center space-x-1">
+                        <User className="h-4 w-4" />
+                        <span>{announcement.author}</span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            }
+
+            if (announcement.type === 'birthday') {
+              return (
+                <Card 
+                  key={announcement.id} 
+                  className="border-0 bg-gradient-to-r from-yellow-50 via-amber-50 to-orange-50 hover:shadow-lg transition-all duration-300"
+                >
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-lg font-semibold text-amber-800">
+                        🎂 {announcement.title}
+                      </CardTitle>
+                      <Badge variant="outline" className="bg-yellow-200 text-yellow-800 border-yellow-300">
+                        Birthday
+                      </Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-amber-700 leading-relaxed">
+                      {announcement.content}
+                    </p>
+                    <div className="flex items-center space-x-4 text-sm text-amber-600 mt-3">
+                      <div className="flex items-center space-x-1">
+                        <User className="h-4 w-4" />
+                        <span>{announcement.author}</span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            }
+
             return (
               <Card 
                 key={announcement.id} 

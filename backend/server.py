@@ -1746,6 +1746,42 @@ async def deactivate_employee(employeeId: str, admin_user: dict = Depends(get_cu
 class PasswordChangeRequest(BaseModel):
     current_password: str
     new_password: str
+        logging.error(f"Error deactivating employee {employeeId}: {e}")
+        raise HTTPException(status_code=500, detail="Error deactivating employee")
+
+@api_router.put("/users/me/deactivate")
+async def deactivate_self(
+    authorization: str = Header(..., alias="Authorization"),
+):
+    """
+    Allows a currently authenticated user to deactivate their own account.
+    The user is identified via their Authorization token.
+    """
+    try:
+        # We can reuse the admin dependency logic to get the user from the token,
+        # but we don't need to check for admin privileges here.
+        if not authorization or not authorization.startswith("Bearer "):
+            raise HTTPException(status_code=401, detail="Not authenticated")
+        
+        token_str = authorization.split(" ")[1]
+        decoded_token = base64.b64decode(token_str).decode('utf-8')
+        user_data_from_token = json.loads(decoded_token)
+        user_email = user_data_from_token.get("email")
+
+        if not user_email:
+            raise HTTPException(status_code=401, detail="Invalid token: email missing.")
+
+        # Use the existing admin-level deactivate function, but pass the user's own email
+        # and a dummy admin_user object to satisfy the dependency.
+        return await deactivate_employee(employeeId=user_email, admin_user={"email": user_email})
+    except Exception as e:
+        logging.error(f"Error during self-deactivation for token: {e}")
+        raise HTTPException(status_code=500, detail="An error occurred during account deactivation.")
+
+class PasswordChangeRequest(BaseModel):
+    current_password: str
+    new_password: str
+
 
 @api_router.put("/users/{user_id}/change-password")
 async def change_password(user_id: str, request: PasswordChangeRequest, admin_user: Optional[dict] = None) -> JSONResponse:

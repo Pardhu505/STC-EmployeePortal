@@ -22,7 +22,9 @@ const Login = () => {
     setLoading(true);
     setError('');
     try {
-      await login(identifier, password);
+      const loggedInUser = await login(identifier, password);
+      // Store the login time in localStorage
+      localStorage.setItem('loginTime', new Date().toISOString());
       navigate('/dashboard');
     } catch (err) {
       setError(err.message);

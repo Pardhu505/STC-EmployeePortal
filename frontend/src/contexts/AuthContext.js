@@ -629,4 +629,8 @@ export const AuthProvider = ({ children }) => {
   }), [user, loading, isConnected, userStatuses, newMessages, currentChannel, currentChatUser, notificationPermission, allChannels, allEmployees, navigationTarget]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+<<<<<<< HEAD
 };
+=======
+};
+>>>>>>> 8be87e4 (Initial commit with frontend and backend)

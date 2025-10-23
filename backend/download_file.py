@@ -9,20 +9,15 @@ router = APIRouter()
 
 # --- Database Connection for GridFS ---
 # This setup ensures the router has its own context for the database
-<<<<<<< HEAD
+
 attendance_mongo_url = os.environ.get("ATTENDANCE_MONGO_URL")
-=======
-attendance_mongo_url = "mongodb+srv://poori420:5imYVGkw7F0cE5K2@cluster0.53oeybd.mongodb.net/"
->>>>>>> 8be87e4 (Initial commit with frontend and backend)
+
 attendance_client = AsyncIOMotorClient(attendance_mongo_url, tlsAllowInvalidCertificates=True)
 chat_db = attendance_client['Internal_communication']
 grid_fs = AsyncIOMotorGridFSBucket(chat_db)
 
 
-<<<<<<< HEAD
-=======
 
->>>>>>> 8be87e4 (Initial commit with frontend and backend)
 @router.get("/api/files/download/{file_id}")
 async def download_file(file_id: str):
     try:

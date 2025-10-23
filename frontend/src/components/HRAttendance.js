@@ -1,4 +1,7 @@
+<<<<<<< HEAD
 
+=======
+>>>>>>> 8be87e4 (Initial commit with frontend and backend)
 import React, { useState, useEffect, useMemo } from 'react';
 import { API_BASE_URL } from '../config/api';
 import { useAuth } from '../contexts/AuthContext';
@@ -458,4 +461,8 @@ const HRAttendance = () => {
   );
 };
 
+<<<<<<< HEAD
 export default HRAttendance;
+=======
+export default HRAttendance;
+>>>>>>> 8be87e4 (Initial commit with frontend and backend)

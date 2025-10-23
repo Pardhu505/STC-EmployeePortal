@@ -7,8 +7,12 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Textarea } from './ui/textarea'; // Corrected import
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+<<<<<<< HEAD
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Calendar as CalendarIcon, User, AlertCircle, Info, CheckCircle, Plus, Send, Shield, Trash2, X, Loader2 } from 'lucide-react';
+=======
+import { Calendar, User, AlertCircle, Info, CheckCircle, Plus, Send, Shield, Trash2, X, Loader2 } from 'lucide-react';
+>>>>>>> 8be87e4 (Initial commit with frontend and backend)
 import { useToast } from '../hooks/use-toast';
 import { API_BASE_URL } from '../config/api';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
@@ -21,8 +25,12 @@ const Announcements = ({ announcements, setAnnouncements }) => {
     title: '',
     content: '',
     priority: 'medium',
+<<<<<<< HEAD
     author: user?.name || 'Admin',
     scheduledTime: null
+=======
+    author: user?.name || 'Admin'
+>>>>>>> 8be87e4 (Initial commit with frontend and backend)
   });
   const { toast } = useToast();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -83,7 +91,10 @@ const Announcements = ({ announcements, setAnnouncements }) => {
           title: newAnnouncement.title,
           content: newAnnouncement.content,
           priority: newAnnouncement.priority,
+<<<<<<< HEAD
           scheduled_time: newAnnouncement.scheduledTime ? newAnnouncement.scheduledTime.toISOString() : null
+=======
+>>>>>>> 8be87e4 (Initial commit with frontend and backend)
         })
       });
 
@@ -98,10 +109,15 @@ const Announcements = ({ announcements, setAnnouncements }) => {
       // So, we don't need to manually add it here.
 
       toast({
+<<<<<<< HEAD
         title: newAnnouncement.scheduledTime ? "Announcement Scheduled" : "Announcement Created",
         description: newAnnouncement.scheduledTime
           ? `Your announcement is scheduled to be published on ${newAnnouncement.scheduledTime.toLocaleString()}.`
           : "Your announcement has been published to all employees.",
+=======
+        title: "Announcement Created",
+        description: "Your announcement has been published to all employees.",
+>>>>>>> 8be87e4 (Initial commit with frontend and backend)
       });
     } catch (error) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -222,6 +238,7 @@ const Announcements = ({ announcements, setAnnouncements }) => {
               </div>
             </div>
             <div>
+<<<<<<< HEAD
               <Label htmlFor="scheduledTime" className="text-sm font-medium text-gray-700">
                 Schedule (Optional)
               </Label>
@@ -279,6 +296,8 @@ const Announcements = ({ announcements, setAnnouncements }) => {
               </div>
             </div>
             <div>
+=======
+>>>>>>> 8be87e4 (Initial commit with frontend and backend)
               <Label htmlFor="content" className="text-sm font-medium text-gray-700">
                 Content
               </Label>
@@ -538,4 +557,8 @@ const Announcements = ({ announcements, setAnnouncements }) => {
   );
 };
 
+<<<<<<< HEAD
 export default Announcements;
+=======
+export default Announcements;
+>>>>>>> 8be87e4 (Initial commit with frontend and backend)

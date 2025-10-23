@@ -287,4 +287,8 @@ const NotificationSystem = ({
   );
 };
 
+<<<<<<< HEAD
 export default NotificationSystem;
+=======
+export default NotificationSystem;
+>>>>>>> 8be87e4 (Initial commit with frontend and backend)

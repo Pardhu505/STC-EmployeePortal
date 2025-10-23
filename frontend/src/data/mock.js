@@ -982,7 +982,12 @@ export const PORTAL_DATA = [
     url: "https://stc-survey-manageme-portal.vercel.app",
     icon: "📋",
     gradient: "from-purple-500 to-pink-600",
+<<<<<<< HEAD
     category: "Analytics"
+=======
+    category: "Analytics",
+    managerOnly: true
+>>>>>>> 8be87e4 (Initial commit with frontend and backend)
   },
   {
     id: 4,
@@ -991,7 +996,12 @@ export const PORTAL_DATA = [
     url: "https://youtube-trendsshowtimeconsultingin.vercel.app",
     icon: "▶️",
     gradient: "from-red-500 to-red-700",
+<<<<<<< HEAD
     category: "Analytics • Social Media"
+=======
+    category: "Analytics • Social Media",
+    managerOnly: true
+>>>>>>> 8be87e4 (Initial commit with frontend and backend)
   },
   {
     id: 5,
@@ -1000,7 +1010,12 @@ export const PORTAL_DATA = [
     url: "https://newsanalysisshowtimeconsultingin.vercel.app",
     icon: "📰",
     gradient: "from-teal-500 to-cyan-600",
+<<<<<<< HEAD
     category: "News • Analytics"
+=======
+    category: "News • Analytics",
+    managerOnly: true
+>>>>>>> 8be87e4 (Initial commit with frontend and backend)
   },
   {
     id: 6,
@@ -1019,7 +1034,12 @@ export const PORTAL_DATA = [
       </svg>
     ),
     gradient: "from-gray-700 to-gray-900",
+<<<<<<< HEAD
     category: "Analytics • Social Media"
+=======
+    category: "Analytics • Social Media",
+    managerOnly: true
+>>>>>>> 8be87e4 (Initial commit with frontend and backend)
   },
    {
     id: 7,
@@ -1034,7 +1054,12 @@ export const PORTAL_DATA = [
       />
     ),
     gradient: "from-blue-400 to-blue-600 border border-blue-500",
+<<<<<<< HEAD
     category: "Data Management"
+=======
+    category: "Data Management",
+    managerOnly: true
+>>>>>>> 8be87e4 (Initial commit with frontend and backend)
   },
 ];
 

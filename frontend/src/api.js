@@ -1,5 +1,9 @@
 // This file centralizes API calls for the application.
+<<<<<<< HEAD
 const API_BASE_URL = 'https://stc-employeeportal.onrender.com/api';
+=======
+const API_BASE_URL = 'http://localhost:8000/api';
+>>>>>>> 8be87e4 (Initial commit with frontend and backend)
 
 /**
  * Fetches the complete profile for a specific user by their email.

@@ -89,25 +89,38 @@ useEffect(() => {
     if (viewType === 'month') return null;
 
     const dayData = attendanceData[0];
+    const lateByString = formatMinutesToHoursMinutes(calculateLateBy(dayData?.inTime));
     const formattedDate = selectedDate.toLocaleDateString();
-    let status = 'Not Recorded';
+    let statusText = 'Not Recorded';
+    let statusColor = 'text-gray-500';
     let inTime = dayData?.inTime || null;
     let outTime = dayData?.outTime || null;
     let totalWorkingHours = dayData?.totalWorkingHours || '00:00';
 
     if (dayData) {
-      if (dayData.status === 'P') status = 'Present';
-      else if (dayData.status === 'A') status = 'Absent';
-      else if (dayData.status === 'WO') status = 'Week Off';
+      if (dayData.status === 'P' && lateByString !== '00:00') {
+        statusText = 'Present (Late)';
+        statusColor = 'text-orange-500';
+      } else if (dayData.status === 'P') {
+        statusText = 'Present';
+        statusColor = 'text-green-500';
+      } else if (dayData.status === 'A') {
+        statusText = 'Absent';
+        statusColor = 'text-red-500';
+      } else if (dayData.status === 'WO' || dayData.status === 'S') {
+        statusText = 'Week Off';
+        statusColor = 'text-gray-500';
+      }
     }
 
     return {
       formattedDate,
-      status,
+      status: statusText,
+      statusColor,
       inTime,
       outTime,
       totalWorkingHours: totalWorkingHours,
-      lateBy: formatMinutesToHoursMinutes(calculateLateBy(inTime)),
+      lateBy: lateByString,
     };
   }, [attendanceData, viewType, selectedDate]);
 
@@ -160,13 +173,7 @@ useEffect(() => {
 
   // --- Day-wise Report ---
   const renderDayReport = () => {
-    const statusColorClass = {
-      'Present': 'text-green-600',
-      'Absent': 'text-red-600',
-      'Week Off': 'text-blue-600',
-      'Not Recorded': 'text-gray-500',
-    }[dailyStats.status];
-
+    const statusColorClass = dailyStats.statusColor || 'text-gray-500';
     return (
       <>
         <div className="overflow-x-auto">
@@ -247,14 +254,7 @@ useEffect(() => {
               </div>
               <div className="p-4 rounded-xl shadow-lg border border-slate-200">
                 <h3 className="text-lg font-semibold text-slate-700">Day Status</h3>
-                <p className={`text-3xl font-bold mt-2 ${
-                  {
-                    'Present': 'text-green-600',
-                    'Absent': 'text-red-600',
-                    'Week Off': 'text-blue-600',
-                    'Not Recorded': 'text-gray-500'
-                  }[dailyStats.status]
-                }`}>{dailyStats.status}</p>
+                <p className={`text-3xl font-bold mt-2 ${dailyStats.statusColor}`}>{dailyStats.status}</p>
               </div>
             </div>
           ) : viewType === 'month' && monthlyStats ? (

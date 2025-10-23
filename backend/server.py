@@ -39,11 +39,9 @@ main_client = AsyncIOMotorClient(main_mongo_url)
 main_db = main_client[os.environ['DB_NAME']]
 
 # MongoDB connection for the Attendance, Chat, and STC_Employees databases (your Atlas connection)
-<<<<<<< HEAD
+
 attendance_mongo_url = os.environ.get("ATTENDANCE_MONGO_URL")
-=======
-attendance_mongo_url = "mongodb+srv://poori420:5imYVGkw7F0cE5K2@cluster0.53oeybd.mongodb.net/"
->>>>>>> 8be87e4 (Initial commit with frontend and backend)
+
 attendance_client = AsyncIOMotorClient(attendance_mongo_url, tlsAllowInvalidCertificates=True)
 
 # Correct the database name to 'employee_attendance'

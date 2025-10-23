@@ -4,23 +4,34 @@ import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { ExternalLink, ArrowRight } from 'lucide-react';
 import { PORTAL_DATA } from '../data/mock';
+import { useAuth } from '../contexts/AuthContext';
 
 const PortalCards = () => {
+  const { user } = useAuth();
+  const isManager = user?.designation === 'Reporting manager';
+
   const handlePortalClick = (url) => {
     window.open(url, '_blank', 'noopener,noreferrer');
   };
+
+  const visiblePortals = PORTAL_DATA.filter(portal => {
+    if (portal.managerOnly) {
+      return isManager;
+    }
+    return true;
+  });
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold text-gray-900">Portal Access</h2>
         <Badge variant="outline" className="bg-[#225F8B]/10 text-[#225F8B] border-[#225F8B]/20">
-          {PORTAL_DATA.length} Available
+          {visiblePortals.length} Available
         </Badge>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {PORTAL_DATA.map((portal) => (
+        {visiblePortals.map((portal) => (
           <Card 
             key={portal.id} 
             className="group hover:shadow-xl transition-all duration-300 cursor-pointer border-0 bg-white/80 backdrop-blur-sm hover:scale-105"

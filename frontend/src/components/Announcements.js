@@ -8,7 +8,6 @@ import { Label } from './ui/label';
 import { Textarea } from './ui/textarea'; // Corrected import
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
-import { Calendar } from './ui/calendar';
 import { Calendar as CalendarIcon, User, AlertCircle, Info, CheckCircle, Plus, Send, Shield, Trash2, X, Loader2 } from 'lucide-react';
 import { useToast } from '../hooks/use-toast';
 import { API_BASE_URL } from '../config/api';

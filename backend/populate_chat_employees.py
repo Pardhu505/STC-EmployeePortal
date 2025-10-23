@@ -1,19 +1,17 @@
 import os
 from dotenv import load_dotenv
 from motor.motor_asyncio import AsyncIOMotorClient
-<<<<<<< HEAD
-from mock_data_module import DEPARTMENT_DATA
-=======
+
 from datetime import datetime, timezone, timedelta
 from typing import Union, Any
 import logging
->>>>>>> 8be87e4 (Initial commit with frontend and backend)
+
 
 # Load environment variables
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 load_dotenv(os.path.join(ROOT_DIR, '.env'))
 
-<<<<<<< HEAD
+
 # MongoDB connection for Internal_communication database (your Atlas connection)
 attendance_mongo_url = os.environ.get("ATTENDANCE_MONGO_URL")
 attendance_client = AsyncIOMotorClient(attendance_mongo_url, tlsAllowInvalidCertificates=True)
@@ -49,9 +47,9 @@ async def populate_chat_employees():
 if __name__ == "__main__":
     import asyncio
     asyncio.run(populate_chat_employees())
-=======
+
 # MongoDB connection for STC_Employees (attendance_client)
-attendance_mongo_url = "mongodb+srv://poori420:5imYVGkw7F0cE5K2@cluster0.53oeybd.mongodb.net/"
+
 attendance_client = AsyncIOMotorClient(attendance_mongo_url, tlsAllowInvalidCertificates=True)
 stc_db = attendance_client['STC_Employees']
 
@@ -193,4 +191,4 @@ if __name__ == "__main__":
     import asyncio
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
     asyncio.run(update_employee_reviewers())
->>>>>>> 8be87e4 (Initial commit with frontend and backend)
+

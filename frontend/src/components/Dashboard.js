@@ -7,14 +7,14 @@ import Announcements from './Announcements';
 import UserProfile from './UserProfile';
 import InternalCommunication from './InternalCommunication';
 import AdminPanel from './AdminPanel';
-import PayslipManagement from './PayslipManagement';
+// import PayslipManagement from './PayslipManagement';
 
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Calendar, Users, BarChart3, Bell, MessageSquare, Gift, Shield, FileText, CalendarCheck } from 'lucide-react';
-import EAttendance from './Attence1';
+import EAttendance from './EMPAttedence';
 import ManagerReport from './Manger Attendence';
-import AttendanceReport from './AttedenceReport';
+import AttendanceReport from './AdminAttedenceReport';
 import { employeeAPI } from '@/Services/api';
 
 const Dashboard = () => {
@@ -144,7 +144,7 @@ const Dashboard = () => {
       case 'profile': return <UserProfile />;
       case 'communication': return <InternalCommunication />;
       case 'admin': return <AdminPanel />;
-      case 'payslips': return <PayslipManagement />;
+      // case 'payslips': return <PayslipManagement />;
 
       case 'attendance':
         if (user?.isAdmin) return <AttendanceReport />;
@@ -159,7 +159,7 @@ const Dashboard = () => {
     { id: 'announcements', label: 'Announcements', icon: Bell },
     { id: 'communication', label: 'Communication', icon: MessageSquare },
     { id: 'attendance', label: user?.isAdmin ? 'Attendance Report' : 'Attendance', icon: CalendarCheck },
-    { id: 'payslips', label: 'Payslips', icon: FileText },
+    // { id: 'payslips', label: 'Payslips', icon: FileText },
 
     ...(user?.isAdmin ? [{ id: 'admin', label: 'Admin Panel', icon: Shield }] : []),
     { id: 'profile', label: 'Profile', icon: Users }

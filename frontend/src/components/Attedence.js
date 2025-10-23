@@ -1,5 +1,5 @@
 import React from "react";
-import EAttendance from "./Attence1";
+import EAttendance from "./EMPAttedence";
 import ReportingManagerReport from "./Manger Attendence";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 

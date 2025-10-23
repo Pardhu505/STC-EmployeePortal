@@ -153,10 +153,30 @@ const ReportingManagerReport = () => {
 
   // ---------- FILTERED DATA ---------- (unchanged)
   const filteredData = useMemo(() => {
-    let data = attendanceData.map((e) => ({
+    let data = attendanceData.map((e) => {
+      let statusText = '-';
+      let statusColor = 'text-gray-500';
+
+      if (e.status) {
+        if (e.status === 'P' && e.lateBy && e.lateBy !== '00:00') {
+          statusText = 'Present (Late)';
+          statusColor = 'text-orange-500';
+        } else if (e.status === 'P') {
+          statusText = 'Present';
+          statusColor = 'text-green-500';
+        } else if (e.status === 'A') {
+          statusText = 'Absent';
+          statusColor = 'text-red-500';
+        } else if (e.status === 'WO' || e.status === 'S') {
+          statusText = 'Week Off';
+          statusColor = 'text-gray-500';
+        }
+      }
+      return {
       empCode: getCode(e),
       empName: getName(e),
-      status: e.status,
+      statusText,
+      statusColor,
       inTime: e.inTime || "-",
       outTime: e.outTime || "-",
       lateBy: fmt(calcLateBy(e.inTime)),
@@ -164,7 +184,7 @@ const ReportingManagerReport = () => {
       P: Number(e.P ?? 0),
       A: Number(e.A ?? 0),
       L: Number(e.L ?? 0),
-    }));
+    }});
 
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
@@ -320,7 +340,9 @@ const ReportingManagerReport = () => {
                       <td className="px-4 py-3 text-slate-600 font-mono">{e.empCode}</td>
                       {reportType === "day" ? (
                         <>
-                          <td className="px-4 py-3 text-center">{e.status}</td>
+                          <td className={`px-4 py-3 text-center font-bold ${e.statusColor}`}>
+                            {e.statusText}
+                          </td>
                           <td className="px-4 py-3 text-slate-600 font-bold text-center">{e.inTime}</td>
                           <td className="px-4 py-3 text-slate-600 font-bold text-center">{e.outTime}</td>
                           <td className="px-4 py-3 text-red-500 font-bold text-center">{e.lateBy}</td>

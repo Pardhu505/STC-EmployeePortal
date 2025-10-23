@@ -574,6 +574,7 @@ class Announcement(BaseModel):
     title: str
     content: str
     priority: str
+    scheduled_time: Optional[datetime] = None
     author: str
     date: datetime = Field(default_factory=lambda: datetime.now(ist_tz))
 
@@ -2467,7 +2468,8 @@ async def create_announcement(
     try:
         announcement = Announcement(
             **announcement_data.model_dump(),
-            author=admin_user.get("name", "Admin")
+            author=admin_user.get("name", "Admin"),
+            date=announcement_data.scheduled_time if announcement_data.scheduled_time else datetime.now(ist_tz)
         )
         await chat_db.Announcements.insert_one(announcement.model_dump())
 

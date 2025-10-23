@@ -7,7 +7,8 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Textarea } from './ui/textarea'; // Corrected import
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { Calendar, User, AlertCircle, Info, CheckCircle, Plus, Send, Shield, Trash2, X, Loader2 } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
+import { Calendar as CalendarIcon, User, AlertCircle, Info, CheckCircle, Plus, Send, Shield, Trash2, X, Loader2 } from 'lucide-react';
 import { useToast } from '../hooks/use-toast';
 import { API_BASE_URL } from '../config/api';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
@@ -20,7 +21,8 @@ const Announcements = ({ announcements, setAnnouncements }) => {
     title: '',
     content: '',
     priority: 'medium',
-    author: user?.name || 'Admin'
+    author: user?.name || 'Admin',
+    scheduledTime: null
   });
   const { toast } = useToast();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -81,6 +83,7 @@ const Announcements = ({ announcements, setAnnouncements }) => {
           title: newAnnouncement.title,
           content: newAnnouncement.content,
           priority: newAnnouncement.priority,
+          scheduled_time: newAnnouncement.scheduledTime ? newAnnouncement.scheduledTime.toISOString() : null
         })
       });
 
@@ -95,8 +98,10 @@ const Announcements = ({ announcements, setAnnouncements }) => {
       // So, we don't need to manually add it here.
 
       toast({
-        title: "Announcement Created",
-        description: "Your announcement has been published to all employees.",
+        title: newAnnouncement.scheduledTime ? "Announcement Scheduled" : "Announcement Created",
+        description: newAnnouncement.scheduledTime
+          ? `Your announcement is scheduled to be published on ${newAnnouncement.scheduledTime.toLocaleString()}.`
+          : "Your announcement has been published to all employees.",
       });
     } catch (error) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -214,6 +219,63 @@ const Announcements = ({ announcements, setAnnouncements }) => {
                     <SelectItem value="low">Low Priority</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+            </div>
+            <div>
+              <Label htmlFor="scheduledTime" className="text-sm font-medium text-gray-700">
+                Schedule (Optional)
+              </Label>
+              <div className="flex items-center space-x-2">
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant={"outline"}
+                      className={`w-[280px] justify-start text-left font-normal mt-1 ${!newAnnouncement.scheduledTime && "text-muted-foreground"}`}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {newAnnouncement.scheduledTime ? newAnnouncement.scheduledTime.toLocaleString() : <span>Pick a date</span>}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={newAnnouncement.scheduledTime}
+                      onSelect={(date) => {
+                        if (!date) {
+                          setNewAnnouncement({ ...newAnnouncement, scheduledTime: null });
+                          return;
+                        }
+                        if (newAnnouncement.scheduledTime) {
+                          date.setHours(newAnnouncement.scheduledTime.getHours());
+                          date.setMinutes(newAnnouncement.scheduledTime.getMinutes());
+                        } else {
+                          const now = new Date();
+                          date.setHours(now.getHours());
+                          date.setMinutes(now.getMinutes());
+                        }
+                        setNewAnnouncement({ ...newAnnouncement, scheduledTime: date });
+                      }}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+                {newAnnouncement.scheduledTime && (
+                  <Input
+                    type="time"
+                    className="mt-1"
+                    value={
+                      `${String(newAnnouncement.scheduledTime.getHours()).padStart(2, '0')}:${String(newAnnouncement.scheduledTime.getMinutes()).padStart(2, '0')}`
+                    }
+                    onChange={(e) => {
+                      const time = e.target.value;
+                      const [hours, minutes] = time.split(':').map(Number);
+                      const newScheduledTime = new Date(newAnnouncement.scheduledTime);
+                      newScheduledTime.setHours(hours);
+                      newScheduledTime.setMinutes(minutes);
+                      setNewAnnouncement({ ...newAnnouncement, scheduledTime: newScheduledTime });
+                    }}
+                  />
+                )}
               </div>
             </div>
             <div>

@@ -8,13 +8,10 @@ ROOT_DIR = Path(__file__).parent
 from dotenv import load_dotenv
 load_dotenv(ROOT_DIR / '.env')
 
-<<<<<<< HEAD
+
 # MongoDB connection for the Attendance database (your Atlas connection)
 attendance_mongo_url = os.environ.get("ATTENDANCE_MONGO_URL")
-=======
-# MongoDB connection for the Attendance database
-attendance_mongo_url = "mongodb+srv://poori420:5imYVGkw7F0cE5K2@cluster0.53oeybd.mongodb.net/"
->>>>>>> 8be87e4 (Initial commit with frontend and backend)
+
 attendance_client = AsyncIOMotorClient(attendance_mongo_url, tlsAllowInvalidCertificates=True)
 
 # Correct the database name to 'employee_attendance'

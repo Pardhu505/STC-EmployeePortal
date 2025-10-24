@@ -28,6 +28,7 @@ const UserProfile = () => {
   });
   const [selectedFile, setSelectedFile] = useState(null);
   const [uploading, setUploading] = useState(false);
+  const [preview, setPreview] = useState(null);
   const fileInputRef = useRef(null);
 
   const [formData, setFormData] = useState({
@@ -134,6 +135,7 @@ const UserProfile = () => {
       updateProfile(updatedUser);
       setIsEditing(false);
       setSelectedFile(null); // Clear the selected file after a successful save
+      setPreview(null); // Clear the preview
       toast({
         title: "Profile Updated",
         description: "Your profile information has been saved successfully.",
@@ -193,12 +195,25 @@ const UserProfile = () => {
       date_of_birth: source.date_of_birth ? source.date_of_birth.split('T')[0] : ''
     });
     setIsEditing(false);
+    setSelectedFile(null);
+    setPreview(null);
   };
 
   // Profile picture handlers
   const handleFileChange = (e) => {
-    setSelectedFile(e.target.files[0]);
+    const file = e.target.files[0];
+    if (file) {
+      setSelectedFile(file);
+      setPreview(URL.createObjectURL(file));
+    }
   };
+
+  // Clean up the object URL to avoid memory leaks
+  useEffect(() => {
+    return () => {
+      if (preview) URL.revokeObjectURL(preview);
+    };
+  }, [preview]);
 
   const handleRemovePicture = async () => {
     setUploading(true);
@@ -210,6 +225,8 @@ const UserProfile = () => {
         title: "Profile Picture Removed",
         description: "Your profile picture has been removed.",
       });
+      setSelectedFile(null);
+      setPreview(null);
     } catch (error) {
       console.error("Failed to remove profile picture:", error);
       toast({
@@ -271,9 +288,9 @@ const UserProfile = () => {
         <Card className="lg:col-span-1 bg-gradient-to-br from-[#225F8B]/10 to-[#225F8B]/20 border-[#225F8B]/20">
           <CardContent className="p-6">
             <div className="text-center">
-              <Avatar key={user?.profilePicture || 'no-picture'} className="w-24 h-24 mx-auto mb-4">
-                {user?.profilePicture ? (
-                  <AvatarImage src={user.profilePicture} alt="Profile" />
+              <Avatar key={preview || user?.profilePicture || 'no-picture'} className="w-24 h-24 mx-auto mb-4">
+                {preview || user?.profilePicture ? (
+                  <AvatarImage src={preview || user.profilePicture} alt="Profile" />
                 ) : (
                   <AvatarFallback className="bg-gradient-to-r from-[#225F8B] to-[#225F8B]/80 text-white text-2xl">
                     {user?.name?.split(' ').map(n => n[0]).join('').slice(0, 2)}
@@ -300,7 +317,7 @@ const UserProfile = () => {
                     <Upload className="h-4 w-4 mr-1" />
                     Upload
                   </Button>
-                  {user?.profilePicture && (
+                  {(user?.profilePicture || preview) && (
                     <Button
                       variant="outline"
                       size="sm"

@@ -7,6 +7,7 @@ import Announcements from './Announcements';
 import UserProfile from './UserProfile';
 import InternalCommunication from './InternalCommunication';
 import AdminPanel from './AdminPanel';
+import AdminRoute from './AdminRoute'; // Import the AdminRoute component
 // import PayslipManagement from './PayslipManagement';
 
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
@@ -19,7 +20,7 @@ import HRAttendance from './HRAttendance'; // Import the new HR component
 import { employeeAPI } from '@/Services/api';
 
 const Dashboard = () => {
-  const { user, loading: authLoading, navigationTarget } = useAuth();
+  const { user, isAdmin, loading: authLoading, navigationTarget } = useAuth();
   const [activeSection, setActiveSection] = useState('portals');
   const [readAnnouncementIds, setReadAnnouncementIds] = useState(new Set());
   const [announcements, setAnnouncements] = useState([]);
@@ -144,11 +145,14 @@ const Dashboard = () => {
       case 'announcements': return <Announcements announcements={announcements} setAnnouncements={setAnnouncements} />;
       case 'profile': return <UserProfile />;
       case 'communication': return <InternalCommunication />;
-      case 'admin': return <AdminPanel />;
+      case 'admin': 
+        // Use the new isAdmin check from AuthContext
+        return isAdmin ? <AdminPanel /> : <PortalCards />;
       // case 'payslips': return <PayslipManagement />;
 
       case 'attendance':
-        if (user?.isAdmin) return <AttendanceReport />;
+        // Use the new isAdmin check from AuthContext
+        if (isAdmin) return <AttendanceReport />;
         if (
           user?.email === 'tejaswini@showtimeconsulting.in' ||
           user?.email === 'shashidhar.kumar@showtimeconsulting.in'
@@ -165,8 +169,8 @@ const Dashboard = () => {
     { id: 'communication', label: 'Communication', icon: MessageSquare },
     { id: 'attendance', label: user?.isAdmin ? 'Attendance Report' : 'Attendance', icon: CalendarCheck },
     // { id: 'payslips', label: 'Payslips', icon: FileText },
-
-    ...(user?.isAdmin ? [{ id: 'admin', label: 'Admin Panel', icon: Shield }] : []),
+    // Use the new isAdmin check from AuthContext to show/hide the Admin Panel button
+    ...(isAdmin ? [{ id: 'admin', label: 'Admin Panel', icon: Shield }] : []),
     { id: 'profile', label: 'Profile', icon: Users }
   ];
 

@@ -28,7 +28,7 @@ import { employeeAPI } from '../Services/api';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
 
 const AdminPanel = () => {
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedUser, setSelectedUser] = useState(null);
@@ -56,7 +56,7 @@ const AdminPanel = () => {
   };
 
   useEffect(() => {
-    if (user?.isAdmin) {
+    if (isAdmin) {
       fetchEmployees();
     }
   }, [user]);
@@ -166,7 +166,7 @@ const AdminPanel = () => {
     }
   };
 
-  if (!user?.isAdmin) {
+  if (!isAdmin) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <Card className="w-full max-w-md">

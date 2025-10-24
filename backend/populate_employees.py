@@ -354,8 +354,15 @@ class ConnectionManager:
         elif channel_id.startswith('dept-'):
             # Department channel, e.g., 'dept-data'
             dept_name_raw = channel_id.replace('dept-', '').replace('-', ' ')
-            dept_name = dept_name_raw.upper() if dept_name_raw == 'dmc' else dept_name_raw.title()
-            members = await get_employees_by_department(stc_db, dept_name)
+            # Find the original department name from DEPARTMENT_TEAMS keys
+            # This is more reliable than trying to reconstruct it.
+            dept_name_found = None
+            for dept in DEPARTMENT_TEAMS.keys():
+                if dept.lower().replace(' ', '-') == dept_name_raw:
+                    dept_name_found = dept
+                    break
+            
+            members = await get_employees_by_department(stc_db, dept_name_found) if dept_name_found else []
             return members
         elif channel_id.startswith('team-'):
             # Team channel, e.g., 'team-research'
@@ -655,7 +662,8 @@ async def get_employees_by_department(stc_db, dept_name: str) -> List[str]:
     collection_names = await stc_db.list_collection_names()
     team_collections = [stc_db[name] for name in collection_names]
     for collection in team_collections:
-        users = await collection.find({"department": dept_name}, {"email": 1, "_id": 0}).to_list(None)
+        # Use case-insensitive regex for matching department
+        users = await collection.find({"department": re.compile(f"^{re.escape(dept_name)}$", re.IGNORECASE)}, {"email": 1, "_id": 0}).to_list(None)
         for u in users:
             all_emails.add(u['email'])
     return list(all_emails)

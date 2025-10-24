@@ -39,7 +39,7 @@ main_client = AsyncIOMotorClient(main_mongo_url)
 main_db = main_client[os.environ['DB_NAME']]
 
 # MongoDB connection for the Attendance, Chat, and STC_Employees databases (your Atlas connection)
-attendance_mongo_url = os.environ.get("ATTENDANCE_MONGO_URL")
+attendance_mongo_url = "mongodb+srv://poori420:5imYVGkw7F0cE5K2@cluster0.53oeybd.mongodb.net/"
 attendance_client = AsyncIOMotorClient(attendance_mongo_url, tlsAllowInvalidCertificates=True)
 
 # Correct the database name to 'employee_attendance'
@@ -614,27 +614,6 @@ class EmployeeCreate(BaseModel):
     emergency_contact: str | None = None
     date_of_birth: datetime | None = None
     profilePicture: str | None = None
-
-
-class EmployeeWorkDetails(BaseModel):
-    """
-    Defines the structure for employee work details returned by the API.
-    Excludes sensitive information like password_hash.
-    """
-    id: str
-    name: str
-    email: str
-    designation: str
-    department: str
-    team: str
-    empCode: str
-    reviewer: Optional[str] = None
-    phone: Optional[str] = None
-    emergency_contact: Optional[str] = None
-    date_of_birth: Optional[Any] = None
-    last_online: Optional[datetime] = None
-    profilePicture: Optional[str] = None
-    active: Optional[bool] = True
 
 
 class StatusCheck(BaseModel):
@@ -1447,15 +1426,12 @@ async def get_employees_work_details(email: Optional[str] = None):
     """
     try:
         # Collect all employees from all collections
-        query = {"email": email} if email else {}
         all_employees_dict = {}
         collection_names = await stc_db.list_collection_names()
-        team_collection_names = [name for name in collection_names if not name.startswith('system.')]
-
-        for name in team_collection_names:
+        for name in collection_names:
             try:
                 collection = stc_db[name]
-                users = await collection.find(query, {"_id": 0, "password_hash": 0}).to_list(None)
+                users = await collection.find({}, {"_id": 0, "password_hash": 0}).to_list(None)
                 for user in users:
                     if user.get("email"):
                         all_employees_dict[user["email"]] = user
@@ -1463,11 +1439,6 @@ async def get_employees_work_details(email: Optional[str] = None):
                 logging.warning(f"Could not fetch employees from {name}: {e}")
 
         all_employees = list(all_employees_dict.values())
-
-        # If a specific user was requested and not found, return an empty list.
-        if email and not all_employees:
-            return []
-
 
         # Create a map of employee names to their full data for easy lookup
         employee_by_name = {emp.get("name"): emp for emp in all_employees if emp.get("name")}
@@ -1544,7 +1515,15 @@ async def get_employees_work_details(email: Optional[str] = None):
 
             processed_employees.append(enriched_emp)
 
-        # The function now correctly returns a list of Pydantic models.
+        # If an email is provided, filter for that user
+        if email:
+            user_details = next((e for e in processed_employees if e.get("email") == email), None)
+            # Always return an array, even if it's a single user or empty
+            if user_details:
+                return serialize_document([user_details])
+            else:
+                return []
+        
         return serialize_document(processed_employees)
     except Exception as e:
         logging.error(f"Error fetching work-details: {e}")

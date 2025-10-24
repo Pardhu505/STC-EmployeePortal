@@ -731,8 +731,4 @@ const UserProfile = () => {
   );
 };
 
-<<<<<<< HEAD
 export default UserProfile;
-=======
-export default UserProfile;
->>>>>>> 8be87e4 (Initial commit with frontend and backend)

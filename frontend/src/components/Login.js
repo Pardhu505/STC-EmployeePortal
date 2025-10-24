@@ -145,8 +145,4 @@ const Login = () => {
   );
 };
 
-<<<<<<< HEAD
 export default Login;
-=======
-export default Login;
->>>>>>> 8be87e4 (Initial commit with frontend and backend)

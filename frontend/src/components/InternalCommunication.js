@@ -1137,8 +1137,4 @@ const handleDeleteMessages = async () => {
   );
 };
 
-<<<<<<< HEAD
 export default InternalCommunication;
-=======
-export default InternalCommunication;
->>>>>>> 8be87e4 (Initial commit with frontend and backend)

@@ -153,7 +153,7 @@ GET /api/v2/health
 
 ### WebSocket Connection
 ```javascript
-const ws = new WebSocket('ws://localhost:8000/api/v2/ws/{user_id}');
+const ws = new WebSocket('ws://localhost:8001/api/v2/ws/{user_id}');
 ```
 
 ### Send Message

@@ -1,11 +1,11 @@
 // src/Services/api.js
 import axios from "axios";
-import { API_BASE_URL } from "@/config/api";
-// Set your backend URL here. Fallback to localhost:8000 if the env var is missing or empty.
-const API_BASE_URLL = (API_BASE_URL || "http://localhost:8000") + "/api";
+import { API_BASE_URL } from "../config/api";
+
+const FULL_API_BASE_URL = API_BASE_URL + "/api";
 
 const api = axios.create({
-  baseURL: API_BASE_URLL,
+  baseURL: FULL_API_BASE_URL,
   headers: {
     "Content-Type": "application/json",
   },
@@ -23,16 +23,27 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
+/**
+ * A centralized error handler for API calls.
+ * It extracts the most relevant error message from the axios error object.
+ * @param {object} error - The error object from axios.
+ * @param {string} [context='An unknown error occurred'] - A fallback error message.
+ */
+const handleError = (error, context = 'An unknown error occurred') => {
+  console.error(`API Error in ${context}:`, error);
+  // Prefer the backend's detailed error message, otherwise fall back.
+  throw new Error(error.response?.data?.detail || error.message || context);
+};
+
 // Employee Management API functions
-export const employeeAPI = {
+const employeeAPI = {
   // Get all employees
   getAllEmployees: async () => {
     try {
       const response = await api.get('/employees/');
       return response.data;
     } catch (error) {
-      console.error('Error fetching employees:', error);
-      throw error;
+      handleError(error, 'fetching employees');
     }
   },
 
@@ -43,8 +54,7 @@ export const employeeAPI = {
       const response = await api.put(`/employees/${employeeId}`, employeeData);
       return response.data;
     } catch (error) {
-      console.error('Error updating employee:', error);
-      throw error;
+      handleError(error, `updating employee ${employeeId}`);
     }
   },
   // Deactivate an employee
@@ -53,8 +63,7 @@ export const employeeAPI = {
       const response = await api.put(`/employees/${employeeId}/deactivate`);
       return response.data;
     } catch (error) {
-      console.error('Error deactivating employee:', error);
-      throw error;
+      handleError(error, `deactivating employee ${employeeId}`);
     }
   },
 
@@ -64,8 +73,7 @@ export const employeeAPI = {
       const response = await api.delete(`/employees/${employeeId}/remove`);
       return response.data;
     } catch (error) {
-      console.error('Error removing employee:', error);
-      throw error;
+      handleError(error, `removing employee ${employeeId}`);
     }
   },
 
@@ -75,8 +83,7 @@ export const employeeAPI = {
       const response = await api.get(`/employees/email/${email}`);
       return response.data;
     } catch (error) {
-      console.error('Error fetching employee by email:', error);
-      throw error;
+      handleError(error, `fetching employee by email ${email}`);
     }
   },
 
@@ -86,8 +93,7 @@ export const employeeAPI = {
       const response = await api.get(`/employees/code/${empCode}`);
       return response.data;
     } catch (error) {
-      console.error('Error fetching employee by code:', error);
-      throw error;
+      handleError(error, `fetching employee by code ${empCode}`);
     }
   },
 
@@ -97,8 +103,7 @@ export const employeeAPI = {
       const response = await api.put(`/users/${email}/deactivate`);
       return response.data;
     } catch (error) {
-      console.error('Error deactivating user:', error);
-      throw error;
+      handleError(error, `deactivating user ${email}`);
     }
   },
 
@@ -111,8 +116,7 @@ export const employeeAPI = {
       });
       return response.data;
     } catch (error) {
-      console.error('Error changing password:', error);
-      throw error;
+      handleError(error, `changing password for user ${userId}`);
     }
   },
 
@@ -121,8 +125,7 @@ export const employeeAPI = {
       const response = await api.get('/health');
       return response.data;
     } catch (error) {
-      console.error('Error during health check:', error);
-      throw error;
+      handleError(error, 'performing health check');
     }
   },
 
@@ -132,19 +135,7 @@ export const employeeAPI = {
       const response = await api.get('/employees/work-details');
       return response.data;
     } catch (error) {
-      console.error('Error fetching employee work details:', error);
-      throw error;
-    }
-  },
-
-  // Get a single employee's enriched work details
-  getSingleEmployeeWorkDetails: async (email) => {
-    try {
-      const response = await api.get(`/employees/email/${email}`);
-      return response.data;
-    } catch (error) {
-      console.error('Error fetching single employee work details:', error);
-      throw error;
+      handleError(error, 'fetching employee work details');
     }
   },
 
@@ -156,8 +147,7 @@ export const employeeAPI = {
       });
       return response.data;
     } catch (error) {
-      console.error('Error updating profile picture:', error);
-      throw error;
+      handleError(error, `updating profile picture for ${employeeId}`);
     }
   },
 
@@ -168,85 +158,66 @@ export const employeeAPI = {
       const response = await api.put(`/users/${email}/profile`, profileData);
       return response.data;
     } catch (error) {
-      console.error('Error updating user profile:', error);
-      throw error;
+      handleError(error, `updating user profile for ${email}`);
     }
   },
-
-  // Admin-specific API functions
-  admin: {
-    updateUserDetails: async (originalEmail, userData, userObject) => {
-      try {
-        const response = await api.put(`/admin/users/${encodeURIComponent(originalEmail)}/details`, userData, {
-          headers: {
-            'Authorization': `Bearer ${btoa(JSON.stringify(userObject))}`
-          }
-        });
-        return response.data;
-      } catch (error) {
-        console.error('Error updating user details (admin):', error);
-        throw error.response?.data || { detail: error.message };
-      }
-    },
-    
-    deleteUser: async (email, userObject) => {
-      try {
-        const response = await api.delete(`/admin/users/${encodeURIComponent(email)}`, {
-          headers: {
-            'Authorization': `Bearer ${btoa(JSON.stringify(userObject))}`
-          }
-        });
-        return response.data;
-      } catch (error) {
-        console.error('Error deleting user (admin):', error);
-        throw error.response?.data || { detail: error.message };
-      }
-    },
-    
-    resetPassword: async (email, newPassword, userObject) => {
-      try {
-        const response = await api.post(`/admin/users/${encodeURIComponent(email)}/reset-password`, {
-          new_password: newPassword,
-        }, {
-          headers: {
-            'Authorization': `Bearer ${btoa(JSON.stringify(userObject))}`
-          }
-        });
-        return response.data;
-      } catch (error) {
-        console.error('Error resetting password (admin):', error);
-        throw error.response?.data || { detail: error.message };
-      }
-    },
-  }
 };
 
-
+// Admin-specific API functions
+const adminAPI = {
+  updateUserDetails: async (originalEmail, userData) => {
+    try {
+      // The request interceptor will automatically add the correct Authorization header.
+      const response = await api.put(`/admin/users/${encodeURIComponent(originalEmail)}/details`, userData);
+      return response.data;
+    } catch (error) {
+      handleError(error, `updating user details for ${originalEmail} (admin)`);
+    }
+  },
+  
+  deleteUser: async (email) => {
+    try {
+      const response = await api.delete(`/admin/users/${encodeURIComponent(email)}`);
+      return response.data;
+    } catch (error) {
+      handleError(error, `deleting user ${email} (admin)`);
+    }
+  },
+  
+  resetPassword: async (email, newPassword) => {
+    try {
+      const response = await api.post(`/admin/users/${encodeURIComponent(email)}/reset-password`, {
+        new_password: newPassword,
+      });
+      return response.data;
+    } catch (error) {
+      handleError(error, `resetting password for ${email} (admin)`);
+    }
+  },
+};
 
 // Channels API functions
-export const channelsAPI = {
+const channelsAPI = {
   // Get channels for a user
   getUserChannels: async (userId) => {
     try {
       const response = await api.get(`/channels?user_id=${userId}`);
       return response.data;
     } catch (error) {
-      console.error('Error fetching user channels:', error);
-      throw error;
+      handleError(error, `fetching channels for user ${userId}`);
     }
   }
 };
 
 // Manager-specific API functions
-export const managerAPI = {
+const managerAPI = {
   // Get a manager's team
   getManagerTeam: async (manager_code) => {
     try {
       const response = await api.get(`/manager/${manager_code}/team`);
       return response.data;
     } catch (error) {
-      console.error(`Error fetching team for manager ${manager_code}:`, error);
-      throw error;
+      handleError(error, `fetching team for manager ${manager_code}`);
     }
   },
 
@@ -267,11 +238,10 @@ export const managerAPI = {
       });
       return response.data;
     } catch (error) {
-      console.error(`Error fetching attendance report for manager ${manager_code}:`, error);
-      throw error;
+      handleError(error, `fetching attendance report for manager ${manager_code}`);
     }
   },
 };
 
 
-export default api;
+export { api as default, employeeAPI, adminAPI, channelsAPI, managerAPI };

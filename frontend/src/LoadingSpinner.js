@@ -11,8 +11,4 @@ const LoadingSpinner = () => {
   );
 };
 
-<<<<<<< HEAD
 export default LoadingSpinner;
-=======
-export default LoadingSpinner;
->>>>>>> 8be87e4 (Initial commit with frontend and backend)

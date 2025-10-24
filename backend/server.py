@@ -39,9 +39,7 @@ main_client = AsyncIOMotorClient(main_mongo_url)
 main_db = main_client[os.environ['DB_NAME']]
 
 # MongoDB connection for the Attendance, Chat, and STC_Employees databases (your Atlas connection)
-
-attendance_mongo_url = os.environ.get("ATTENDANCE_MONGO_URL")
-
+attendance_mongo_url = "mongodb+srv://poori420:5imYVGkw7F0cE5K2@cluster0.53oeybd.mongodb.net/"
 attendance_client = AsyncIOMotorClient(attendance_mongo_url, tlsAllowInvalidCertificates=True)
 
 # Correct the database name to 'employee_attendance'
@@ -576,10 +574,6 @@ class Announcement(BaseModel):
     title: str
     content: str
     priority: str
-<<<<<<< HEAD
-    scheduled_time: Optional[datetime] = None
-=======
->>>>>>> 8be87e4 (Initial commit with frontend and backend)
     author: str
     date: datetime = Field(default_factory=lambda: datetime.now(ist_tz))
 
@@ -1750,19 +1744,13 @@ async def deactivate_employee(employeeId: str, admin_user: dict = Depends(get_cu
         raise HTTPException(status_code=500, detail="Error deactivating employee")
 
 @api_router.put("/users/me/deactivate")
-<<<<<<< HEAD
-=======
 @api_router.delete("/users/me")
->>>>>>> 8be87e4 (Initial commit with frontend and backend)
 async def deactivate_self(
     authorization: str = Header(..., alias="Authorization"),
 ):
     """
     Allows a currently authenticated user to deactivate their own account.
-<<<<<<< HEAD
-=======
     Allows a currently authenticated user to permanently delete their own account.
->>>>>>> 8be87e4 (Initial commit with frontend and backend)
     The user is identified via their Authorization token.
     """
     try:
@@ -1771,10 +1759,7 @@ async def deactivate_self(
         if not authorization or not authorization.startswith("Bearer "):
             raise HTTPException(status_code=401, detail="Not authenticated")
         
-<<<<<<< HEAD
-=======
 
->>>>>>> 8be87e4 (Initial commit with frontend and backend)
         token_str = authorization.split(" ")[1]
         decoded_token = base64.b64decode(token_str).decode('utf-8')
         user_data_from_token = json.loads(decoded_token)
@@ -1782,16 +1767,11 @@ async def deactivate_self(
 
         if not user_email:
             raise HTTPException(status_code=401, detail="Invalid token: email missing.")
-<<<<<<< HEAD
-=======
             raise HTTPException(status_code=401, detail="Invalid token: user email missing.")
->>>>>>> 8be87e4 (Initial commit with frontend and backend)
 
         # Use the existing admin-level deactivate function, but pass the user's own email
         # and a dummy admin_user object to satisfy the dependency.
         return await deactivate_employee(employeeId=user_email, admin_user={"email": user_email})
-<<<<<<< HEAD
-=======
         user, collection = await get_user_info_with_collection(stc_db, user_email)
 
         if not user or collection is None:
@@ -1804,7 +1784,6 @@ async def deactivate_self(
             return {"message": "Your account has been permanently deleted."}
         
         raise HTTPException(status_code=500, detail="Account could not be deleted.")
->>>>>>> 8be87e4 (Initial commit with frontend and backend)
     except Exception as e:
         logging.error(f"Error during self-deactivation for token: {e}")
         raise HTTPException(status_code=500, detail="An error occurred during account deactivation.")
@@ -2155,20 +2134,6 @@ async def save_attendance_report(employees: List[EmployeeAttendance] = Body(...)
         raise HTTPException(status_code=500, detail=f"Error saving data: {e}")
 
 @api_router.get("/attendance-report")
-<<<<<<< HEAD
-async def get_attendance_report():
-    try:
-        # Fetch all attendance records from the database (using the same collection as POST)
-        attendance_records = await attendance_db.Attendance.find().to_list(length=None)
-        
-        # Convert ObjectId to string for JSON serialization
-        for record in attendance_records:
-            if '_id' in record:
-                record['_id'] = str(record['_id'])
-        
-        logging.info(f"Retrieved {len(attendance_records)} attendance records from database")
-        return {"data": attendance_records, "count": len(attendance_records)}
-=======
 async def get_attendance_report(
     view_type: Optional[str] = None,
     year: Optional[int] = None,
@@ -2232,7 +2197,6 @@ async def get_attendance_report(
         sanitized_records = serialize_document(attendance_records)
         logging.info(f"Retrieved {len(attendance_records)} attendance records from database")
         return {"data": sanitized_records, "count": len(sanitized_records)}
->>>>>>> 8be87e4 (Initial commit with frontend and backend)
     except Exception as e:
         logging.error(f"Failed to fetch attendance report: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to fetch attendance data: {e}")
@@ -2570,12 +2534,7 @@ async def create_announcement(
     try:
         announcement = Announcement(
             **announcement_data.model_dump(),
-<<<<<<< HEAD
-            author=admin_user.get("name", "Admin"),
-            date=announcement_data.scheduled_time if announcement_data.scheduled_time else datetime.now(ist_tz)
-=======
             author=admin_user.get("name", "Admin")
->>>>>>> 8be87e4 (Initial commit with frontend and backend)
         )
         await chat_db.Announcements.insert_one(announcement.model_dump())
 
@@ -2871,8 +2830,4 @@ async def startup_event():
         logger.info("MongoDB connections successful.")
     except Exception as e:
         logger.error(f"MongoDB connection failed: {e}")
-<<<<<<< HEAD
         logger.info("Continuing without MongoDB - WebSocket functionality will work without database persistence")
-=======
-        logger.info("Continuing without MongoDB - WebSocket functionality will work without database persistence")
->>>>>>> 8be87e4 (Initial commit with frontend and backend)

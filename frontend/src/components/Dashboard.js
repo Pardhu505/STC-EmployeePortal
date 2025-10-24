@@ -15,10 +15,7 @@ import { Calendar, Users, BarChart3, Bell, MessageSquare, Gift, Shield, FileText
 import EAttendance from './EMPAttedence';
 import ManagerReport from './Manger Attendence';
 import AttendanceReport from './AdminAttedenceReport';
-<<<<<<< HEAD
-=======
 import HRAttendance from './HRAttendance'; // Import the new HR component
->>>>>>> 8be87e4 (Initial commit with frontend and backend)
 import { employeeAPI } from '@/Services/api';
 
 const Dashboard = () => {
@@ -152,13 +149,10 @@ const Dashboard = () => {
 
       case 'attendance':
         if (user?.isAdmin) return <AttendanceReport />;
-<<<<<<< HEAD
-=======
         if (
           user?.email === 'tejaswini@showtimeconsulting.in' ||
           user?.email === 'shashidhar.kumar@showtimeconsulting.in'
         ) return <HRAttendance />;
->>>>>>> 8be87e4 (Initial commit with frontend and backend)
         if (user?.designation === 'Reporting manager') return <ManagerReport />;
         return <EAttendance />;
       default: return <PortalCards />;

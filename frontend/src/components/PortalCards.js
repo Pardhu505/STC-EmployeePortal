@@ -101,8 +101,4 @@ const PortalCards = () => {
   );
 };
 
-<<<<<<< HEAD
 export default PortalCards;
-=======
-export default PortalCards;
->>>>>>> 8be87e4 (Initial commit with frontend and backend)

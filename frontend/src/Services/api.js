@@ -274,8 +274,4 @@ export const managerAPI = {
 };
 
 
-<<<<<<< HEAD
 export default api;
-=======
-export default api;
->>>>>>> 8be87e4 (Initial commit with frontend and backend)

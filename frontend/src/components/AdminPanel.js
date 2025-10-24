@@ -12,10 +12,7 @@ import {
   Shield, 
   Users, 
   Search, 
-<<<<<<< HEAD
-=======
   Edit3, 
->>>>>>> 8be87e4 (Initial commit with frontend and backend)
   Save, 
   X,
   Lock,
@@ -23,10 +20,6 @@ import {
   EyeOff,
   UserCheck,
   UserX,
-<<<<<<< HEAD
-  Edit,
-=======
->>>>>>> 8be87e4 (Initial commit with frontend and backend)
   Trash2,
   AlertTriangle,
 } from 'lucide-react';
@@ -91,11 +84,7 @@ const AdminPanel = () => {
     }
 
     try {
-<<<<<<< HEAD
-      await employeeAPI.admin.resetPassword(selectedUser.email, newPassword, user);
-=======
       await employeeAPI.admin.resetPassword(selectedUser.email, newPassword);
->>>>>>> 8be87e4 (Initial commit with frontend and backend)
 
       toast({
         title: "Password Reset",
@@ -133,11 +122,7 @@ const AdminPanel = () => {
     console.log("Attempting to update user:", editingUser.originalEmail, "with payload:", payload);
 
     try {
-<<<<<<< HEAD
-      await employeeAPI.admin.updateUserDetails(editingUser.originalEmail, payload, user);
-=======
       await employeeAPI.admin.updateUserDetails(editingUser.originalEmail, payload);
->>>>>>> 8be87e4 (Initial commit with frontend and backend)
 
       toast({
         title: "User Updated",
@@ -164,11 +149,7 @@ const AdminPanel = () => {
     console.log("Attempting to delete user:", userToDelete.email);
 
     try {
-<<<<<<< HEAD
-      await employeeAPI.admin.deleteUser(userToDelete.email, user);
-=======
       await employeeAPI.admin.deleteUser(userToDelete.email);
->>>>>>> 8be87e4 (Initial commit with frontend and backend)
 
       toast({
         title: "Success",
@@ -179,11 +160,7 @@ const AdminPanel = () => {
       fetchEmployees();
     } catch (error) {
       console.error("Failed to delete user:", error);
-<<<<<<< HEAD
-      toast({ title: "Error", description: error.detail || "Failed to delete user.", variant: "destructive" });
-=======
       toast({ title: "Error", description: error.detail || error.message, variant: "destructive" });
->>>>>>> 8be87e4 (Initial commit with frontend and backend)
     } finally {
       setIsDeleting(false); // ALWAYS reset loading state
     }
@@ -240,61 +217,6 @@ const AdminPanel = () => {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-<<<<<<< HEAD
-            {loading ? (
-              <div className="text-center py-8 text-gray-500">Loading employees...</div>
-            ) : filteredEmployees.length === 0 ? (
-              <div className="text-center py-8 text-gray-500">No employees found.</div>
-            ) : (
-              filteredEmployees.map((employee, index) => (
-                <div key={employee.email || index} className="flex flex-col md:flex-row items-start md:items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
-                  <div className="flex items-center space-x-4 mb-4 md:mb-0">
-                    <Avatar className="w-10 h-10">
-                      <AvatarFallback className="bg-[#225F8B] text-white">
-                        {employee.name?.split(' ').map(n => n[0]).join('').slice(0, 2)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <div className="font-medium text-gray-900">{employee.name}</div>
-                      <div className="text-sm text-gray-500 break-all">{employee.email}</div>
-                      <div className="text-xs text-gray-500 mt-1">
-                        {employee.designation} • {employee.department}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center w-full sm:w-auto space-y-2 sm:space-y-0 sm:space-x-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleEditUser(employee)}
-                      className="w-full sm:w-auto"
-                    >
-                      <Edit className="h-4 w-4 mr-1" />
-                      Edit
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handlePasswordReset(employee)}
-                      className="text-orange-600 hover:text-orange-700 w-full sm:w-auto"
-                    >
-                      <Lock className="h-4 w-4 mr-1" />
-                      Reset Password
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="destructive"
-                      onClick={() => { setUserToDelete(employee); setShowDeleteDialog(true); }}
-                      className="bg-red-600 hover:bg-red-700 w-full sm:w-auto"
-                    >
-                      <Trash2 className="h-4 w-4 mr-1" />
-                      Delete
-                    </Button>
-                  </div>
-                </div>
-              ))
-            )}
-=======
             {filteredEmployees.map((employee, index) => (
               <div key={employee.email || index} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
                 <div className="flex items-center space-x-4">
@@ -341,7 +263,6 @@ const AdminPanel = () => {
                 </div>
               </div>
             ))}
->>>>>>> 8be87e4 (Initial commit with frontend and backend)
           </div>
         </CardContent>
       </Card>
@@ -414,19 +335,11 @@ const AdminPanel = () => {
 
       {/* Edit User Dialog */}
       {editingUser && (
-<<<<<<< HEAD
-        <Dialog open={!!editingUser} onOpenChange={(isOpen) => !isOpen && setEditingUser(null)}>
-          <DialogContent className="max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <Edit className="h-5 w-5" />
-=======
         <Dialog open={!!editingUser} onOpenChange={() => setEditingUser(null)}>
           <DialogContent className="max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <Edit3 className="h-5 w-5" />
->>>>>>> 8be87e4 (Initial commit with frontend and backend)
                 Edit User
               </DialogTitle>
               <DialogDescription>
@@ -546,11 +459,7 @@ const AdminPanel = () => {
               onClick={handleDeleteUser}
               disabled={isDeleting}
             >
-<<<<<<< HEAD
-              {isDeleting ? 'Deleting...' : <><Trash2 className="h-4 w-4 mr-2" />Confirm Delete</>}
-=======
               {isDeleting ? 'Deleting...' : 'Confirm Delete'}
->>>>>>> 8be87e4 (Initial commit with frontend and backend)
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -559,8 +468,4 @@ const AdminPanel = () => {
   );
 };
 
-<<<<<<< HEAD
 export default AdminPanel;
-=======
-export default AdminPanel;
->>>>>>> 8be87e4 (Initial commit with frontend and backend)

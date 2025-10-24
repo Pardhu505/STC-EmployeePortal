@@ -2831,3 +2831,13 @@ async def startup_event():
     except Exception as e:
         logger.error(f"MongoDB connection failed: {e}")
         logger.info("Continuing without MongoDB - WebSocket functionality will work without database persistence")
+if __name__ == "__main__":
+    import uvicorn
+    # Load host and port from environment variables, with defaults
+    host = os.getenv("HOST", "127.0.0.1") # Defaults to 127.0.0.1 if HOST is not set
+    port = int(os.getenv("PORT", 8000))
+    
+    print(f"🚀 Starting server on http://{host}:{port}")
+    print("✅ Make sure your phone/laptop is on the same Wi-Fi network.")
+    
+    uvicorn.run("server:app", host=host, port=port, reload=True)

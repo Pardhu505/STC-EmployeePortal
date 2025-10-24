@@ -1,5 +1,7 @@
 // This file centralizes API calls for the application.
-const API_BASE_URL = 'http://localhost:8000/api';
+import { API_BASE_URL } from "./config/api";
+
+const FULL_API_BASE_URL = API_BASE_URL + '/api';
 
 /**
  * Fetches the complete profile for a specific user by their email.
@@ -11,7 +13,7 @@ export const fetchUserProfile = async (email) => {
   if (!email) {
     throw new Error('Email is required to fetch user profile.');
   }
-  const response = await fetch(`${API_BASE_URL}/employees/email/${encodeURIComponent(email.trim())}`);
+  const response = await fetch(`${FULL_API_BASE_URL}/employees/email/${encodeURIComponent(email.trim())}`);
   
   if (!response.ok) {
     const errorData = await response.json();
@@ -33,7 +35,7 @@ export const updateUserProfile = async (email, profileData) => {
     throw new Error('Email is required to update user profile.');
   }
   
-  const response = await fetch(`${API_BASE_URL}/users/${encodeURIComponent(email.trim())}/profile`, {
+  const response = await fetch(`${FULL_API_BASE_URL}/users/${encodeURIComponent(email.trim())}/profile`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(profileData),
@@ -57,7 +59,7 @@ export const updateUserProfile = async (email, profileData) => {
  * @throws {Error} - Throws an error if the API call fails.
  */
 export const fetchEmployeesWorkDetails = async () => {
-  const response = await fetch(`${API_BASE_URL}/employees/work-details/`); // Note the trailing slash
+  const response = await fetch(`${FULL_API_BASE_URL}/employees/work-details/`); // Note the trailing slash
   
   if (!response.ok) {
     const errorData = await response.json();
@@ -77,7 +79,7 @@ export const fetchManagerTeam = async (managerId) => {
   if (!managerId) {
     throw new Error('Manager ID is required to fetch the team.');
   }
-  const response = await fetch(`${API_BASE_URL}/manager/${encodeURIComponent(managerId)}/team`);
+  const response = await fetch(`${FULL_API_BASE_URL}/manager/${encodeURIComponent(managerId)}/team`);
 
   if (!response.ok) {
     const errorData = await response.json();
@@ -103,7 +105,7 @@ export const fetchManagerAttendanceReport = async ({ managerId, teamEmpCodes, re
   }
 
   // The endpoint is now just /attendance-report/manager
-  const url = `${API_BASE_URL}/attendance-report/manager`;
+  const url = `${FULL_API_BASE_URL}/attendance-report/manager`;
 
   // Prepare the request body
   const body = {
@@ -133,3 +135,38 @@ export const fetchManagerAttendanceReport = async ({ managerId, teamEmpCodes, re
 
   return response.json();
 };
+
+/**
+ * (Admin) Updates a user's details.
+ * @param {string} originalEmail - The original email of the user to update.
+ * @param {object} userData - The data to update.
+ * @param {string} token - The admin user's auth token.
+ * @returns {Promise<object>}
+ */
+export const adminUpdateUserDetails = async (originalEmail, userData, token) => {
+  const response = await fetch(`${FULL_API_BASE_URL}/admin/users/${encodeURIComponent(originalEmail)}/details`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+    body: JSON.stringify(userData),
+  });
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.detail || 'Failed to update user details');
+  }
+  return response.json();
+};
+
+/**
+ * (Admin) Deletes a user permanently.
+ * @param {string} email - The email of the user to delete.
+ * @param {string} token - The admin user's auth token.
+ * @returns {Promise<object>}
+ */
+export const adminDeleteUser = async (email, token) => {
+  // Implementation for admin delete user
+};
+
+// You can add other admin functions like reset password here.

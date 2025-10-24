@@ -25,5 +25,5 @@
 ## Notes
 - Files are stored in `backend/uploads/` directory
 - Unique filenames are generated using UUID to prevent conflicts
-- Static files are served at `http://localhost:8000/uploads/{filename}`
+- Static files are served at `/uploads/{filename}` relative to the backend URL.
 - CORS is configured to allow requests from frontend (localhost:3000/3001)

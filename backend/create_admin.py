@@ -39,7 +39,8 @@ async def create_admin_user():
         "empCode": "STC-ADMIN",
         "password_hash": hashed_password,
         "reviewer": "Management",
-        "active": True
+        "active": True,
+        "profilePicture": None
     }
 
     team = admin_data["team"]

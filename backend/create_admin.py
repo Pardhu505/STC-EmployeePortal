@@ -34,7 +34,7 @@ async def create_admin_user():
         "name": "System Administrator",
         "email": admin_email,
         "designation": "System Admin",
-        "department": "Admin",
+        "department": "System Admin",
         "team": "System Admin",
         "empCode": "STC-ADMIN",
         "password_hash": hashed_password,

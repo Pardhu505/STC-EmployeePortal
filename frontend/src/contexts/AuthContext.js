@@ -394,39 +394,6 @@ export const AuthProvider = ({ children }) => {
   
   const login = async (email, password) => {
     try {
-      // Admin login
-      if (email === "admin@showtimeconsulting.in" && password === "Welcome@123") {
-        const adminUser = {
-          id: email,
-          name: "System Administrator",
-          email,
-          designation: "System Admin",
-          department: "Admin",
-          subDepartment: "System Admin",
-          reviewer: "Management",
-          isAdmin: true,
-          loginTime: new Date().toISOString(),
-        };
-        setUser(adminUser);
-        localStorage.setItem("showtimeUser", JSON.stringify(adminUser));
-
-        // Request notification permission on successful login
-        if ('Notification' in window) {
-          if (Notification.permission === 'default') {
-            const permission = await Notification.requestPermission();
-            setNotificationPermission(permission);
-            console.log('Notification permission requested on login:', permission);
-            if (permission !== 'granted') {
-              console.warn('Notification permission not granted:', permission);
-            }
-          } else {
-            console.log('Notification permission already set:', Notification.permission);
-          }
-        }
-
-        return adminUser;
-      }
-
       // API login
       const response = await fetch(`${API_BASE_URL}/api/login`, {
         method: 'POST',
@@ -598,8 +565,19 @@ export const AuthProvider = ({ children }) => {
     setNavigationTarget(target);
   };
 
+  // Centralized check for administrator privileges.
+  // This logic can be used throughout the app via the useAuth hook.
+  const isAdmin = React.useMemo(() => {
+    if (!user) return false;
+    const designation = user.designation?.toLowerCase() || '';
+    return user.isAdmin === true || 
+           user.email === 'admin@showtimeconsulting.in' ||
+           designation === 'system admin';
+  }, [user]);
+
   const value = React.useMemo(() => ({
       user,
+      isAdmin, // Expose the isAdmin boolean through the context
       loading,
       isConnected,
       userStatuses,
@@ -626,7 +604,7 @@ export const AuthProvider = ({ children }) => {
       showNotification,
       requestNotificationPermission,
       navigateTo,
-  }), [user, loading, isConnected, userStatuses, newMessages, currentChannel, currentChatUser, notificationPermission, allChannels, allEmployees, navigationTarget]);
+  }), [user, isAdmin, loading, isConnected, userStatuses, newMessages, currentChannel, currentChatUser, notificationPermission, allChannels, allEmployees, navigationTarget]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

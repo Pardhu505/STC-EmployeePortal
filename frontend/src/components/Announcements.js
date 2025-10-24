@@ -13,7 +13,7 @@ import { API_BASE_URL } from '../config/api';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
 
 const Announcements = ({ announcements, setAnnouncements }) => {
-  const { user, showNotification } = useAuth();
+  const { user, isAdmin, showNotification } = useAuth();
   const [selectedPriority, setSelectedPriority] = useState('all');
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [newAnnouncement, setNewAnnouncement] = useState({
@@ -26,9 +26,6 @@ const Announcements = ({ announcements, setAnnouncements }) => {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [announcementToDelete, setAnnouncementToDelete] = useState(null);
   const [loading, setLoading] = useState(true);
-
-  // Check if user is admin
-  const isAdmin = user?.isAdmin || user?.email === 'admin@showtimeconsulting.in';
 
   useEffect(() => {
     // When announcements prop updates, stop loading

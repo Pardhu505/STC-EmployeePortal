@@ -7,10 +7,11 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Textarea } from './ui/textarea'; // Corrected import
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { Calendar, User, AlertCircle, Info, CheckCircle, Plus, Send, Shield, Trash2, X, Loader2 } from 'lucide-react';
+import { Calendar, User, AlertCircle, Info, CheckCircle, Plus, Send, Shield, Trash2, X, Loader2, Clock } from 'lucide-react';
 import { useToast } from '../hooks/use-toast';
 import { API_BASE_URL } from '../config/api';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
+import { Checkbox } from './ui/checkbox';
 
 const Announcements = ({ announcements, setAnnouncements }) => {
   const { user, isAdmin, showNotification } = useAuth();
@@ -20,7 +21,10 @@ const Announcements = ({ announcements, setAnnouncements }) => {
     title: '',
     content: '',
     priority: 'medium',
-    author: user?.name || 'Admin'
+    author: user?.name || 'Admin',
+    is_scheduled: false,
+    scheduled_date: '',
+    scheduled_time: '',
   });
   const { toast } = useToast();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -67,6 +71,28 @@ const Announcements = ({ announcements, setAnnouncements }) => {
       return;
     }
 
+    let scheduled_at = null;
+    if (newAnnouncement.is_scheduled) {
+      if (!newAnnouncement.scheduled_date || !newAnnouncement.scheduled_time) {
+        toast({
+          title: "Scheduling Error",
+          description: "Please provide both a date and time for scheduling.",
+          variant: "destructive"
+        });
+        return;
+      }
+      scheduled_at = new Date(`${newAnnouncement.scheduled_date}T${newAnnouncement.scheduled_time}`).toISOString();
+
+      if (new Date(scheduled_at) < new Date()) {
+        toast({
+          title: "Scheduling Error",
+          description: "Scheduled time cannot be in the past.",
+          variant: "destructive"
+        });
+        return;
+      }
+    }
+
     try {
       const response = await fetch(`${API_BASE_URL}/api/announcements`, {
         method: 'POST',
@@ -78,6 +104,7 @@ const Announcements = ({ announcements, setAnnouncements }) => {
           title: newAnnouncement.title,
           content: newAnnouncement.content,
           priority: newAnnouncement.priority,
+          scheduled_at: scheduled_at,
         })
       });
 
@@ -92,8 +119,10 @@ const Announcements = ({ announcements, setAnnouncements }) => {
       // So, we don't need to manually add it here.
 
       toast({
-        title: "Announcement Created",
-        description: "Your announcement has been published to all employees.",
+        title: scheduled_at ? "Announcement Scheduled" : "Announcement Published",
+        description: scheduled_at 
+          ? `Your announcement will be published on ${formatDate(scheduled_at)} at ${new Date(scheduled_at).toLocaleTimeString()}.`
+          : "Your announcement has been published to all employees.",
       });
     } catch (error) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -103,7 +132,10 @@ const Announcements = ({ announcements, setAnnouncements }) => {
       title: '',
       content: '',
       priority: 'medium',
-      author: user?.name || 'Admin'
+      author: user?.name || 'Admin',
+      is_scheduled: false,
+      scheduled_date: '',
+      scheduled_time: '',
     });
     setShowCreateForm(false);
   };
@@ -213,6 +245,42 @@ const Announcements = ({ announcements, setAnnouncements }) => {
                 </Select>
               </div>
             </div>
+            <div className="space-y-4 rounded-md border border-gray-200 p-4">
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="is_scheduled"
+                  checked={newAnnouncement.is_scheduled}
+                  onCheckedChange={(checked) => setNewAnnouncement({ ...newAnnouncement, is_scheduled: checked })}
+                />
+                <Label htmlFor="is_scheduled" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                  Schedule for later
+                </Label>
+              </div>
+              {newAnnouncement.is_scheduled && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                  <div>
+                    <Label htmlFor="scheduled_date">Date</Label>
+                    <Input
+                      id="scheduled_date"
+                      type="date"
+                      value={newAnnouncement.scheduled_date}
+                      onChange={(e) => setNewAnnouncement({ ...newAnnouncement, scheduled_date: e.target.value })}
+                      className="mt-1"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="scheduled_time">Time</Label>
+                    <Input
+                      id="scheduled_time"
+                      type="time"
+                      value={newAnnouncement.scheduled_time}
+                      onChange={(e) => setNewAnnouncement({ ...newAnnouncement, scheduled_time: e.target.value })}
+                      className="mt-1"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
             <div>
               <Label htmlFor="content" className="text-sm font-medium text-gray-700">
                 Content
@@ -235,7 +303,10 @@ const Announcements = ({ announcements, setAnnouncements }) => {
                     title: '',
                     content: '',
                     priority: 'medium',
-                    author: 'Admin'
+                    author: user?.name || 'Admin',
+                    is_scheduled: false,
+                    scheduled_date: '',
+                    scheduled_time: '',
                   });
                 }}
               >
@@ -245,8 +316,8 @@ const Announcements = ({ announcements, setAnnouncements }) => {
                 onClick={handleCreateAnnouncement}
                 className="bg-gradient-to-r from-[#225F8B] to-[#225F8B]/80 text-white"
               >
-                <Send className="h-4 w-4 mr-2" />
-                Publish Announcement
+                {newAnnouncement.is_scheduled ? <Clock className="h-4 w-4 mr-2" /> : <Send className="h-4 w-4 mr-2" />}
+                {newAnnouncement.is_scheduled ? 'Schedule Announcement' : 'Publish Now'}
               </Button>
             </div>
           </CardContent>

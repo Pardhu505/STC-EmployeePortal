@@ -14,6 +14,7 @@ import uuid
 from datetime import datetime, timedelta, timezone, time, date
 import json
 import re
+import asyncio
 from bson.json_util import dumps
 from typing import Optional, Any
 # from mock_data_module import DEPARTMENT_DATA
@@ -584,11 +585,14 @@ class Announcement(BaseModel):
     author: str
     date: datetime = Field(default_factory=lambda: datetime.now(ist_tz))
 
+    # New fields for scheduling
+    status: str = "published" # Can be 'published' or 'scheduled'
+    scheduled_at: Optional[datetime] = None
+
 class AnnouncementCreate(BaseModel):
     title: str
     content: str
     priority: str
-
 class Employee(BaseModel):
     id: str
     name: str
@@ -607,6 +611,7 @@ class Employee(BaseModel):
     active: bool = True
 
 class EmployeeCreate(BaseModel):
+    scheduled_at: Optional[datetime] = None
     """Model for creating a new employee, without database-generated fields."""
     id: str
     name: str
@@ -1334,6 +1339,41 @@ async def setup_indexes():
     except Exception as e:
         logging.error(f"Failed to create TTL indexes: {e}")
 
+
+async def check_scheduled_announcements():
+    """
+    A background task that runs continuously to check for and publish scheduled announcements.
+    """
+    while True:
+        try:
+            now_utc = datetime.now(timezone.utc)
+            
+            # Find announcements that are scheduled and due
+            due_announcements = await chat_db.Announcements.find({
+                "status": "scheduled",
+                "scheduled_at": {"$lte": now_utc}
+            }).to_list(length=None)
+
+            for ann in due_announcements:
+                logging.info(f"Publishing scheduled announcement: {ann['title']}")
+                
+                # Update status to 'published'
+                await chat_db.Announcements.update_one(
+                    {"_id": ann["_id"]},
+                    {"$set": {"status": "published"}}
+                )
+
+                # Broadcast the announcement
+                broadcast_payload = {
+                    "type": "new_announcement",
+                    "data": serialize_document(ann)
+                }
+                await manager.broadcast(json.dumps(broadcast_payload))
+
+        except Exception as e:
+            logging.error(f"Error in scheduled announcement checker: {e}")
+        
+        await asyncio.sleep(60) # Check every 60 seconds
 
 @api_router.post("/employees", response_model=Employee)
 async def create_employee(employee: Employee):
@@ -2519,17 +2559,25 @@ async def get_channels(user_id: Optional[str] = None):
         logging.info(f"Filtered channels for user {user_id}: {len(user_channels)} channels")
         return user_channels
 
-@api_router.get("/announcements", response_model=List[Announcement])
-async def get_announcements():
+@api_router.get("/announcements", response_model=List[Dict])
+async def get_announcements(admin_user: dict = Depends(get_current_admin_user)):
     """
-    Fetch all announcements from the database.
+    (Admin Only) Fetch all announcements from the database.
     """
     try:
-        announcements = await chat_db.Announcements.find().sort("date", -1).to_list(length=None)
+        # Fetch only published announcements for the general view
+        # Admins can see scheduled ones in a different view if needed later
+        announcements = await chat_db.Announcements.find({"status": "published"}).sort("date", -1).to_list(length=None)
         return serialize_document(announcements)
     except Exception as e:
         logging.error(f"Error fetching announcements: {e}")
         raise HTTPException(status_code=500, detail="Failed to fetch announcements.")
+
+class AnnouncementCreate(BaseModel):
+    title: str
+    content: str
+    priority: str
+    scheduled_at: Optional[datetime] = None
 
 @api_router.post("/announcements", response_model=Announcement)
 async def create_announcement(
@@ -2541,44 +2589,53 @@ async def create_announcement(
     """
     try:
         announcement = Announcement(
-            **announcement_data.model_dump(),
-            author=admin_user.get("name", "Admin")
+            title=announcement_data.title,
+            content=announcement_data.content,
+            priority=announcement_data.priority,
+            author=admin_user.get("name", "Admin"),
+            scheduled_at=announcement_data.scheduled_at
         )
+
+        # If it's a scheduled announcement, save it as 'scheduled' and don't broadcast yet.
+        if announcement.scheduled_at and announcement.scheduled_at > datetime.now(timezone.utc):
+            announcement.status = "scheduled"
+            logging.info(f"Admin '{admin_user.get('email')}' scheduled announcement for {announcement.scheduled_at}")
+        else:
+            # If not scheduled or scheduled for the past, publish immediately.
+            announcement.status = "published"
+            announcement.scheduled_at = None # Clear scheduled time if published now
+
         await chat_db.Announcements.insert_one(announcement.model_dump())
 
-        # --- Create notifications for offline users ---
-        all_employee_emails = await get_all_employees_emails(stc_db)
-        offline_users = [email for email in all_employee_emails if email not in manager.active_connections]
+        # Only broadcast and create notifications if the announcement is published immediately.
+        if announcement.status == "published":
+            logging.info(f"Admin '{admin_user.get('email')}' published announcement: '{announcement.title}'")
 
-        if offline_users:
-            notifications_to_create = []
-            for user_id in offline_users:
-                # Avoid creating a notification for the admin who sent it, if they are somehow offline
-                if user_id == admin_user.get("email"):
-                    continue
-                
-                notification = Notification(
-                    user_id=user_id,
-                    sender_id=admin_user.get("email", "admin"),
-                    sender_name=announcement.author,
-                    message_id=announcement.id,
-                    message_content=announcement.title,
-                    type="announcement" # Specific type for announcements
-                )
-                notifications_to_create.append(notification.model_dump())
-            if notifications_to_create:
+            # --- Create notifications for offline users ---
+            all_employee_emails = await get_all_employees_emails(stc_db)
+            offline_users = [email for email in all_employee_emails if email not in manager.active_connections and email != admin_user.get("email")]
+
+            if offline_users:
+                notifications_to_create = [
+                    Notification(
+                        user_id=user_id,
+                        sender_id=admin_user.get("email", "admin"),
+                        sender_name=announcement.author,
+                        message_id=announcement.id,
+                        message_content=announcement.title,
+                        type="announcement"
+                    ).model_dump() for user_id in offline_users
+                ]
                 await chat_db.Notifications.insert_many(notifications_to_create)
                 logging.info(f"Created {len(notifications_to_create)} offline notifications for new announcement.")
 
-        # Broadcast the new announcement to all connected clients
-        broadcast_payload = {
-            "type": "new_announcement",
-            "data": serialize_document(announcement.model_dump())
-        }
-        # We don't exclude the sender, so the admin also sees the real-time update.
-        await manager.broadcast(json.dumps(broadcast_payload))
+            # Broadcast the new announcement to all connected clients
+            broadcast_payload = {
+                "type": "new_announcement",
+                "data": serialize_document(announcement.model_dump())
+            }
+            await manager.broadcast(json.dumps(broadcast_payload))
 
-        logging.info(f"Admin '{admin_user.get('email')}' created announcement: '{announcement.title}'")
         return announcement
     except Exception as e:
         logging.error(f"Error creating announcement: {e}")
@@ -2587,13 +2644,19 @@ async def create_announcement(
 @api_router.delete("/announcements/{announcement_id}", status_code=204)
 async def delete_announcement(announcement_id: str, admin_user: dict = Depends(get_current_admin_user)):
     """
-    (Admin Only) Delete an announcement by its ID.
+    (Admin Only) Delete an announcement by its _id.
     """
-    result = await chat_db.Announcements.delete_one({"id": announcement_id})
+    try:
+        # The frontend sends the UUID 'id' field, not the BSON '_id'
+        result = await chat_db.Announcements.delete_one({"id": announcement_id})
+    except Exception as e:
+        logging.error(f"Error deleting announcement {announcement_id}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to delete announcement.")
+
     if result.deleted_count == 0:
-        raise HTTPException(status_code=404, detail="Announcement not found")
-    logging.info(f"Admin '{admin_user.get('email')}' deleted announcement ID: {announcement_id}")
-    return
+        raise HTTPException(status_code=404, detail="Announcement not found.")
+
+    logging.info(f"Admin '{admin_user.get('email')}' deleted announcement with _id: {announcement_id}")
 
 
 async def handle_reaction_update(message_data, client_id):
@@ -2836,6 +2899,9 @@ async def startup_event():
         await main_client.admin.command('ping')
         await attendance_client.admin.command('ping')
         logger.info("MongoDB connections successful.")
+        # Start the background task for checking scheduled announcements
+        asyncio.create_task(check_scheduled_announcements())
     except Exception as e:
         logger.error(f"MongoDB connection failed: {e}")
         logger.info("Continuing without MongoDB - WebSocket functionality will work without database persistence")
+        

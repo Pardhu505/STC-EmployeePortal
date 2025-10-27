@@ -892,7 +892,11 @@ def serialize_document(obj):
     elif isinstance(obj, ObjectId):
         return str(obj)
     elif isinstance(obj, datetime):
-        return obj.isoformat()
+        # If the datetime is naive, assume it's UTC and make it aware
+        if obj.tzinfo is None:
+            obj = obj.replace(tzinfo=timezone.utc)
+        # Convert to IST and then to ISO format string
+        return obj.astimezone(ist_tz).isoformat()
     else:
         return obj
 
@@ -1360,13 +1364,17 @@ async def check_scheduled_announcements():
                 # Update status to 'published'
                 await chat_db.Announcements.update_one(
                     {"_id": ann["_id"]},
-                    {"$set": {"status": "published"}}
+                    {"$set": {"status": "published", "date": now_utc}}
                 )
+
+                # Update the announcement object in memory before broadcasting
+                # so the frontend receives the correct publication time.
+                ann["date"] = now_utc
 
                 # Broadcast the announcement
                 broadcast_payload = {
                     "type": "new_announcement",
-                    "data": serialize_document(ann)
+                    "data": serialize_document(ann) # serialize_document will convert now_utc to IST
                 }
                 await manager.broadcast(json.dumps(broadcast_payload))
 
@@ -2560,13 +2568,11 @@ async def get_channels(user_id: Optional[str] = None):
         return user_channels
 
 @api_router.get("/announcements", response_model=List[Dict])
-async def get_announcements(admin_user: dict = Depends(get_current_admin_user)):
+async def get_announcements():
     """
-    (Admin Only) Fetch all announcements from the database.
+    Fetch all published announcements from the database. This is accessible to all users.
     """
     try:
-        # Fetch only published announcements for the general view
-        # Admins can see scheduled ones in a different view if needed later
         announcements = await chat_db.Announcements.find({"status": "published"}).sort("date", -1).to_list(length=None)
         return serialize_document(announcements)
     except Exception as e:
@@ -2596,11 +2602,13 @@ async def create_announcement(
             scheduled_at=announcement_data.scheduled_at
         )
 
-        # If it's a scheduled announcement, save it as 'scheduled' and don't broadcast yet.
+        # The frontend sends a UTC datetime, so we can use it directly.
+
         if announcement.scheduled_at and announcement.scheduled_at > datetime.now(timezone.utc):
             announcement.status = "scheduled"
             logging.info(f"Admin '{admin_user.get('email')}' scheduled announcement for {announcement.scheduled_at}")
         else:
+
             # If not scheduled or scheduled for the past, publish immediately.
             announcement.status = "published"
             announcement.scheduled_at = None # Clear scheduled time if published now

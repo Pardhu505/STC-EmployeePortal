@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, createContext, useContext } from "react";
-import { fetchUserProfile, fetchManagerTeam, fetchManagerAttendanceReport } from "@/api"; // Import fetchUserProfile and fetchManagerTeam
-import { useAuth, AuthProvider } from "@/contexts/AuthContext";
+import { fetchUserProfile, fetchManagerTeam, fetchManagerAttendanceReport } from "../api"; // Import fetchUserProfile and fetchManagerTeam
+import { useAuth, AuthProvider } from "../contexts/AuthContext";
 
 
 // ---------- HELPERS ----------

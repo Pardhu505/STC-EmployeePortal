@@ -1,11 +1,10 @@
 // src/Services/api.js
 import axios from "axios";
-import { API_BASE_URL } from "@/config/api";
-// Set your backend URL here. Fallback to localhost:8000 if the env var is missing or empty.
-const API_BASE_URLL = (API_BASE_URL || "http://localhost:8000") + "/api";
+import { API_BASE_URL } from "../config/api";
 
 const api = axios.create({
-  baseURL: API_BASE_URLL,
+  // Set your backend URL here. Fallback to localhost:8000 if the env var is missing or empty.
+  baseURL: (API_BASE_URL || "http://localhost:8000") + "/api",
   headers: {
     "Content-Type": "application/json",
   },

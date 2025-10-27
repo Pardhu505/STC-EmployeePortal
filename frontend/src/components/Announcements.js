@@ -12,7 +12,6 @@ import { useToast } from '../hooks/use-toast';
 import { API_BASE_URL } from '../config/api';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { Checkbox } from './ui/checkbox';
-import { format } from 'date-fns-tz';
 
 const Announcements = ({ announcements, setAnnouncements }) => {
   const { user, isAdmin, showNotification } = useAuth();
@@ -178,11 +177,23 @@ const Announcements = ({ announcements, setAnnouncements }) => {
   };
 
   const formatDate = (dateString) => {
-    return format(dateString, 'MMMM d, yyyy', { timeZone: 'Asia/Kolkata' });
+    if (!dateString) return 'No date';
+    return new Intl.DateTimeFormat('en-IN', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      timeZone: 'Asia/Kolkata',
+    }).format(new Date(dateString));
   };
 
   const formatTime = (dateString) => {
-    return format(dateString, 'h:mm a', { timeZone: 'Asia/Kolkata' });
+    if (!dateString) return 'No time';
+    return new Intl.DateTimeFormat('en-IN', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+      timeZone: 'Asia/Kolkata',
+    }).format(new Date(dateString));
   };
 
   return (
@@ -444,11 +455,11 @@ const Announcements = ({ announcements, setAnnouncements }) => {
                         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-500">
                           <div className="flex items-center space-x-1">
                             <Calendar className="h-4 w-4" />
-                            <span>{formatDate(announcement.scheduled_at || announcement.date)}</span>
+                            <span>{formatDate(announcement.scheduled_at || announcement.created_at)}</span>
                           </div>
                           <div className="flex items-center space-x-1">
                             <Clock className="h-4 w-4" />
-                            <span>{formatTime(announcement.scheduled_at || announcement.date)}</span>
+                            <span>{formatTime(announcement.scheduled_at || announcement.created_at)}</span>
                           </div>
                           <div className="flex items-center space-x-1">
                             <User className="h-4 w-4" />

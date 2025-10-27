@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -10,8 +10,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Calendar, User, AlertCircle, Info, CheckCircle, Plus, Send, Shield, Trash2, X, Loader2, Clock } from 'lucide-react';
 import { useToast } from '../hooks/use-toast';
 import { API_BASE_URL } from '../config/api';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { Checkbox } from './ui/checkbox';
+import { format } from 'date-fns-tz';
 
 const Announcements = ({ announcements, setAnnouncements }) => {
   const { user, isAdmin, showNotification } = useAuth();
@@ -52,6 +53,12 @@ const Announcements = ({ announcements, setAnnouncements }) => {
     ? announcements 
     : announcements.filter(ann => ann.priority === selectedPriority);
 
+  const convertLocalToUTC = (date, time) => {
+    const localDateTimeString = `${date}T${time}`;
+    const localDate = new Date(localDateTimeString);
+    // The Date object is in the browser's local timezone. .toISOString() correctly converts it to UTC.
+    return localDate.toISOString();
+  };
   const handleCreateAnnouncement = async () => {
     if (!isAdmin) {
       toast({
@@ -81,7 +88,7 @@ const Announcements = ({ announcements, setAnnouncements }) => {
         });
         return;
       }
-      scheduled_at = new Date(`${newAnnouncement.scheduled_date}T${newAnnouncement.scheduled_time}`).toISOString();
+      scheduled_at = convertLocalToUTC(newAnnouncement.scheduled_date, newAnnouncement.scheduled_time);
 
       if (new Date(scheduled_at) < new Date()) {
         toast({
@@ -121,7 +128,7 @@ const Announcements = ({ announcements, setAnnouncements }) => {
       toast({
         title: scheduled_at ? "Announcement Scheduled" : "Announcement Published",
         description: scheduled_at 
-          ? `Your announcement will be published on ${formatDate(scheduled_at)} at ${new Date(scheduled_at).toLocaleTimeString()}.`
+          ? `Your announcement will be published on ${formatDate(scheduled_at)} at ${formatTime(scheduled_at)}.`
           : "Your announcement has been published to all employees.",
       });
     } catch (error) {
@@ -171,11 +178,11 @@ const Announcements = ({ announcements, setAnnouncements }) => {
   };
 
   const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
+    return format(dateString, 'MMMM d, yyyy', { timeZone: 'Asia/Kolkata' });
+  };
+
+  const formatTime = (dateString) => {
+    return format(dateString, 'h:mm a', { timeZone: 'Asia/Kolkata' });
   };
 
   return (
@@ -434,10 +441,14 @@ const Announcements = ({ announcements, setAnnouncements }) => {
                         <CardTitle className="text-lg font-semibold text-gray-900 mb-2">
                           {announcement.title}
                         </CardTitle>
-                        <div className="flex items-center space-x-4 text-sm text-gray-500">
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-500">
                           <div className="flex items-center space-x-1">
                             <Calendar className="h-4 w-4" />
-                            <span>{formatDate(announcement.date)}</span>
+                            <span>{formatDate(announcement.scheduled_at || announcement.date)}</span>
+                          </div>
+                          <div className="flex items-center space-x-1">
+                            <Clock className="h-4 w-4" />
+                            <span>{formatTime(announcement.scheduled_at || announcement.date)}</span>
                           </div>
                           <div className="flex items-center space-x-1">
                             <User className="h-4 w-4" />

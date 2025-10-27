@@ -22,8 +22,8 @@ import {
   UserX,
   Trash2,
   AlertTriangle,
-} from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
+} from "lucide-react";
+import { useToast } from "../hooks/use-toast";
 import { employeeAPI } from '../Services/api';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
 

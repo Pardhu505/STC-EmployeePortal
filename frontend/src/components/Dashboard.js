@@ -16,8 +16,8 @@ import { Calendar, Users, BarChart3, Bell, MessageSquare, Gift, Shield, FileText
 import EAttendance from './EMPAttedence';
 import ManagerReport from './Manger Attendence';
 import AttendanceReport from './AdminAttedenceReport';
-import HRAttendance from './HRAttendance'; // Import the new HR component
-import { employeeAPI } from '@/Services/api';
+import HRAttendance from './HRAttendance';
+import { employeeAPI } from '../Services/api';
 
 const Dashboard = () => {
   const { user, isAdmin, loading: authLoading, navigationTarget } = useAuth();

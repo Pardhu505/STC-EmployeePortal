@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, createContext, useContext } from 'react';
-import { useAuth, AuthProvider } from "@/contexts/AuthContext";
+import { useAuth, AuthProvider } from "../contexts/AuthContext";
 import { API_BASE_URL } from '../config/api';
 
 // Main component for displaying attendance

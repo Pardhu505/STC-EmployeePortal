@@ -66,27 +66,13 @@ app = FastAPI()
 # Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
 
+# --- Allowed Origins for CORS ---
 ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://localhost:3001",
     "https://showtime-consulting-employee-portal.onrender.com",
     "https://showtime-employeeportal.vercel.app"
 ]
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS,
-    allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allow_headers=["*"],
-)
-
-# Add a root route to the main app to handle basic health checks
-@app.get("/")
-async def app_root():
-    """A simple endpoint for the root URL to confirm the server is running."""
-    return {"message": "Welcome to the STC Portal API. Visit /docs for documentation."}
-
 
 # --- Generic Exception Handler for unhandled errors ---
 @app.exception_handler(Exception)
@@ -1405,11 +1391,8 @@ async def create_employee(employee: Employee):
     await team_collection.insert_one(employee_dict)
     return employee
 
-@api_router.get("/employees", response_model=List[Dict])
-async def get_all_employees(
-    # Secure this endpoint by requiring an authenticated user.
-    current_user: dict = Depends(get_current_admin_user)
-):
+@api_router.get("/employees")
+async def get_all_employees():
     try:
         all_employees = {}
         # Iterate only through collections corresponding to known teams
@@ -1432,7 +1415,6 @@ async def get_all_employees(
 
         employees = list(all_employees.values())
         logging.info(f"Total unique employees fetched from all teams: {len(employees)}")
-        # Ensure the response is properly serialized to handle MongoDB-specific types.
         return serialize_document(employees)
     except Exception as e:
         logging.error(f"Error fetching employees: {e}")
@@ -2877,8 +2859,12 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
             elif message.type == "personal_message" and message.recipient_id:
                 # Send to the recipient. The manager will create a notification if offline.
                 await manager.send_personal_message(message_json, message.recipient_id)
+                
                 # Also send the confirmed message back to the sender.
-                await manager.send_personal_message(message_json, message.sender_id)
+                # Add an 'is_echo' flag to prevent self-notification on the client.
+                echo_data = json.loads(message_json)
+                echo_data['is_echo'] = True
+                await manager.send_personal_message(json.dumps(echo_data, default=default_serializer), message.sender_id)
             else:
                 logging.warning(f"Message from {client_id} could not be routed: {message_json}")
 
@@ -2891,9 +2877,22 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
         await manager.disconnect(websocket, client_id)
         logging.info(f"User {client_id} connection handler finished.")
 
+# Corrected CORS middleware configuration
+@app.get("/")
+async def app_root():
+    """A simple endpoint for the root URL to confirm the server is running."""
+    return {"message": "Welcome to the STC Portal API. Visit /docs for documentation."}
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=ALLOWED_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*", "Authorization"],
+)
+
 # Include the router in the main app
 app.include_router(api_router)
-
 app.include_router(download_router)  # Include the download file router
 
 # Mount static files for uploads
@@ -2908,7 +2907,6 @@ logger = logging.getLogger(__name__)
 
 @app.on_event("startup")
 async def startup_event():
-    await setup_indexes()
     try:
         await main_client.admin.command('ping')
         await attendance_client.admin.command('ping')
@@ -2918,3 +2916,4 @@ async def startup_event():
     except Exception as e:
         logger.error(f"MongoDB connection failed: {e}")
         logger.info("Continuing without MongoDB - WebSocket functionality will work without database persistence")
+        

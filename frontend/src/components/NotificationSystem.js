@@ -32,6 +32,11 @@ const NotificationSystem = ({
           console.log("NotificationSystem: Skipping message from current user:", msg);
           return false;
         }
+        // Also skip messages that are echoes back to the sender (for direct messages)
+        if (msg.is_echo) {
+          console.log("NotificationSystem: Skipping echoed message:", msg);
+          return false;
+        }
         // All other filtering (recipient, channel membership) is handled in AuthContext
         // before messages are added to newMessages. So, if it's in newMessages and not from the current user, it's relevant.
         return true; // Keep the message if it's not from the current user
@@ -46,17 +51,37 @@ const NotificationSystem = ({
         data: msg
       }));
 
-    const announcementNotifications = (newAnnouncements || []).map(ann => ({
+    // Filter announcements to exclude those created by the current user
+    const announcementNotifications = (newAnnouncements || [])
+      .filter(ann => {
+        if (!user?.name) return true; // If user isn't loaded, show all
+        // The author field on announcements is just a name string.
+        // This prevents the user who created it from getting a notification.
+        return ann.author !== user.name;
+      })
+      .map(ann => ({
+        id: `ann_${ann.id}`,
+        type: 'announcement',
+        title: 'New Announcement',
+        message: `${ann.title} - ${ann.priority} priority`,
+        timestamp: ann.date,
+        read: false,
+        data: ann
+      }));
+
+    const birthdayNotifications = (newAnnouncements || []).filter(ann => ann.type && ann.type.startsWith('birthday')).map(ann => ({
       id: `ann_${ann.id}`,
-      type: 'announcement',
-      title: 'New Announcement',
-      message: `${ann.title} - ${ann.priority} priority`,
+      type: 'birthday',
+      title: ann.title,
+      message: ann.content,
       timestamp: ann.date,
       read: false,
       data: ann
     }));
 
-    const allNotifications = [...messageNotifications, ...announcementNotifications];
+    const regularAnnouncements = announcementNotifications.filter(ann => !ann.type.startsWith('birthday'));
+
+    const allNotifications = [...messageNotifications, ...regularAnnouncements, ...birthdayNotifications];
     setNotifications(allNotifications);
     setUnreadCount(allNotifications.filter(n => !n.read).length);
   }, [newMessages, newAnnouncements, user]);
@@ -96,11 +121,11 @@ const NotificationSystem = ({
       }
     };
 
-    const unreadAnnouncements = notifications.filter(
-      n => n.type === 'announcement' && !notifiedIds.has(n.id)
+    const unreadNotifications = notifications.filter(
+      n => (n.type === 'announcement' || n.type.includes('message')) && !notifiedIds.has(n.id)
     );
 
-    unreadAnnouncements.forEach(showBrowserNotification);
+    unreadNotifications.forEach(showBrowserNotification);
   }, [notifications, notifiedIds]);
 
   const handleNotificationClick = (notification) => {
@@ -120,14 +145,14 @@ const NotificationSystem = ({
     
     // New navigation logic
     if (notification.data) {
-      if (notification.type === 'announcement') {
+      if (notification.type === 'announcement' || notification.type.startsWith('birthday')) {
         navigateTo({ section: 'announcements' });
       } else if (notification.data.channel) { // It's a channel message
         navigateTo({ section: 'communication', type: 'channel', id: notification.data.channel });
       } else if (notification.data.isDirectMessage) { // It's a direct message
         navigateTo({ section: 'communication', type: 'dm', id: notification.data.senderName });
       }
-    } else if (notification.type === 'announcement') { // Fallback for older structure
+    } else if (notification.type === 'announcement' || notification.type.startsWith('birthday')) { // Fallback for older structure
       navigateTo({ section: 'announcements' });
     }
 
@@ -161,6 +186,8 @@ const NotificationSystem = ({
         return <MessageSquare className="h-4 w-4 text-blue-600" />;
       case 'announcement':
         return <Megaphone className="h-4 w-4 text-orange-600" />;
+      case 'birthday':
+        return <Megaphone className="h-4 w-4 text-pink-600" />; // Different icon/color for birthdays
       default:
         return <Bell className="h-4 w-4 text-gray-600" />;
     }
@@ -174,6 +201,8 @@ const NotificationSystem = ({
         return 'border-l-blue-500 bg-blue-50';
       case 'announcement':
         return 'border-l-orange-500 bg-orange-50';
+      case 'birthday':
+        return 'border-l-pink-500 bg-pink-50';
       default:
         return 'border-l-gray-500 bg-gray-50';
     }

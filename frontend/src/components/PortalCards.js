@@ -8,7 +8,10 @@ import { useAuth } from '../contexts/AuthContext';
 
 const PortalCards = () => {
   const { user } = useAuth();
-  const isManager = user?.designation === 'Reporting manager';
+  const hasElevatedAccess =
+    user?.designation === 'Reporting manager' ||
+    user?.department === 'HR' ||
+    user?.designation === 'System Admin';
 
   const handlePortalClick = (url) => {
     window.open(url, '_blank', 'noopener,noreferrer');
@@ -16,7 +19,7 @@ const PortalCards = () => {
 
   const visiblePortals = PORTAL_DATA.filter(portal => {
     if (portal.managerOnly) {
-      return isManager;
+      return hasElevatedAccess;
     }
     return true;
   });

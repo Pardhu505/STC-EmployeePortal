@@ -72,12 +72,23 @@ const Dashboard = () => {
 
   const fetchAnnouncements = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/announcements`);
+      const response = await fetch(`${API_BASE_URL}/api/announcements`, {
+        headers: {
+          // Send the user's auth token so the backend knows who is asking.
+          'Authorization': `Bearer ${btoa(JSON.stringify(user))}`
+        }
+      });
       if (!response.ok) throw new Error('Failed to fetch announcements');
       const data = await response.json();
       
-      // Fetch all employees to check for birthdays
-      const employees = await employeeAPI.getAllEmployees();
+      // Fetch all employees' work details to check for birthdays. This endpoint is accessible to all users.
+      const employeesResponse = await fetch(`${API_BASE_URL}/api/employees/work-details/`, {
+        headers: {
+          'Authorization': `Bearer ${btoa(JSON.stringify(user))}`
+        }
+      });
+      if (!employeesResponse.ok) throw new Error('Failed to fetch employees');
+      const employees = await employeesResponse.json();
       setAllEmployees(employees);
 
       // Generate birthday announcements
@@ -112,6 +123,14 @@ const Dashboard = () => {
     return () => window.removeEventListener('websocket-message', handleNewAnnouncement);
   }, []);
 
+  // Periodically re-fetch announcements to catch newly active scheduled ones
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      fetchAnnouncements();
+    }, 60000); // Re-fetch every 60 seconds
+    return () => clearInterval(intervalId); // Cleanup on component unmount
+  }, []); // Empty dependency array ensures this runs only once
+
   // Load and manage user-specific read announcement IDs
   useEffect(() => {
     if (user?.email) {
@@ -130,19 +149,12 @@ const Dashboard = () => {
     });
   };
 
-  // Effect to handle navigation from notifications
-  useEffect(() => {
-    if (navigationTarget?.section) {
-      setActiveSection(navigationTarget.section);
-    }
-  }, [navigationTarget]);
-
   const renderContent = () => {
     if (authLoading) return <div className="flex justify-center items-center h-64">Loading...</div>;
 
     switch (activeSection) {
       case 'portals': return <PortalCards />;
-      case 'announcements': return <Announcements announcements={announcements} setAnnouncements={setAnnouncements} />;
+      case 'announcements': return <Announcements announcements={announcements} setAnnouncements={setAnnouncements} fetchAnnouncements={fetchAnnouncements} />;
       case 'profile': return <UserProfile />;
       case 'communication': return <InternalCommunication />;
       case 'admin': 

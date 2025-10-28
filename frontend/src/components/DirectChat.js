@@ -576,7 +576,7 @@ const handleClearChat = async () => {
             {messages.length === 0 ? (
               <div className="text-center text-gray-500 py-8">
                 <p>Start a conversation with {selectedEmployee.name}.</p>
-                <p className="text-xs">Messages are end-to-end NOT encrypted (this is a demo).</p>
+                <p className="text-xs">Messages are end-to-end NOT encrypted.</p>
               </div>
             ) : (
               (() => {

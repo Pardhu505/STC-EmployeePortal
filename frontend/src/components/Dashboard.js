@@ -131,6 +131,16 @@ const Dashboard = () => {
     return () => clearInterval(intervalId); // Cleanup on component unmount
   }, []); // Empty dependency array ensures this runs only once
 
+  // Handle navigation from notifications
+  useEffect(() => {
+    if (navigationTarget && navigationTarget.section) {
+      // Check if the target section is different from the active one to avoid unnecessary re-renders
+      if (activeSection !== navigationTarget.section) {
+        setActiveSection(navigationTarget.section);
+      }
+    }
+  }, [navigationTarget]);
+
   // Load and manage user-specific read announcement IDs
   useEffect(() => {
     if (user?.email) {
@@ -201,7 +211,7 @@ const Dashboard = () => {
       <div className="relative z-10">
         <Header 
           onSectionChange={setActiveSection} 
-          newAnnouncements={announcements.filter(a => a.type !== 'birthday' && !readAnnouncementIds.has(a.id))}
+          newAnnouncements={announcements.filter(a => !readAnnouncementIds.has(a.id))}
           onReadAnnouncement={handleReadAnnouncement}
         />
         <div className="container mx-auto px-4 py-8">

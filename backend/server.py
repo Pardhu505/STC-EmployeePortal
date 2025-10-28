@@ -61,10 +61,10 @@ grid_fs = AsyncIOMotorGridFSBucket(chat_db)
 # Define IST timezone
 ist_tz = timezone(timedelta(hours=5, minutes=30))
 # Create the main app without a prefix
-app = FastAPI()
+app = FastAPI(trailing_slash=False)
 
 # Create a router with the /api prefix
-api_router = APIRouter(prefix="/api")
+api_router = APIRouter()
 
 # --- Allowed Origins for CORS ---
 ALLOWED_ORIGINS = [

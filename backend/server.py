@@ -40,7 +40,7 @@ main_client = AsyncIOMotorClient(main_mongo_url)
 main_db = main_client[os.environ['DB_NAME']]
 
 # MongoDB connection for the Attendance, Chat, and STC_Employees databases (your Atlas connection)
-attendance_mongo_url = "mongodb+srv://poori420:5imYVGkw7F0cE5K2@cluster0.53oeybd.mongodb.net/"
+attendance_mongo_url = os.environ.get("ATTENDANCE_MONGO_URL")
 attendance_client = AsyncIOMotorClient(attendance_mongo_url, tlsAllowInvalidCertificates=True)
 
 # Correct the database name to 'employee_attendance'
@@ -105,6 +105,9 @@ async def http_exception_handler(request: Request, exc: HTTPException):
     if origin in ALLOWED_ORIGINS:
         headers["Access-Control-Allow-Origin"] = origin
         headers["Access-Control-Allow-Credentials"] = "true"
+            # Also allow all methods and headers in the error response
+        headers["Access-Control-Allow-Methods"] = "*"
+        headers["Access-Control-Allow-Headers"] = "*"
 
     return JSONResponse(
         status_code=exc.status_code,

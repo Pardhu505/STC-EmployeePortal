@@ -60,12 +60,6 @@ grid_fs = AsyncIOMotorGridFSBucket(chat_db)
 
 # Define IST timezone
 ist_tz = timezone(timedelta(hours=5, minutes=30))
-# Create the main app without a prefix
-app = FastAPI()
-
-# Create a router with the /api prefix
-api_router = APIRouter(prefix="/api")
-
 # --- Allowed Origins for CORS ---
 ALLOWED_ORIGINS = [
     "http://localhost:3000",
@@ -74,8 +68,8 @@ ALLOWED_ORIGINS = [
     "https://showtime-employeeportal.vercel.app"
 ]
 
-# --- Generic Exception Handler for unhandled errors ---
-@app.exception_handler(Exception)
+# --- Exception Handlers ---
+
 async def generic_exception_handler(request: Request, exc: Exception):
     """
     Catch-all exception handler to return a 500 error with CORS headers.
@@ -87,6 +81,9 @@ async def generic_exception_handler(request: Request, exc: Exception):
     if origin in ALLOWED_ORIGINS:
         headers["Access-Control-Allow-Origin"] = origin
         headers["Access-Control-Allow-Credentials"] = "true"
+        # Also allow all methods and headers in the error response
+        headers["Access-Control-Allow-Methods"] = "*"
+        headers["Access-Control-Allow-Headers"] = "*"
 
     return JSONResponse(
         status_code=500,
@@ -94,26 +91,36 @@ async def generic_exception_handler(request: Request, exc: Exception):
         headers=headers,
     )
 
-# --- Custom Exception Handler for CORS ---
-@app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException):
     """
     Custom exception handler to ensure CORS headers are added to all HTTP exceptions.
     """
     origin = request.headers.get('origin')
-    headers = exc.headers or {}
+    response_headers = exc.headers or {} # Start with existing headers from the exception
+
     if origin in ALLOWED_ORIGINS:
-        headers["Access-Control-Allow-Origin"] = origin
-        headers["Access-Control-Allow-Credentials"] = "true"
-            # Also allow all methods and headers in the error response
-        headers["Access-Control-Allow-Methods"] = "*"
-        headers["Access-Control-Allow-Headers"] = "*"
+        # Explicitly set/override CORS headers to ensure they are present
+        response_headers["Access-Control-Allow-Origin"] = origin
+        response_headers["Access-Control-Allow-Credentials"] = "true"
+        response_headers["Access-Control-Allow-Methods"] = "*" # Allow all methods for error responses
+        response_headers["Access-Control-Allow-Headers"] = "*" # Allow all headers for error responses
 
     return JSONResponse(
         status_code=exc.status_code,
         content={"detail": exc.detail},
-        headers=headers,
+        headers=response_headers,
     )
+
+# Create the main app and register exception handlers
+app = FastAPI(exception_handlers={
+    HTTPException: http_exception_handler,
+    Exception: generic_exception_handler,
+})
+
+# Create a router with the /api prefix
+api_router = APIRouter(prefix="/api")
+
+
 
 async def get_current_admin_user(authorization: str = Header(None, alias="Authorization")):
     """
@@ -2886,13 +2893,6 @@ async def app_root():
     """A simple endpoint for the root URL to confirm the server is running."""
     return {"message": "Welcome to the STC Portal API. Visit /docs for documentation."}
 
-# This part is crucial. By adding the exception handlers to the main `app` instance,
-# you ensure they are active for all routes and will correctly add CORS headers
-# to error responses, which is the root cause of the issue you're seeing.
-@app.exception_handler(HTTPException)
-async def http_exception_handler_with_cors(request: Request, exc: HTTPException):
-    # Re-use the handler logic you already wrote
-    return await http_exception_handler(request, exc)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,

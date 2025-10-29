@@ -2893,17 +2893,16 @@ async def app_root():
     """A simple endpoint for the root URL to confirm the server is running."""
     return {"message": "Welcome to the STC Portal API. Visit /docs for documentation."}
 
+app.include_router(api_router)
+app.include_router(download_router)  # Include the download file router
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=["*", "Authorization"]
+    allow_headers=["*"] # Using ["*"] is generally safe and covers "Authorization"
 )
-
-# Include the router in the main app
-app.include_router(api_router)
-app.include_router(download_router)  # Include the download file router
 
 # Mount static files for uploads
 # from fastapi.staticfiles import StaticFiles

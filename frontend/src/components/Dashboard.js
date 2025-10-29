@@ -82,11 +82,7 @@ const Dashboard = () => {
       const data = await response.json();
       
       // Fetch all employees' work details to check for birthdays. This endpoint is accessible to all users.
-      const employeesResponse = await fetch(`${API_BASE_URL}/api/employees/work-details/`, {
-        headers: {
-          'Authorization': `Bearer ${btoa(JSON.stringify(user))}`
-        }
-      });
+      const employeesResponse = await fetch(`${API_BASE_URL}/api/employees/work-details/`);
       if (!employeesResponse.ok) throw new Error('Failed to fetch employees');
       const employees = await employeesResponse.json();
       setAllEmployees(employees);

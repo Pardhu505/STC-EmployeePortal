@@ -40,7 +40,7 @@ main_client = AsyncIOMotorClient(main_mongo_url)
 main_db = main_client[os.environ['DB_NAME']]
 
 # MongoDB connection for the Attendance, Chat, and STC_Employees databases (your Atlas connection)
-attendance_mongo_url = os.environ.get("ATTENDANCE_MONGO_URL")
+attendance_mongo_url = "mongodb+srv://poori420:5imYVGkw7F0cE5K2@cluster0.53oeybd.mongodb.net/"
 attendance_client = AsyncIOMotorClient(attendance_mongo_url, tlsAllowInvalidCertificates=True)
 
 # Correct the database name to 'employee_attendance'
@@ -64,19 +64,15 @@ ist_tz = timezone(timedelta(hours=5, minutes=30))
 app = FastAPI()
 
 # Create a router with the /api prefix
-api_router = APIRouter(prefix="/api") # This line was already present, no change needed here.
+api_router = APIRouter(prefix="/api")
 
 # --- Allowed Origins for CORS ---
-cors_origins_env = os.environ.get("CORS_ALLOWED_ORIGINS")
-if cors_origins_env:
-    ALLOWED_ORIGINS = [origin.strip() for origin in cors_origins_env.split(',')]
-else:
-    ALLOWED_ORIGINS = [
-        "http://localhost:3000",
-        "http://localhost:3001",
-        "https://showtime-consulting-employee-portal.onrender.com",
-        "https://showtime-employeeportal.vercel.app"
-    ]
+ALLOWED_ORIGINS = [
+    "http://localhost:3000",
+    "http://localhost:3001",
+    "https://showtime-consulting-employee-portal.onrender.com",
+    "https://showtime-employeeportal.vercel.app"
+]
 
 # --- Generic Exception Handler for unhandled errors ---
 @app.exception_handler(Exception)
@@ -2920,4 +2916,4 @@ async def startup_event():
     except Exception as e:
         logger.error(f"MongoDB connection failed: {e}")
         logger.info("Continuing without MongoDB - WebSocket functionality will work without database persistence")
-        s
+        

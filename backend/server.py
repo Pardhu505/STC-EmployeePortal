@@ -60,18 +60,23 @@ grid_fs = AsyncIOMotorGridFSBucket(chat_db)
 
 # Define IST timezone
 ist_tz = timezone(timedelta(hours=5, minutes=30))
+# Create the main app without a prefix
 app = FastAPI()
 
 # Create a router with the /api prefix
-api_router = APIRouter(prefix="/api")
+api_router = APIRouter(prefix="/api") # This line was already present, no change needed here.
 
 # --- Allowed Origins for CORS ---
-ALLOWED_ORIGINS = [
-    "http://localhost:3000",
-    "http://localhost:3001",
-    "https://showtime-consulting-employee-portal.onrender.com",
-    "https://showtime-employeeportal.vercel.app"
-]
+cors_origins_env = os.environ.get("CORS_ALLOWED_ORIGINS")
+if cors_origins_env:
+    ALLOWED_ORIGINS = [origin.strip() for origin in cors_origins_env.split(',')]
+else:
+    ALLOWED_ORIGINS = [
+        "http://localhost:3000",
+        "http://localhost:3001",
+        "https://showtime-consulting-employee-portal.onrender.com",
+        "https://showtime-employeeportal.vercel.app"
+    ]
 
 # --- Generic Exception Handler for unhandled errors ---
 @app.exception_handler(Exception)
@@ -2915,4 +2920,4 @@ async def startup_event():
     except Exception as e:
         logger.error(f"MongoDB connection failed: {e}")
         logger.info("Continuing without MongoDB - WebSocket functionality will work without database persistence")
-        
+        s

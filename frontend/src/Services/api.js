@@ -34,7 +34,7 @@ export const employeeAPI = {
   // Get all employees
   getAllEmployees: async () => {
     try {
-      const response = await api.get('/employees/');
+      const response = await api.get('/employees');
       return response.data;
     } catch (error) {
       console.error('Error fetching employees:', error);

@@ -71,6 +71,9 @@ const Dashboard = () => {
   };
 
   const fetchAnnouncements = async () => {
+    // Do not fetch if user is not yet available
+    if (!user) return;
+
     try {
       const response = await fetch(`${API_BASE_URL}/api/announcements`, {
         headers: {

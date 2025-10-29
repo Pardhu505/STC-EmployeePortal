@@ -2888,7 +2888,7 @@ app.add_middleware(
     allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=["*", "Authorization"],
+    allow_headers=["*", "Authorization"]
 )
 
 # Include the router in the main app

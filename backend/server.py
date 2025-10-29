@@ -117,6 +117,14 @@ app = FastAPI(exception_handlers={
     Exception: generic_exception_handler,
 })
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=ALLOWED_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 # Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
 
@@ -2895,14 +2903,6 @@ async def app_root():
 
 app.include_router(api_router)
 app.include_router(download_router)  # Include the download file router
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"] # Using ["*"] is generally safe and covers "Authorization"
-)
 
 # Mount static files for uploads
 # from fastapi.staticfiles import StaticFiles

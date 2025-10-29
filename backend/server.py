@@ -2883,6 +2883,13 @@ async def app_root():
     """A simple endpoint for the root URL to confirm the server is running."""
     return {"message": "Welcome to the STC Portal API. Visit /docs for documentation."}
 
+# This part is crucial. By adding the exception handlers to the main `app` instance,
+# you ensure they are active for all routes and will correctly add CORS headers
+# to error responses, which is the root cause of the issue you're seeing.
+@app.exception_handler(HTTPException)
+async def http_exception_handler_with_cors(request: Request, exc: HTTPException):
+    # Re-use the handler logic you already wrote
+    return await http_exception_handler(request, exc)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,

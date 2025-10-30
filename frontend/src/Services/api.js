@@ -4,7 +4,7 @@ import { API_BASE_URL } from "../config/api";
 
 const api = axios.create({
   // Set your backend URL here. Fallback to localhost:8000 if the env var is missing or empty.
-  baseURL: API_BASE_URL,
+  baseURL: (API_BASE_URL || "http://localhost:8000") + "/api",
   headers: {
     "Content-Type": "application/json",
   },

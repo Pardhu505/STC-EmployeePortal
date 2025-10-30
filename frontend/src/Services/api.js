@@ -1,5 +1,6 @@
 // src/Services/api.js
 import axios from "axios";
+// Assuming you have a config file for the base URL. If not, you can hardcode it.
 import { API_BASE_URL } from "../config/api";
 
 const api = axios.create({
@@ -10,19 +11,27 @@ const api = axios.create({
   },
 });
 
-// Add a request interceptor if you use authentication
+// Add a request interceptor to handle the special admin authentication.
 api.interceptors.request.use(
   (config) => {
-    // For admin requests, the backend expects a Base64 encoded user object.
-    // For other requests, a different token might be used.
-    // This logic specifically handles the admin auth format.
-    const userString = localStorage.getItem("showtimeUser");
-    if (userString) {
-      try {
-        // The backend's get_current_admin_user expects a base64 encoded JSON string.
-        const token = btoa(userString);
-        config.headers["Authorization"] = `Bearer ${token}`;
-      } catch (e) { console.error("Could not encode user for auth token", e); }
+    // Only apply this special authorization for admin routes.
+    if (config.url.startsWith('/admin/')) {
+      const userString = localStorage.getItem("showtimeUser");
+      if (userString) {
+        try {
+          // Ensure what's in localStorage is valid JSON before encoding.
+          JSON.parse(userString); 
+          const token = btoa(userString);
+          config.headers["Authorization"] = `Bearer ${token}`;
+        } catch (e) {
+          console.error("Failed to create admin auth token. The user object in localStorage might be invalid.", e);
+          // Prevent the broken request from being sent.
+          return Promise.reject(new Error("Invalid user data for admin authentication."));
+        }
+      } else {
+        // If there's no user, we can't make an admin request.
+        return Promise.reject(new Error("Admin request requires a logged-in user."));
+      }
     }
     return config;
   },
@@ -35,17 +44,11 @@ export const employeeAPI = {
   getAllEmployees: async () => {
     try {
       // This is a public endpoint. We temporarily remove the auth header
-      // to prevent any potential issues with invalid tokens on public routes.
-      const response = await api.get('/employees', {
-        transformRequest: (data, headers) => {
-          delete headers.Authorization;
-          return data;
-        },
-      });
+      const response = await api.get('/employees');
       return response.data;
     } catch (error) {
       console.error('Error fetching employees:', error);
-      // throw error;
+      throw error;
     }
   },
 
@@ -190,7 +193,7 @@ export const employeeAPI = {
   admin: {
     updateUserDetails: async (originalEmail, userData) => {
       try {
-        const response = await api.put(`/admin/users/${encodeURIComponent(originalEmail)}/details`, userData);
+        const response = await api.put(`/admin/users/${encodeURIComponent(originalEmail.trim())}/details`, userData);
         return response.data;
       } catch (error) {
         console.error('Error updating user details (admin):', error);
@@ -200,7 +203,7 @@ export const employeeAPI = {
 
     deleteUser: async (email) => {
       try {
-        const response = await api.delete(`/admin/users/${encodeURIComponent(email)}`);
+        const response = await api.delete(`/admin/users/${encodeURIComponent(email.trim())}`);
         return response.data;
       } catch (error) {
         console.error('Error deleting user (admin):', error);
@@ -221,8 +224,6 @@ export const employeeAPI = {
     },
   }
 };
-
-
 
 // Channels API functions
 export const channelsAPI = {
@@ -252,18 +253,25 @@ export const managerAPI = {
   },
 
   // Get attendance report for a manager's team
-  getManagerAttendanceReport: async ({ manager_code, reportType, date, signal }) => {
+  // This function was inconsistent with the `fetch` version.
+  // The backend likely expects a POST request with a body for this complex query.
+  getManagerAttendanceReport: async ({ manager_code, team_emp_codes, reportType, date, signal }) => {
     try {
-      const params = new URLSearchParams({ view_type: reportType });
+      const url = `/attendance-report/manager`;
+      const body = {
+        manager_code: manager_code,
+        team_emp_codes: team_emp_codes, // Added team_emp_codes
+        view_type: reportType,
+      };
+
       if (reportType === 'day') {
-        params.append('date', date.toISOString().split('T')[0]);
+        body.date = date.toISOString().split('T')[0];
       } else { // month
-        params.append('year', date.getFullYear());
-        params.append('month', date.getMonth() + 1);
+        body.year = date.getFullYear();
+        body.month = date.getMonth() + 1;
       }
 
-      const response = await api.get(`/attendance-report/manager/${manager_code}`, {
-        params,
+      const response = await api.post(url, body, {
         signal,
       });
       return response.data;
@@ -273,6 +281,5 @@ export const managerAPI = {
     }
   },
 };
-
 
 export default api;

@@ -34,11 +34,18 @@ export const employeeAPI = {
   // Get all employees
   getAllEmployees: async () => {
     try {
-      const response = await api.get('/employees');
+      // This is a public endpoint. We temporarily remove the auth header
+      // to prevent any potential issues with invalid tokens on public routes.
+      const response = await api.get('/employees', {
+        transformRequest: (data, headers) => {
+          delete headers.Authorization;
+          return data;
+        },
+      });
       return response.data;
     } catch (error) {
       console.error('Error fetching employees:', error);
-      throw error;
+      // throw error;
     }
   },
 

@@ -194,20 +194,20 @@ export const employeeAPI = {
         return response.data;
       } catch (error) {
         console.error('Error updating user details (admin):', error);
-        throw error; // Re-throw the original Axios error
+        throw error;
       }
     },
-    
+
     deleteUser: async (email) => {
       try {
         const response = await api.delete(`/admin/users/${encodeURIComponent(email)}`);
         return response.data;
       } catch (error) {
         console.error('Error deleting user (admin):', error);
-        throw error; // Re-throw the original Axios error
+        throw error;
       }
     },
-    
+
     resetPassword: async (email, newPassword) => {
       try {
         const response = await api.post(`/admin/users/${encodeURIComponent(email)}/reset-password`, {
@@ -216,7 +216,7 @@ export const employeeAPI = {
         return response.data;
       } catch (error) {
         console.error('Error resetting password (admin):', error);
-        throw error; // Re-throw the original Axios error
+        throw error;
       }
     },
   }

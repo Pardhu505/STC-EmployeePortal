@@ -188,27 +188,27 @@ export const employeeAPI = {
 
   // Admin-specific API functions
   admin: {
-    updateUserDetails: async (originalEmail, userData, userObject) => {
+    updateUserDetails: async (originalEmail, userData) => {
       try {
         const response = await api.put(`/admin/users/${encodeURIComponent(originalEmail)}/details`, userData);
         return response.data;
       } catch (error) {
         console.error('Error updating user details (admin):', error);
-        throw error.response?.data || { detail: error.message };
+        throw error; // Re-throw the original Axios error
       }
     },
     
-    deleteUser: async (email, userObject) => {
+    deleteUser: async (email) => {
       try {
         const response = await api.delete(`/admin/users/${encodeURIComponent(email)}`);
         return response.data;
       } catch (error) {
         console.error('Error deleting user (admin):', error);
-        throw error.response?.data || { detail: error.message };
+        throw error; // Re-throw the original Axios error
       }
     },
     
-    resetPassword: async (email, newPassword, userObject) => {
+    resetPassword: async (email, newPassword) => {
       try {
         const response = await api.post(`/admin/users/${encodeURIComponent(email)}/reset-password`, {
           new_password: newPassword,
@@ -216,7 +216,7 @@ export const employeeAPI = {
         return response.data;
       } catch (error) {
         console.error('Error resetting password (admin):', error);
-        throw error.response?.data || { detail: error.message };
+        throw error; // Re-throw the original Axios error
       }
     },
   }

@@ -38,7 +38,7 @@ export const employeeAPI = {
       return response.data;
     } catch (error) {
       console.error('Error fetching employees:', error);
-      // throw error;
+      throw error;
     }
   },
 

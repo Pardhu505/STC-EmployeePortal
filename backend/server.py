@@ -68,12 +68,30 @@ ALLOWED_ORIGINS = [
     "https://showtime-employeeportal.vercel.app"
 ]
 
-# --- Exception Handlers ---
+# --- Custom Exception Handlers to ensure CORS headers on errors ---
+
+async def http_exception_handler(request: Request, exc: HTTPException):
+    """
+    Custom handler for HTTPException to ensure all error responses include
+    the necessary CORS headers. This prevents the frontend from seeing
+    a generic "Network Error" on 4xx/5xx responses.
+    """
+    origin = request.headers.get('origin')
+    headers = getattr(exc, "headers", {})
+    if origin in ALLOWED_ORIGINS:
+        headers["Access-Control-Allow-Origin"] = origin
+        headers["Access-Control-Allow-Credentials"] = "true"
+
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail},
+        headers=headers,
+    )
 
 async def generic_exception_handler(request: Request, exc: Exception):
     """
-    Catch-all exception handler to return a 500 error with CORS headers.
-    This prevents the client from seeing a CORS error for unhandled exceptions.
+    Catch-all handler for unhandled exceptions to return a 500 error
+    with CORS headers.
     """
     logging.error(f"Unhandled exception: {exc}", exc_info=True)
     origin = request.headers.get('origin')
@@ -81,42 +99,11 @@ async def generic_exception_handler(request: Request, exc: Exception):
     if origin in ALLOWED_ORIGINS:
         headers["Access-Control-Allow-Origin"] = origin
         headers["Access-Control-Allow-Credentials"] = "true"
-        # Also allow all methods and headers in the error response
-        headers["Access-Control-Allow-Methods"] = "*"
-        headers["Access-Control-Allow-Headers"] = "*"
 
-    return JSONResponse(
-        status_code=500,
-        content={"detail": "An internal server error occurred."},
-        headers=headers,
-    )
-
-async def http_exception_handler(request: Request, exc: HTTPException):
-    """
-    Custom exception handler to ensure CORS headers are added to all HTTP exceptions.
-    """
-    origin = request.headers.get('origin')
-    response_headers = exc.headers or {} # Start with existing headers from the exception
-
-    if origin in ALLOWED_ORIGINS:
-        # Explicitly set/override CORS headers to ensure they are present
-        response_headers["Access-Control-Allow-Origin"] = origin
-        response_headers["Access-Control-Allow-Credentials"] = "true"
-        response_headers["Access-Control-Allow-Methods"] = "*" # Allow all methods for error responses
-        response_headers["Access-Control-Allow-Headers"] = "*" # Allow all headers for error responses
-
-    return JSONResponse(
-        status_code=exc.status_code,
-        content={"detail": exc.detail},
-        headers=response_headers,
-    )
+    return JSONResponse(status_code=500, content={"detail": "An internal server error occurred."}, headers=headers)
 
 # Create the main app and register exception handlers
-app = FastAPI(exception_handlers={
-    HTTPException: http_exception_handler,
-    Exception: generic_exception_handler,
-})
-
+app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
@@ -125,18 +112,25 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Register the custom exception handlers
+app.add_exception_handler(HTTPException, http_exception_handler)
+app.add_exception_handler(Exception, generic_exception_handler)
+
 # Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
 
 
 
-async def get_current_admin_user(authorization: str = Header(None, alias="Authorization")):
+async def get_current_admin_user(authorization: Optional[str] = Header(None, alias="Authorization")):
     """
     Dependency to get and validate the current admin user from a token.
     This checks if the user associated with the token is an admin.
+    If no token is provided, it returns None. If a token is provided but invalid, it raises an error.
     """
-    if not authorization or not authorization.startswith("Bearer "):
-        logging.warning("Admin auth failed: Missing or malformed Authorization header")
+    if not authorization:
+        return None # No token provided, this is not an error for optional auth.
+
+    if not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Not authenticated")
     
     token_str = authorization.split(" ")[1]
@@ -212,7 +206,7 @@ async def admin_update_user_details(
     if not update_payload:
         raise HTTPException(status_code=400, detail="No update data provided.")
 
-    # If email is being changed, we need to handle it carefully
+    # If the email is being changed, we need to handle it carefully
     new_email = update_payload.get("email")
     if new_email and new_email.lower() != decoded_email.lower():
         # Check if the new email is already taken

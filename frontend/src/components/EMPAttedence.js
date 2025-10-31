@@ -75,21 +75,11 @@ useEffect(() => {
     return `${pad(hours)}:${pad(minutes)}`;
   };
 
-  const calculateLateBy = (inTime) => {
-    if (!inTime) return 0;
-    const [inHours, inMinutes] = inTime.split(':').map(Number);
-    const standardTimeInMinutes = 10 * 60;
-    const checkInTimeInMinutes = inHours * 60 + inMinutes;
-    const diffInMinutes = checkInTimeInMinutes - standardTimeInMinutes;
-    return diffInMinutes > 0 ? diffInMinutes : 0;
-  };
-
   // --- Daily Stats ---
   const dailyStats = useMemo(() => {
     if (viewType === 'month') return null;
 
     const dayData = attendanceData[0];
-    const lateByString = formatMinutesToHoursMinutes(calculateLateBy(dayData?.inTime));
     const formattedDate = selectedDate.toLocaleDateString();
     let statusText = 'Not Recorded';
     let statusColor = 'text-gray-500';
@@ -98,7 +88,7 @@ useEffect(() => {
     let totalWorkingHours = dayData?.totalWorkingHours || '00:00';
 
     if (dayData) {
-      if (dayData.status === 'P' && lateByString !== '00:00') {
+      if (dayData.status === 'P' && dayData.lateBy && dayData.lateBy !== '00:00') {
         statusText = 'Present (Late)';
         statusColor = 'text-orange-500';
       } else if (dayData.status === 'P') {
@@ -120,7 +110,7 @@ useEffect(() => {
       inTime,
       outTime,
       totalWorkingHours: totalWorkingHours,
-      lateBy: lateByString,
+      lateBy: dayData?.lateBy || '00:00',
     };
   }, [attendanceData, viewType, selectedDate]);
 
@@ -142,7 +132,7 @@ useEffect(() => {
 
     attendanceData.forEach(dayData => {
       if (dayData.status === 'P') daysPresent++;
-      if (dayData.inTime && calculateLateBy(dayData.inTime) > 0) lateDays++;
+      if (dayData.status === 'P' && dayData.lateBy && dayData.lateBy !== '00:00') lateDays++;
     });
 
     const absentDays = totalWorkingDays - daysPresent;
@@ -240,7 +230,7 @@ useEffect(() => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 py-12 px-4 sm:px-6 lg:px-8 font-sans">
+    <div className="min-h-screen py-12 px-4 sm:px-6 lg:px-8 font-sans">
       <div className="max-w-7xl mx-auto">
         <div className="bg-white p-6 md:p-10 rounded-3xl shadow-2xl">
           <h2 className="text-3xl font-bold text-center text-gray-900 mb-8">My Attendance Report</h2>

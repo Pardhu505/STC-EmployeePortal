@@ -122,6 +122,7 @@ useEffect(() => {
     let totalWorkingDays = 0;
     let totalWeekOffs = 0;
     let daysPresent = 0;
+    let absentDays = 0; // Initialize absent days counter
     let lateDays = 0;
 
     for (let day = 1; day <= totalDaysInMonth; day++) {
@@ -132,10 +133,10 @@ useEffect(() => {
 
     attendanceData.forEach(dayData => {
       if (dayData.status === 'P') daysPresent++;
+      if (dayData.status === 'A') absentDays++; // Count absent days directly from API data
       if (dayData.status === 'P' && dayData.lateBy && dayData.lateBy !== '00:00') lateDays++;
     });
 
-    const absentDays = totalWorkingDays - daysPresent;
     const selectedMonth = selectedDate.toLocaleString('default', { month: 'long', year: 'numeric' });
 
     return {

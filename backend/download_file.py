@@ -1,25 +1,17 @@
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import StreamingResponse
-from motor.motor_asyncio import AsyncIOMotorClient
 from motor.motor_asyncio import AsyncIOMotorGridFSBucket
 from bson import ObjectId
-import os
+
+# Import the dependency from the new central database module
+from database import get_grid_fs
 
 router = APIRouter()
 
-# --- Database Connection for GridFS ---
-# This setup ensures the router has its own context for the database
-
-attendance_mongo_url = os.environ.get("ATTENDANCE_MONGO_URL")
-
-attendance_client = AsyncIOMotorClient(attendance_mongo_url, tlsAllowInvalidCertificates=True)
-chat_db = attendance_client['Internal_communication']
-grid_fs = AsyncIOMotorGridFSBucket(chat_db)
-
-
-
-@router.get("/api/files/download/{file_id}")
-async def download_file(file_id: str):
+@router.get("/files/download/{file_id}")
+async def download_file(
+    file_id: str, grid_fs: AsyncIOMotorGridFSBucket = Depends(get_grid_fs)
+):
     try:
         # Convert string ID to BSON ObjectId
         gridfs_id = ObjectId(file_id)

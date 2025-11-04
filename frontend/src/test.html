@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+<body>
+<button onclick="notify()">Test Popup</button>
+<script>
+function notify() {
+  if ('Notification' in window) {
+    if (Notification.permission === 'default') {
+      Notification.requestPermission();
+    } else if (Notification.permission === 'granted') {
+      new Notification('Hello!', { body: 'Standalone test working.' });
+    } else {
+      alert('Denied.');
+    }
+  } else {
+    alert('No Notification API');
+  }
+}
+</script>
+</body>
+</html>

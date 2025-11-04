@@ -1,8 +1,6 @@
 from fastapi import FastAPI, APIRouter, WebSocket, WebSocketDisconnect, HTTPException, Request, Body, File, UploadFile
 from fastapi.responses import FileResponse
-from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
-from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import logging
 from pathlib import Path
@@ -19,17 +17,20 @@ from bson.json_util import dumps
 from typing import Optional, Any
 # from mock_data_module import DEPARTMENT_DATA
 import urllib.parse 
-from bson import ObjectId
 from pydantic import field_validator
 from download_file import router as download_router
 from passlib.context import CryptContext
 from fastapi import Depends, Header
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-
-
+# Import all database objects and dependencies from the central database module
+from database import (
+    main_db, attendance_db, chat_db, stc_db, grid_fs, get_grid_fs,
+    main_client, attendance_client
+)
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -54,6 +55,7 @@ stc_db = attendance_client['STC_Employees']
 # GridFS bucket for file storage in the chat database
 grid_fs = AsyncIOMotorGridFSBucket(chat_db)
 
+
 # DeletedMessages
 # Messages
 
@@ -77,7 +79,11 @@ async def http_exception_handler(request: Request, exc: HTTPException):
     a generic "Network Error" on 4xx/5xx responses.
     """
     origin = request.headers.get('origin')
-    headers = getattr(exc, "headers", {})
+
+    # headers = getattr(exc, "headers", {})
+
+    headers = getattr(exc, "headers") or {}
+
     if origin in ALLOWED_ORIGINS:
         headers["Access-Control-Allow-Origin"] = origin
         headers["Access-Control-Allow-Credentials"] = "true"
@@ -277,11 +283,10 @@ class ConnectionManager:
         self.user_status[user_id] = "online"
         logging.info(f"User {user_id} connected. Total connections for user: {len(self.active_connections[user_id])}")
         await self.broadcast_status(user_id, "online")
-        # Send any pending notifications to the user
-        await self.send_pending_notifications(user_id, chat_db)
-        # Send missed messages since last_online
+        
+        # Send missed messages and notifications BEFORE updating the last_online timestamp.
         await self.send_missed_messages(user_id, stc_db, chat_db)
-        # Update last_online to current datetime after sending missed messages
+
         try:
             now = datetime.now(ist_tz)
             user, collection = await get_user_info_with_collection(stc_db, user_id)
@@ -295,6 +300,9 @@ class ConnectionManager:
                 logging.warning(f"User {user_id} not found for last_online update")
         except Exception as e:
             logging.error(f"Failed to update last_online for user {user_id}: {e}")
+
+        # Now, send any other pending notifications (like for announcements)
+        await self.send_pending_notifications(user_id, chat_db)
 
     async def disconnect(self, websocket: WebSocket, user_id: str):
         if user_id in self.active_connections:
@@ -340,6 +348,7 @@ class ConnectionManager:
                 {"$match": {
                     "$and": [
                         {"recipient_id": user_id},
+                        {"sender_id": {"$ne": user_id}},
                         {"timestamp": {"$gt": last_online}}
                     ]
                 }},
@@ -356,6 +365,7 @@ class ConnectionManager:
                     {"$match": {
                         "$and": [
                             {"channel_id": channel_id},
+                            {"sender_id": {"$ne": user_id}},
                             {"timestamp": {"$gt": last_online}}
                         ]
                     }},
@@ -2804,7 +2814,7 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
                 sender_id=client_id,
                 sender_name=message_data.get("sender_name", client_id),
                 content=message_data.get("content", ""),
-                channel_id=recipient_id if msg_type == "channel_message" else None,
+                channel_id=channel_id if channel_id else (recipient_id if msg_type == "channel_message" else None),
                 recipient_id=message_data.get("recipient_id"),
                 # New file message fields
                 file_name=message_data.get("file_name"),
@@ -2859,11 +2869,14 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
 
             # Send message based on type
             if msg_type == "channel_message":
-                # Broadcast to channel members
+                # Broadcast to channel members, excluding the sender.
                 await manager.broadcast_to_channel(message_json, message.channel_id, stc_db, sender_id=client_id)
+                # The sender's client will handle the message via an optimistic update, so no echo is needed here.
             elif isinstance(message.recipient_id, list):
                 # Group message: send to all recipients in the list
                 for recipient in message.recipient_id:
+                    if recipient == client_id:
+                        continue # Don't send the message back to the sender
                     if recipient in manager.active_connections:
                         await manager.send_personal_message(message_json, recipient)
                 # Also send back to the sender
@@ -2871,12 +2884,16 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
             elif message.type == "personal_message" and message.recipient_id:
                 # Send to the recipient. The manager will create a notification if offline.
                 await manager.send_personal_message(message_json, message.recipient_id)
-                
-                # Also send the confirmed message back to the sender.
-                # Add an 'is_echo' flag to prevent self-notification on the client.
-                echo_data = json.loads(message_json)
-                echo_data['is_echo'] = True
-                await manager.send_personal_message(json.dumps(echo_data, default=default_serializer), message.sender_id)
+
+                # Send a confirmation back to the sender with the final message ID and timestamp.
+                # This allows the client to replace the optimistic message without triggering a self-notification.
+                confirmation_data = {
+                    "type": "message_confirmation",
+                    "optimistic_id": message_data.get("id"), # The temporary ID from the client
+                    "final_id": message.id,
+                    "timestamp": message.timestamp.isoformat()
+                }
+                await websocket.send_text(json.dumps(confirmation_data))
             else:
                 logging.warning(f"Message from {client_id} could not be routed: {message_json}")
 
@@ -2895,8 +2912,16 @@ async def app_root():
     """A simple endpoint for the root URL to confirm the server is running."""
     return {"message": "Welcome to the STC Portal API. Visit /docs for documentation."}
 
+
 app.include_router(api_router)
 app.include_router(download_router)  # Include the download file router
+
+# Include the download file router and provide the GridFS dependency
+api_router.include_router(
+    download_router, dependencies=[Depends(get_grid_fs)]
+)
+app.include_router(api_router) # Include the main api_router in the app
+
 
 # Mount static files for uploads
 # from fastapi.staticfiles import StaticFiles

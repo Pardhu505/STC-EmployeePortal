@@ -81,8 +81,9 @@ const parseCsvData = (csvData) => {
 
         let lateBy = '00:00';
         const inMinutes = parseTime(inTimeStr);
-        if (inMinutes > 600 && status === 'P') { // >10AM
-          lateBy = formatMinutesToTime(inMinutes - 600);
+        const lateThreshold = 10 * 60 + 35; // 10:35 AM = 635 minutes
+        if (inMinutes > lateThreshold && status === 'P') {
+          lateBy = formatMinutesToTime(inMinutes - lateThreshold);
         }
         
         dailyRecords.push({
@@ -136,11 +137,15 @@ const AttendanceReport = () => {
 
       if (fileExtension === 'xls' || fileExtension === 'xlsx') {
         // Handle Excel file
+        let combinedCsvData = '';
         const workbook = XLSX.read(fileContent, { type: 'binary' });
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-        const csvData = XLSX.utils.sheet_to_csv(worksheet);
-        setUploadedFileContent(csvData);
+        // Iterate over all sheets and combine their data
+        workbook.SheetNames.forEach(sheetName => {
+          const worksheet = workbook.Sheets[sheetName];
+          const csvData = XLSX.utils.sheet_to_csv(worksheet);
+          combinedCsvData += csvData + '\n'; // Add a newline to separate sheet data
+        });
+        setUploadedFileContent(combinedCsvData);
       } else {
         // Handle CSV file (as before)
         setUploadedFileContent(fileContent);

@@ -1,6 +1,24 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { employeeAPI } from '../Services/api';
 import { API_BASE_URL } from '../config/api';
+// Prevent duplicate notifications across sessions
+const getShownMessageIds = () => {
+  try {
+    return new Set(JSON.parse(localStorage.getItem('shownMessageIds') || '[]'));
+  } catch {
+    return new Set();
+  }
+};
+
+const addShownMessageId = (id) => {
+  if (!id) return;
+  const ids = JSON.parse(localStorage.getItem('shownMessageIds') || '[]');
+  if (!ids.includes(id)) {
+    ids.push(id);
+    if (ids.length > 500) ids.splice(0, ids.length - 200); // keep recent 200
+    localStorage.setItem('shownMessageIds', JSON.stringify(ids));
+  }
+};
 
 // Auto-detect WS URL with fallback
 const WS_URL = API_BASE_URL.replace(/^http/, 'ws') + "/api/ws";
@@ -120,7 +138,12 @@ export const AuthProvider = ({ children }) => {
           messageHandled = true;
         } else if (message.type === "chat_message" || message.type === "channel_message" || message.type === "personal_message") {
           // Add to newMessages if not from current user and not currently viewing
-          if (message.sender_id !== userId && userId) { // userId is user.email from connectWebSocket
+          // Do not notify if it's a confirmation of a message we just sent.
+          if (message.type === "message_confirmation") {
+             // This is handled below, but we stop it from being processed as a new message here.
+          } else if (message.sender_id !== userId && userId) { // userId is user.email from connectWebSocket
+
+
             const isChannelMessage = message.recipient_id && !message.recipient_id.includes('@');
             const isDirectMessage = message.recipient_id && message.recipient_id.includes('@');
 
@@ -195,16 +218,16 @@ export const AuthProvider = ({ children }) => {
   // Handle missed messages by adding them to newMessages for notification display
   const missedMsgs = message.messages || [];
   // CRITICAL FIX: Ensure missed messages are for the current user before processing for notifications.
-  // The backend sends this to a specific user, but this client-side check adds a layer of safety.
   const currentUserMissedMsgs = missedMsgs.filter(msg => {
-    // It's a direct message to me OR it's a channel message for a channel I'm in.
     const readMessageIds = getReadMessageIds();
     if (msg.id && readMessageIds.has(msg.id)) {
       return false; // Filter out already read messages
     }
+    // A missed message should only be for the current user if they are the recipient (for DMs)
+    // or if it's in a channel they belong to AND they are not the sender.
+    const isMyDirectMessage = msg.recipient_id === userId && msg.sender_id !== userId;
+    const isMyChannelMessage = msg.channel_id && userChannels.some(ch => ch.name === msg.channel_id) && msg.sender_id !== userId;
 
-    const isMyDirectMessage = msg.recipient_id === userId;
-    const isMyChannelMessage = msg.channel_id && userChannels.some(ch => ch.name === msg.channel_id);
     return isMyDirectMessage || isMyChannelMessage;
   });
 
@@ -250,6 +273,12 @@ export const AuthProvider = ({ children }) => {
   }
   messageHandled = true;
   // Still dispatch to components for local message handling
+  const customEvent = new CustomEvent('websocket-message', { detail: message });
+  window.dispatchEvent(customEvent);
+} else if (message.type === "message_confirmation") {
+  // This is a confirmation for a message we sent.
+  // We dispatch it so the chat component can update the optimistic message.
+  console.log("Dispatching message confirmation to components:", message);
   const customEvent = new CustomEvent('websocket-message', { detail: message });
   window.dispatchEvent(customEvent);
 }

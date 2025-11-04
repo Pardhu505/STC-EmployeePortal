@@ -217,23 +217,23 @@ const AdminPanel = () => {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {filteredEmployees.map((employee, index) => (
-              <div key={employee.email || index} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
-                <div className="flex items-center space-x-4">
+            {filteredEmployees.map((employee) => (
+              <div key={employee.email} className="flex flex-col md:flex-row md:items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors space-y-4 md:space-y-0">
+                <div className="flex items-center space-x-4 flex-1 min-w-0">
                   <Avatar className="w-10 h-10">
                     <AvatarFallback className="bg-[#225F8B] text-white">
                       {employee.name?.split(' ').map(n => n[0]).join('').slice(0, 2)}
                     </AvatarFallback>
                   </Avatar>
-                  <div>
-                    <div className="font-medium text-gray-900">{employee.name}</div>
-                    <div className="text-sm text-gray-500">{employee.email}</div>
-                    <div className="text-xs text-gray-500">
+                  <div className="min-w-0">
+                    <div className="font-medium text-gray-900 truncate">{employee.name}</div>
+                    <div className="text-sm text-gray-500 truncate">{employee.email}</div>
+                    <div className="text-xs text-gray-500 truncate">
                       {employee.designation} • {employee.department}
                     </div>
                   </div>
                 </div>
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center space-x-2 flex-shrink-0 self-end md:self-center">
                   <Button
                     size="sm"
                     variant="outline"

@@ -56,7 +56,7 @@ async def http_exception_handler(request: Request, exc: HTTPException):
     a generic "Network Error" on 4xx/5xx responses.
     """
     origin = request.headers.get('origin')
-    headers = getattr(exc, "headers") or {}
+    headers = getattr(exc, "headers",None) or {}
     if origin in ALLOWED_ORIGINS:
         headers["Access-Control-Allow-Origin"] = origin
         headers["Access-Control-Allow-Credentials"] = "true"

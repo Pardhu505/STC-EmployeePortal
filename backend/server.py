@@ -32,30 +32,6 @@ from database import (
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
-ROOT_DIR = Path(__file__).parent
-load_dotenv(ROOT_DIR / '.env')
-
-# MongoDB connection for the main database (using environment variables)
-main_mongo_url = os.environ['MONGO_URL']
-main_client = AsyncIOMotorClient(main_mongo_url)
-main_db = main_client[os.environ['DB_NAME']]
-
-# MongoDB connection for the Attendance, Chat, and STC_Employees databases (your Atlas connection)
-attendance_mongo_url = os.environ.get("ATTENDANCE_MONGO_URL")
-attendance_client = AsyncIOMotorClient(attendance_mongo_url, tlsAllowInvalidCertificates=True)
-
-# Correct the database name to 'employee_attendance'
-attendance_db = attendance_client['employee_attendance']
-
-chat_db=attendance_client['Internal_communication']
-
-# STC_Employees database for user authentication
-stc_db = attendance_client['STC_Employees']
-
-# GridFS bucket for file storage in the chat database
-grid_fs = AsyncIOMotorGridFSBucket(chat_db)
-
-
 # DeletedMessages
 # Messages
 
@@ -67,7 +43,8 @@ ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://localhost:3001",
     "https://showtime-consulting-employee-portal.onrender.com",
-    "https://showtime-employeeportal.vercel.app"
+    "https://showtime-employeeportal.vercel.app",
+    "https://stc-employeeportal.vercel.app"
 ]
 
 # --- Custom Exception Handlers to ensure CORS headers on errors ---
@@ -79,11 +56,7 @@ async def http_exception_handler(request: Request, exc: HTTPException):
     a generic "Network Error" on 4xx/5xx responses.
     """
     origin = request.headers.get('origin')
-
-    # headers = getattr(exc, "headers", {})
-
     headers = getattr(exc, "headers") or {}
-
     if origin in ALLOWED_ORIGINS:
         headers["Access-Control-Allow-Origin"] = origin
         headers["Access-Control-Allow-Credentials"] = "true"
@@ -2875,8 +2848,6 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
             elif isinstance(message.recipient_id, list):
                 # Group message: send to all recipients in the list
                 for recipient in message.recipient_id:
-                    if recipient == client_id:
-                        continue # Don't send the message back to the sender
                     if recipient in manager.active_connections:
                         await manager.send_personal_message(message_json, recipient)
                 # Also send back to the sender
@@ -2912,16 +2883,11 @@ async def app_root():
     """A simple endpoint for the root URL to confirm the server is running."""
     return {"message": "Welcome to the STC Portal API. Visit /docs for documentation."}
 
-
-app.include_router(api_router)
-app.include_router(download_router)  # Include the download file router
-
 # Include the download file router and provide the GridFS dependency
 api_router.include_router(
     download_router, dependencies=[Depends(get_grid_fs)]
 )
 app.include_router(api_router) # Include the main api_router in the app
-
 
 # Mount static files for uploads
 # from fastapi.staticfiles import StaticFiles
@@ -2944,4 +2910,5 @@ async def startup_event():
     except Exception as e:
         logger.error(f"MongoDB connection failed: {e}")
         logger.info("Continuing without MongoDB - WebSocket functionality will work without database persistence")
+        
         

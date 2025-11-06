@@ -8,7 +8,7 @@ import { Label } from './ui/label';
 import { Textarea } from './ui/textarea'; // Corrected import
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Calendar, User, AlertCircle, Info, CheckCircle, Plus, Send, Shield, Trash2, X, Loader2, Clock } from 'lucide-react';
-import { useToast } from '../hooks/use-toast';
+import { useToast } from "../hooks/use-toast";
 import { API_BASE_URL } from '../config/api';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { Checkbox } from './ui/checkbox';
@@ -392,7 +392,7 @@ const Announcements = ({ announcements, setAnnouncements }) => {
                     </div>
                   </CardHeader>
                   <CardContent>
-                    <p className="text-rose-700 leading-relaxed">
+                    <p className="text-rose-700 leading-relaxed whitespace-pre-wrap">
                       {announcement.content}
                     </p>
                     <div className="flex items-center space-x-4 text-sm text-rose-600 mt-3">
@@ -423,7 +423,7 @@ const Announcements = ({ announcements, setAnnouncements }) => {
                     </div>
                   </CardHeader>
                   <CardContent>
-                    <p className="text-amber-700 leading-relaxed">
+                    <p className="text-amber-700 leading-relaxed whitespace-pre-wrap">
                       {announcement.content}
                     </p>
                     <div className="flex items-center space-x-4 text-sm text-amber-600 mt-3">
@@ -455,11 +455,11 @@ const Announcements = ({ announcements, setAnnouncements }) => {
                         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-500">
                           <div className="flex items-center space-x-1">
                             <Calendar className="h-4 w-4" />
-                            <span>{formatDate(announcement.scheduled_at || announcement.created_at)}</span>
+                            <span>{formatDate(announcement.scheduled_at || announcement.created_at || announcement.date)}</span>
                           </div>
                           <div className="flex items-center space-x-1">
                             <Clock className="h-4 w-4" />
-                            <span>{formatTime(announcement.scheduled_at || announcement.created_at)}</span>
+                            <span>{formatTime(announcement.scheduled_at || announcement.created_at || announcement.date)}</span>
                           </div>
                           <div className="flex items-center space-x-1">
                             <User className="h-4 w-4" />
@@ -489,7 +489,7 @@ const Announcements = ({ announcements, setAnnouncements }) => {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-gray-700 leading-relaxed">
+                  <p className="text-gray-700 leading-relaxed whitespace-pre-wrap">
                     {announcement.content}
                   </p>
                 </CardContent>

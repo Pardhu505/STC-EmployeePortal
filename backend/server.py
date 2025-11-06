@@ -56,7 +56,7 @@ async def http_exception_handler(request: Request, exc: HTTPException):
     a generic "Network Error" on 4xx/5xx responses.
     """
     origin = request.headers.get('origin')
-    headers = getattr(exc, "headers",None) or {}
+    headers = getattr(exc, "headers", None) or {}
     if origin in ALLOWED_ORIGINS:
         headers["Access-Control-Allow-Origin"] = origin
         headers["Access-Control-Allow-Credentials"] = "true"
@@ -98,6 +98,78 @@ app.add_exception_handler(Exception, generic_exception_handler)
 # Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
 
+# --- Constants for Teams and Departments ---
+# Moved these definitions to the top to resolve NameError issues in methods
+# that depend on them, like get_channel_members.
+
+TEAMS = [
+    "Research",
+    "Media",
+    "Data",
+    "Digital Production",
+    "Digital Communication",
+    "Propagation",
+    "Neagitive Propagation",
+    "Digital Marketing/Networking",
+    "HIVE",
+    "Campaign",
+    "Soul Central",
+    "Field Team AP-1",
+    "Field Team AP-2",
+    "Field Team TG",
+    "PMU",
+    "Directors Team-1",
+    "Directors Team-2",
+    "HR",
+    "Directors Team-3",
+    "Operations",
+    "System Admin"
+]
+
+DEPARTMENT_TEAMS = {
+    "Research": ["Research"],
+    "Media": ["Media"],
+    "Data": ["Data"],
+    "DMC": [
+        "Digital Production",
+        "Digital Communication",
+        "Propagation",
+        "Neagitive Propagation",
+        "Digital Marketing/Networking",
+        "HIVE"
+    ],
+    "Campaign": ["Campaign"],
+    "Soul Central": [
+        "Soul Central",
+        "Field Team AP-1",
+        "Field Team AP-2",
+        "Field Team TG",
+        "PMU"
+    ],
+    "Directors team": [
+        "Directors Team-1",
+        "Directors Team-2",
+        "Directors Team-3"
+    ],
+    "HR": ["HR"],
+    "Admin": [
+        "Operations",
+        "System Admin"
+    ]
+}
+
+def get_department_from_team(team: str) -> str:
+    """
+    Helper function to find the department for a given team.
+    This needs DEPARTMENT_TEAMS to be defined before it's called.
+    """
+    for dept, teams in DEPARTMENT_TEAMS.items():
+        if team in teams:
+            return dept
+    return None
+
+
+# --- Dependencies ---
 
 
 async def get_current_admin_user(authorization: Optional[str] = Header(None, alias="Authorization")):
@@ -679,96 +751,6 @@ class User(BaseModel):
     name: str
     created_at: datetime = Field(default_factory=lambda: datetime.now(ist_tz))
 
-TEAMS = [
-    "Research",
-    "Media",
-    "Data",
-    "Digital Production",
-    "Digital Communication",
-    "Propagation",
-    "Neagitive Propagation",
-    "Digital Marketing/Networking",
-    "HIVE",
-    "Campaign",
-    "Soul Central",
-    "Field Team AP-1",
-    "Field Team AP-2",
-    "Field Team TG",
-    "PMU",
-    "Directors Team-1",
-    "Directors Team-2",
-    "HR",
-    "Directors Team-3",
-    "Operations",
-    "System Admin"
-]
-
-DEPARTMENT_TEAMS = {
-    "Research": ["Research"],
-    "Media": ["Media"],
-    "Data": ["Data"],
-    "DMC": [
-        "Digital Production",
-        "Digital Communication",
-        "Propagation",
-        "Neagitive Propagation",
-        "Digital Marketing/Networking",
-        "HIVE"
-    ],
-    "Campaign": ["Campaign"],
-    "Soul Central": [
-        "Soul Central",
-        "Field Team AP-1",
-        "Field Team AP-2",
-        "Field Team TG",
-        "PMU"
-    ],
-    "Directors team": [
-        "Directors Team-1",
-        "Directors Team-2",
-        "Directors Team-3"
-    ],
-    "HR": ["HR"],
-    "Admin": [
-        "Operations",
-        "System Admin"
-    ]
-}
-
-HARDCODED_CHANNELS = [
-    {"name": "general", "type": "public", "department": "All", "description": "General company announcements and discussions"},
-    {"name": "dept-research", "type": "department", "department": "Research", "description": "Research department discussions"},
-    {"name": "dept-media", "type": "department", "department": "Media", "description": "Media department discussions"},
-    {"name": "dept-data", "type": "department", "department": "Data", "description": "Data department discussions"},
-    {"name": "dept-dmc", "type": "department", "department": "DMC", "description": "DMC department discussions"},
-    {"name": "dept-campaign", "type": "department", "department": "Campaign", "description": "Campaign department discussions"},
-    {"name": "dept-soul-central", "type": "department", "department": "Soul Central", "description": "Soul Central department discussions"},
-    {"name": "dept-directors-team", "type": "department", "department": "Directors team", "description": "Directors team department discussions"},
-    {"name": "dept-hr", "type": "department", "department": "HR", "description": "HR department discussions"},
-    {"name": "dept-admin", "type": "department", "department": "Admin", "description": "Admin department discussions"},
-    {"name": "team-digital-production", "type": "team", "department": "DMC", "subDepartment": "Digital Production", "description": "Digital Production team channel"},
-    {"name": "team-digital-communication", "type": "team", "department": "DMC", "subDepartment": "Digital Communication", "description": "Digital Communication team channel"},
-    {"name": "team-propagation", "type": "team", "department": "DMC", "subDepartment": "Propagation", "description": "Propagation team channel"},
-    {"name": "team-neagitive-propagation", "type": "team", "department": "DMC", "subDepartment": "Neagitive Propagation", "description": "Neagitive Propagation team channel"},
-    {"name": "team-digital-marketing/networking", "type": "team", "department": "DMC", "subDepartment": "Digital Marketing/Networking", "description": "Digital Marketing/Networking team channel"},
-    {"name": "team-hive", "type": "team", "department": "DMC", "subDepartment": "HIVE", "description": "HIVE team channel"},
-    {"name": "team-field-team-ap-1", "type": "team", "department": "Soul Central", "subDepartment": "Field Team AP-1", "description": "Field Team AP-1 team channel"},
-    {"name": "team-field-team-ap-2", "type": "team", "department": "Soul Central", "subDepartment": "Field Team AP-2", "description": "Field Team AP-2 team channel"},
-    {"name": "team-field-team-tg", "type": "team", "department": "Soul Central", "subDepartment": "Field Team TG", "description": "Field Team TG team channel"},
-    {"name": "team-pmu", "type": "team", "department": "Soul Central", "subDepartment": "PMU", "description": "PMU team channel"},
-    {"name": "team-directors-team-1", "type": "team", "department": "Directors team", "subDepartment": "Directors Team-1", "description": "Directors Team-1 team channel"},
-    {"name": "team-directors-team-2", "type": "team", "department": "Directors team", "subDepartment": "Directors Team-2", "description": "Directors Team-2 team channel"},
-    {"name": "team-directors-team-3", "type": "team", "department": "Directors team", "subDepartment": "Directors Team-3", "description": "Directors Team-3 team channel"},
-    {"name": "team-operations", "type": "team", "department": "Admin", "subDepartment": "Operations", "description": "Operations team channel"},
-    {"name": "team-system-admin", "type": "team", "department": "Admin", "subDepartment": "System Admin", "description": "System Admin team channel"}
-]
-
-def get_department_from_team(team: str) -> str:
-    for dept, teams in DEPARTMENT_TEAMS.items():
-        if team in teams:
-            return dept
-    return None
-
 
 async def get_user_info(stc_db, user_id: str) -> Optional[dict]:
     """
@@ -940,6 +922,55 @@ async def set_user_status_api(user_id: str, status_update: StatusCheckCreate):
     await manager.broadcast_status(user_id, new_status)
     return {"user_id": user_id, "status": new_status}
 
+class UserPasswordResetRequest(BaseModel):
+    current_password: str
+    new_password: str
+
+@api_router.put("/users/me/reset-password")
+async def user_reset_password(
+    request: UserPasswordResetRequest = Body(...),
+    authorization: str = Header(..., alias="Authorization")
+):
+    """
+    Allows a logged-in user to reset their own password securely.
+    Requires the current password for verification.
+    """
+    try:
+        if not authorization or not authorization.startswith("Bearer "):
+            raise HTTPException(status_code=401, detail="Not authenticated")
+
+        token_str = authorization.split(" ")[1]
+        decoded_token = base64.b64decode(token_str).decode('utf-8')
+        user_data = json.loads(decoded_token)
+        user_email = user_data.get("email")
+
+        if not user_email:
+            raise HTTPException(status_code=400, detail="Invalid token: no email found")
+
+        # Fetch user with password_hash
+        user, collection = await get_user_info_with_collection(stc_db, user_email, include_hash=True)
+        if not user or collection is None:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        stored_hash = user.get("password_hash")
+        if not pwd_context.verify(request.current_password, stored_hash):
+            raise HTTPException(status_code=403, detail="Current password is incorrect")
+
+        # Update new password
+        new_hash = pwd_context.hash(request.new_password)
+        await collection.update_one(
+            {"email": re.compile(f"^{re.escape(user_email)}$", re.IGNORECASE)},
+            {"$set": {"password_hash": new_hash}}
+        )
+
+        return {"message": "Password reset successful"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"Error resetting password: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error during password reset")
+    
 @api_router.get("/messages")
 async def get_messages(channel_id: str = None, recipient_id: str = None, sender_id: str = None, user_id: str = None, limit: int = 50):
     query = {}
@@ -2513,6 +2544,33 @@ async def get_manager_attendance_report(request: ManagerReportRequest):
         logging.error(f"Manager report failed: {e}")
         raise HTTPException(status_code=500, detail=f"Manager report failed: {e}")
 
+HARDCODED_CHANNELS = [
+    {"name": "general", "type": "public", "department": "All", "description": "General company announcements and discussions"},
+    {"name": "dept-research", "type": "department", "department": "Research", "description": "Research department discussions"},
+    {"name": "dept-media", "type": "department", "department": "Media", "description": "Media department discussions"},
+    {"name": "dept-data", "type": "department", "department": "Data", "description": "Data department discussions"},
+    {"name": "dept-dmc", "type": "department", "department": "DMC", "description": "DMC department discussions"},
+    {"name": "dept-campaign", "type": "department", "department": "Campaign", "description": "Campaign department discussions"},
+    {"name": "dept-soul-central", "type": "department", "department": "Soul Central", "description": "Soul Central department discussions"},
+    {"name": "dept-directors-team", "type": "department", "department": "Directors team", "description": "Directors team department discussions"},
+    {"name": "dept-hr", "type": "department", "department": "HR", "description": "HR department discussions"},
+    {"name": "dept-admin", "type": "department", "department": "Admin", "description": "Admin department discussions"},
+    {"name": "team-digital-production", "type": "team", "department": "DMC", "subDepartment": "Digital Production", "description": "Digital Production team channel"},
+    {"name": "team-digital-communication", "type": "team", "department": "DMC", "subDepartment": "Digital Communication", "description": "Digital Communication team channel"},
+    {"name": "team-propagation", "type": "team", "department": "DMC", "subDepartment": "Propagation", "description": "Propagation team channel"},
+    {"name": "team-neagitive-propagation", "type": "team", "department": "DMC", "subDepartment": "Neagitive Propagation", "description": "Neagitive Propagation team channel"},
+    {"name": "team-digital-marketing/networking", "type": "team", "department": "DMC", "subDepartment": "Digital Marketing/Networking", "description": "Digital Marketing/Networking team channel"},
+    {"name": "team-hive", "type": "team", "department": "DMC", "subDepartment": "HIVE", "description": "HIVE team channel"},
+    {"name": "team-field-team-ap-1", "type": "team", "department": "Soul Central", "subDepartment": "Field Team AP-1", "description": "Field Team AP-1 team channel"},
+    {"name": "team-field-team-ap-2", "type": "team", "department": "Soul Central", "subDepartment": "Field Team AP-2", "description": "Field Team AP-2 team channel"},
+    {"name": "team-field-team-tg", "type": "team", "department": "Soul Central", "subDepartment": "Field Team TG", "description": "Field Team TG team channel"},
+    {"name": "team-pmu", "type": "team", "department": "Soul Central", "subDepartment": "PMU", "description": "PMU team channel"},
+    {"name": "team-directors-team-1", "type": "team", "department": "Directors team", "subDepartment": "Directors Team-1", "description": "Directors Team-1 team channel"},
+    {"name": "team-directors-team-2", "type": "team", "department": "Directors team", "subDepartment": "Directors Team-2", "description": "Directors Team-2 team channel"},
+    {"name": "team-directors-team-3", "type": "team", "department": "Directors team", "subDepartment": "Directors Team-3", "description": "Directors Team-3 team channel"},
+    {"name": "team-operations", "type": "team", "department": "Admin", "subDepartment": "Operations", "description": "Operations team channel"},
+    {"name": "team-system-admin", "type": "team", "department": "Admin", "subDepartment": "System Admin", "description": "System Admin team channel"}
+]
 
 
 @api_router.get("/channels")
@@ -2911,4 +2969,4 @@ async def startup_event():
         logger.error(f"MongoDB connection failed: {e}")
         logger.info("Continuing without MongoDB - WebSocket functionality will work without database persistence")
         
-        
+app.include_router(api_router)

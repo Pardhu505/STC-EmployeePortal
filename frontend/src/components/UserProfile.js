@@ -150,40 +150,54 @@ const UserProfile = () => {
     }
   };
 
-  const handlePasswordSave = async () => {
-    if (passwordData.newPassword !== passwordData.confirmPassword) {
-      toast({
-        title: "Error",
-        description: "New passwords do not match.",
-        variant: "destructive"
-      });
-      return;
+ const handlePasswordSave = async () => {
+  if (passwordData.newPassword !== passwordData.confirmPassword) {
+    toast({
+      title: "Error",
+      description: "New passwords do not match.",
+      variant: "destructive"
+    });
+    return;
+  }
+
+  try {
+    const token = btoa(JSON.stringify(user)); // same encoding as login
+
+    const response = await fetch("http://localhost:8000/api/users/me/reset-password", {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        current_password: passwordData.currentPassword,
+        new_password: passwordData.newPassword
+      })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.detail || "Failed to reset password.");
     }
 
-    try {
-      // This functionality isn't in api.js, so we'll implement it here for now.
-      const response = await fetch(`${API_BASE_URL}/api/users/${user.email}/change-password`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ current_password: passwordData.currentPassword, new_password: passwordData.newPassword }),
-      });
+    toast({
+      title: "Success",
+      description: "Your password has been reset successfully."
+    });
 
-      if (!response.ok) throw new Error((await response.json()).detail || 'Failed to change password.');
-      toast({
-        title: "Password Updated",
-        description: "Your password has been changed successfully.",
-      });
-      setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
-      setShowPasswordChange(false);
-    } catch (error) {
-      console.error("Failed to change password:", error);
-      toast({
-        title: "Password Change Error",
-        description: error.message || "Failed to change password.",
-        variant: "destructive",
-      });
-    }
-  };
+    setPasswordData({ currentPassword: "", newPassword: "", confirmPassword: "" });
+    setShowPasswordChange(false);
+  } catch (error) {
+    console.error("Password reset failed:", error);
+    toast({
+      title: "Error",
+      description: error.message || "Failed to reset password.",
+      variant: "destructive"
+    });
+  }
+};
+
 
   const handleCancel = () => {
     const source = userDetails || user;

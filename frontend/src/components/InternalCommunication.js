@@ -83,17 +83,26 @@ const InternalCommunication = () => {
     setChannels(formattedChannels);
   }, [allChannels]);
 
-  // Update member count for 'general' channel to all employees
+  // Update member counts for channels based on the full employee list
   useEffect(() => {
-    if (channels.length > 0 && allEmployeesList.length > 0) {
-      const generalChannel = channels.find(ch => ch.name === 'general');
-      if (generalChannel && generalChannel.memberCount !== allEmployeesList.length) {
-        setChannels(prevChannels => prevChannels.map(ch =>
-          ch.name === 'general' ? { ...ch, memberCount: allEmployeesList.length } : ch
-        ));
-      }
+    if (channels.length > 0 && allEmployees.length > 0) {
+      setChannels(prevChannels =>
+        prevChannels.map(channel => {
+          let memberCount = channel.memberCount;
+          if (channel.name === 'general') {
+            memberCount = allEmployees.length;
+          } else if (channel.type === 'department') {
+            // The department name is in the channel object, e.g., 'DMC'
+            memberCount = allEmployees.filter(emp => emp.department === channel.department).length;
+          } else if (channel.type === 'team') {
+            // The team name is in the subDepartment field, e.g., 'Digital Production'
+            memberCount = allEmployees.filter(emp => emp.team === channel.subDepartment).length;
+          }
+          return { ...channel, memberCount };
+        })
+      );
     }
-  }, [allEmployeesList, channels.length]); // Depend on allEmployeesList and only re-run if channel list length changes
+  }, [allEmployees, allChannels]); // Rerun when allEmployees or the base channels list changes
 
   // Load persisted state from localStorage after user and channels are available
   useEffect(() => {

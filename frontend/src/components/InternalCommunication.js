@@ -71,36 +71,29 @@ const InternalCommunication = () => {
     setAllEmployeesList(allEmployees);
   }, [allEmployees]);
 
+  // Format channels and calculate member counts in a single effect
   useEffect(() => {
-    // Format channels from context
-    const formattedChannels = (allChannels || []).map(ch => ({
-      ...ch,
-      name: ch.name || ch.id,
-      type: ch.type || 'public',
-      memberCount: ch.memberCount || 0,
-      description: ch.description || ''
-    }));
-    setChannels(formattedChannels);
-  }, [allChannels]);
-
-  // Update member counts for channels based on the full employee list
-  useEffect(() => {
-    if (channels.length > 0 && allEmployees.length > 0) {
-      setChannels(prevChannels =>
-        prevChannels.map(channel => {
-          let memberCount = channel.memberCount;
-          if (channel.name === 'general') {
-            memberCount = allEmployees.length;
-          } else if (channel.type === 'department') {
-            // The department name is in the channel object, e.g., 'DMC'
-            memberCount = allEmployees.filter(emp => emp.department === channel.department).length;
-          } else if (channel.type === 'team') {
-            // The team name is in the subDepartment field, e.g., 'Digital Production'
-            memberCount = allEmployees.filter(emp => emp.team === channel.subDepartment).length;
-          }
-          return { ...channel, memberCount };
-        })
-      );
+    if (allChannels.length > 0 && allEmployees.length > 0) {
+      const updatedChannels = allChannels.map(channel => {
+        let memberCount = 0; // Start from zero to ensure fresh calculation
+        if (channel.name === 'general') {
+          memberCount = allEmployees.length;
+        } else if (channel.type === 'department') {
+          // The department name is in the channel object, e.g., 'DMC'
+          memberCount = allEmployees.filter(emp => emp.department === channel.department).length;
+        } else if (channel.type === 'team') {
+          // The team name is in the subDepartment field, e.g., 'Digital Production'
+          memberCount = allEmployees.filter(emp => emp.team === channel.subDepartment).length;
+        }
+        return {
+          ...channel,
+          name: channel.name || channel.id,
+          type: channel.type || 'public',
+          description: channel.description || '',
+          memberCount, // Use the newly calculated count
+        };
+      });
+      setChannels(updatedChannels);
     }
   }, [allEmployees, allChannels]); // Rerun when allEmployees or the base channels list changes
 

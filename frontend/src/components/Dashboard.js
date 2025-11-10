@@ -75,12 +75,7 @@ const Dashboard = () => {
     if (!user) return;
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/announcements`, {
-        headers: {
-          // Send the user's auth token so the backend knows who is asking.
-          'Authorization': `Bearer ${btoa(JSON.stringify(user))}`
-        }
-      });
+      const response = await fetch(`${API_BASE_URL}/api/announcements`);
       if (!response.ok) throw new Error('Failed to fetch announcements');
       const data = await response.json();
       

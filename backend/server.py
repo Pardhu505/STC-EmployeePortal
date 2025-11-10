@@ -2227,24 +2227,57 @@ async def get_attendance_report(
 
         # If filtering parameters are provided, build the projection stage
         if view_type == 'month' and year and month:
-            pipeline.append({
-                "$project": {
-                    "empCode": 1,
-                    "empName": 1,
-                    "dailyRecords": {
-                        "$filter": {
-                            "input": "$dailyRecords",
-                            "as": "record",
-                            "cond": {
-                                "$and": [
-                                    {"$eq": [{"$year": "$$record.date"}, year]},
-                                    {"$eq": [{"$month": "$$record.date"}, month]}
-                                ]
+            pipeline.extend([
+                # Deconstruct the dailyRecords array
+                {"$unwind": "$dailyRecords"},
+                # Filter the records for the selected month and year
+                {"$match": {
+                    "dailyRecords.date": {
+                        "$gte": datetime(year, month, 1, tzinfo=timezone.utc),
+                        "$lt": datetime(year, month + 1, 1, tzinfo=timezone.utc) if month < 12 else datetime(year + 1, 1, 1, tzinfo=timezone.utc)
+                    }
+                }},
+                # Group back by employee to calculate summaries and collect records
+                {"$group": {
+                    "_id": "$empCode",
+                    "empName": {"$first": "$empName"},
+                    "dailyRecords": {"$push": "$dailyRecords"},
+                    "P": {
+                        "$sum": {
+                            "$cond": [{"$eq": ["$dailyRecords.status", "P"]}, 1, 0]
+                        }
+                    },
+                    "A": {
+                        "$sum": {
+                            "$cond": [{"$eq": ["$dailyRecords.status", "A"]}, 1, 0]
+                        }
+                    },
+                    "H": {
+                        "$sum": {
+                            "$cond": [{"$in": ["$dailyRecords.status", ["H", "Holiday"]]}, 1, 0]
+                        }
+                    },
+                    "L": {
+                        "$sum": {
+                            "$cond": [
+                                {"$and": [
+                                    {"$eq": ["$dailyRecords.status", "P"]},
+                                    {"$ne": ["$dailyRecords.lateBy", "00:00"]},
+                                    {"$ne": ["$dailyRecords.lateBy", None]}
+                                ]}, 1, 0]
                             }
                         }
-                    }
-                }
-            })
+                    
+                }},
+                # Project the final fields
+                {"$project": {
+                    "_id": 0,
+                    "empCode": "$_id",
+                    "empName": "$empName",
+                    "dailyRecords": 1,
+                    "P": 1, "A": 1, "H": 1, "L": 1
+                }}
+            ])
         elif view_type == 'day' and date:
             try:
                 target_date = datetime.strptime(date, '%Y-%m-%d')
@@ -2470,10 +2503,11 @@ async def get_manager_team(manager_code: str):
 class ManagerReportRequest(BaseModel):
     manager_code: str
     team_emp_codes: List[str]
-    view_type: str
+    reportType: str
     year: Optional[int] = None
     month: Optional[int] = None
     date: Optional[str] = None
+    endDate: Optional[str] = None
 
 @api_router.post("/attendance-report/manager")
 async def get_manager_attendance_report(request: ManagerReportRequest):
@@ -2486,56 +2520,64 @@ async def get_manager_attendance_report(request: ManagerReportRequest):
         coll = attendance_db["Attendance"]
         pipeline = [{"$match": {"empCode": {"$in": team_employee_codes}}}]
 
-        # Day view
-        if request.view_type == "day" and request.date:
-            target = datetime.strptime(request.date, "%Y-%m-%d")
+        # Day-wise range view
+        if request.reportType == "day" and request.date and request.endDate:
+            start_date = datetime.fromisoformat(request.date.split('T')[0] + 'T00:00:00.000Z')
+            end_date = datetime.fromisoformat(request.endDate.split('T')[0] + 'T23:59:59.999Z')
             pipeline += [
                 {"$unwind": "$dailyRecords"},
+                {"$match": {
+                    "dailyRecords.date": {"$gte": start_date, "$lte": end_date}
+                }},
                 {
-                    "$match": {
-                        "$expr": {
-                            "$and": [
-                                {"$eq": [{"$year": "$dailyRecords.date"}, target.year]},
-                                {"$eq": [{"$month": "$dailyRecords.date"}, target.month]},
-                                {"$eq": [{"$dayOfMonth": "$dailyRecords.date"}, target.day]},
-                            ]
-                        }
+                    "$group": {
+                        "_id": "$empCode",
+                        "empName": {"$first": "$empName"},
+                        "dailyRecords": {"$push": "$dailyRecords"}
                     }
                 },
                 {
                     "$project": {
                         "_id": 0,
-                        "empCode": "$empCode",
-                        "empName": "$empName",
-                        "status": "$dailyRecords.status",
-                        "inTime": "$dailyRecords.inTime",
-                        "outTime": "$dailyRecords.outTime",
-                        "lateBy": "$dailyRecords.lateBy",
-                        "totalWorkingHours": "$dailyRecords.totalWorkingHours",
+                        "empCode": "$_id",
+                        "empName": 1,
+                        "dailyRecords": 1
                     }
                 }
             ]
 
         # Month view
-        elif request.view_type == "month" and request.year and request.month:
+        elif request.reportType == "month" and request.year and request.month:
             start = datetime(request.year, request.month, 1)
             end = (start + timedelta(days=32)).replace(day=1) - timedelta(days=1)
             pipeline += [
                 {"$unwind": "$dailyRecords"},
-                {"$match": {"dailyRecords.date": {"$gte": start, "$lte": end}}},
+                {"$match": {
+                    "dailyRecords.date": {
+                        "$gte": start.replace(tzinfo=timezone.utc),
+                        "$lte": end.replace(tzinfo=timezone.utc)
+                    }
+                }},
                 {
                     "$group": {
                         "_id": "$empCode",
                         "empName": {"$first": "$empName"},
                         "P": {"$sum": {"$cond": [{"$eq": ["$dailyRecords.status", "P"]}, 1, 0]}},
                         "A": {"$sum": {"$cond": [{"$eq": ["$dailyRecords.status", "A"]}, 1, 0]}},
-                        "L": {"$sum": {"$cond": [{"$gt": ["$dailyRecords.lateBy", "00:00"]}, 1, 0]}},
+                        "L": {"$sum": {"$cond": {
+                                "if": {"$gt": ["$dailyRecords.lateBy", "00:00"]},
+                                "then": 1,
+                                "else": 0
+                            }}},
+                        "dailyRecords": {"$push": "$dailyRecords"} # Add this line
                     }
                 },
-                {"$project": {"_id": 0, "empCode": "$_id", "empName": "$empName", "P": 1, "A": 1, "L": 1}},
+                {
+                    "$project": {"_id": 0, "empCode": "$_id", "empName": 1, "P": 1, "A": 1, "L": 1, "dailyRecords": 1}
+                },
             ]
         else:
-            raise HTTPException(status_code=400, detail="Invalid query parameters. Use view_type=day or month.")
+            raise HTTPException(status_code=400, detail="Invalid query parameters. Use reportType=day (with date & endDate) or reportType=month (with year & month).")
 
         records = await coll.aggregate(pipeline).to_list(length=None)
         return {"teamRecords": records}
@@ -2701,6 +2743,54 @@ async def create_announcement(
     except Exception as e:
         logging.error(f"Error creating announcement: {e}")
         raise HTTPException(status_code=500, detail="Failed to create announcement.")
+
+class AnnouncementUpdate(BaseModel):
+    title: Optional[str] = None
+    content: Optional[str] = None
+    priority: Optional[str] = None
+    scheduled_at: Optional[datetime] = None
+
+@api_router.put("/announcements/{announcement_id}", response_model=Announcement)
+async def update_announcement(
+    announcement_id: str,
+    announcement_data: AnnouncementUpdate,
+    admin_user: dict = Depends(get_current_admin_user)
+):
+    """
+    (Admin Only) Update an existing announcement.
+    """
+    try:
+        update_payload = announcement_data.model_dump(exclude_unset=True)
+
+        # Handle scheduling logic
+        if 'scheduled_at' in update_payload:
+            scheduled_time = update_payload['scheduled_at']
+            if scheduled_time and scheduled_time > datetime.now(timezone.utc):
+                update_payload['status'] = 'scheduled'
+            else:
+                update_payload['status'] = 'published'
+                update_payload['date'] = datetime.now(timezone.utc) # Set publish date to now
+                update_payload['scheduled_at'] = None # Clear schedule time
+
+        if not update_payload:
+            raise HTTPException(status_code=400, detail="No update data provided.")
+
+        result = await chat_db.Announcements.update_one(
+            {"id": announcement_id},
+            {"$set": update_payload}
+        )
+
+        if result.modified_count == 0:
+            if not await chat_db.Announcements.find_one({"id": announcement_id}):
+                 raise HTTPException(status_code=404, detail="Announcement not found.")
+
+        updated_announcement = await chat_db.Announcements.find_one({"id": announcement_id})
+        return updated_announcement
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"Error updating announcement {announcement_id}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to update announcement.")
 
 @api_router.delete("/announcements/{announcement_id}", status_code=204)
 async def delete_announcement(announcement_id: str, admin_user: dict = Depends(get_current_admin_user)):

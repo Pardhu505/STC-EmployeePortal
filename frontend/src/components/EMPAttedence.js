@@ -1,9 +1,14 @@
 import React, { useState, useEffect, useMemo, createContext, useContext } from 'react';
 import { useAuth, AuthProvider } from "../contexts/AuthContext";
 import { API_BASE_URL } from '../config/api';
+import { getHolidaysForYear } from './Holidays';
+import { Calendar, ChevronRight, ChevronDown } from 'lucide-react';
+import DatePicker from "react-datepicker";
+import "react-datepicker/dist/react-datepicker.css";
 
 // Main component for displaying attendance
 const EMPAttendance = () => {
+  
   const { user, loading: authLoading } = useAuth();
   const [employeeDetails, setEmployeeDetails] = useState({ empCode: null, empName: null });
   const ATTENDANCE_API_URL = `${API_BASE_URL}/api/attendance-report`;
@@ -11,8 +16,8 @@ const EMPAttendance = () => {
   const [attendanceData, setAttendanceData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [viewType, setViewType] = useState('month'); // 'day' or 'month'
-  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [selectedMonthDate, setSelectedMonthDate] = useState(new Date());
+  const [isExpanded, setIsExpanded] = useState(false);
 
  
 useEffect(() => {
@@ -40,15 +45,10 @@ useEffect(() => {
     setLoading(true);
     setError(null);
     let url = `${ATTENDANCE_API_URL}/user/${employeeDetails.empCode}`;
-
-    if (viewType === 'day') {
-      const dateString = selectedDate.toISOString().split('T')[0];
-      url += `?view_type=day&date=${dateString}`;
-    } else {
-      const year = selectedDate.getFullYear();
-      const month = selectedDate.getMonth() + 1;
-      url += `?view_type=month&year=${year}&month=${month}`;
-    }
+    
+    const year = selectedMonthDate.getFullYear();
+    const month = selectedMonthDate.getMonth() + 1;
+    url += `?view_type=month&year=${year}&month=${month}`;
 
     try {
       const response = await fetch(url);
@@ -65,7 +65,7 @@ useEffect(() => {
 
   useEffect(() => {
     fetchAttendanceData();
-  }, [employeeDetails.empCode, viewType, selectedDate]);
+  }, [employeeDetails.empCode, selectedMonthDate]);
 
   const formatMinutesToHoursMinutes = (totalMinutes) => {
     if (totalMinutes < 0 || isNaN(totalMinutes)) return '00:00';
@@ -75,69 +75,82 @@ useEffect(() => {
     return `${pad(hours)}:${pad(minutes)}`;
   };
 
-  // --- Daily Stats ---
-  const dailyStats = useMemo(() => {
-    if (viewType === 'month') return null;
+  // --- Detailed Day-wise Report Data (for expansion) ---
+  const detailedDayWiseData = useMemo(() => {
+    if (!attendanceData) return [];
 
-    const dayData = attendanceData[0];
-    const formattedDate = selectedDate.toLocaleDateString();
-    let statusText = 'Not Recorded';
-    let statusColor = 'text-gray-500';
-    let inTime = dayData?.inTime || null;
-    let outTime = dayData?.outTime || null;
-    let totalWorkingHours = dayData?.totalWorkingHours || '00:00';
+    return attendanceData
+      .map(record => {
+        let statusText = 'Not Recorded';
+        let statusColor = 'text-gray-500';
 
-    if (dayData) {
-      if (dayData.status === 'P' && dayData.lateBy && dayData.lateBy !== '00:00') {
-        statusText = 'Present (Late)';
-        statusColor = 'text-orange-500';
-      } else if (dayData.status === 'P') {
-        statusText = 'Present';
-        statusColor = 'text-green-500';
-      } else if (dayData.status === 'A') {
-        statusText = 'Absent';
-        statusColor = 'text-red-500';
-      } else if (dayData.status === 'WO' || dayData.status === 'S') {
-        statusText = 'Week Off';
-        statusColor = 'text-gray-500';
-      }
-    }
+        if (record.status === 'P' && record.lateBy && record.lateBy !== '00:00') {
+          statusText = 'Present (Late)';
+          statusColor = 'text-orange-500';
+        } else if (record.status === 'P') {
+          statusText = 'Present';
+          statusColor = 'text-green-500';
+        } else if (record.status === 'A') {
+          statusText = 'Absent';
+          statusColor = 'text-red-500';
+        } else if (record.status === 'WO' || record.status === 'S') {
+          statusText = 'Week Off';
+          statusColor = 'text-blue-500';
+        } else if (record.status === 'Holiday') { // Changed from 'H' to 'Holiday' as stored in DB
+          statusText = 'Holiday';
+          statusColor = 'text-blue-500';
+        }
 
-    return {
-      formattedDate,
-      status: statusText,
-      statusColor,
-      inTime,
-      outTime,
-      totalWorkingHours: totalWorkingHours,
-      lateBy: dayData?.lateBy || '00:00',
-    };
-  }, [attendanceData, viewType, selectedDate]);
+        return {
+          ...record,
+          formattedDate: new Date(record.date).toLocaleDateString('en-CA'), // YYYY-MM-DD
+          statusText,
+          statusColor,
+        };
+      }).sort((a, b) => new Date(a.date) - new Date(b.date)); // Sort by date
+  }, [attendanceData]);
 
   // --- Monthly Stats ---
   const monthlyStats = useMemo(() => {
-    if (viewType === 'day') return null;
+    const currentMonth = selectedMonthDate.getMonth(); // 0-11
+    const currentYear = selectedMonthDate.getFullYear();
+    const totalDaysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
 
-    const totalDaysInMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0).getDate();
-    let totalWorkingDays = 0;
+    // Get all holidays for the year and filter for the current month
+    const allHolidaysForYear = getHolidaysForYear(currentYear); // Get all holidays for the year
+    const monthHolidays = allHolidaysForYear.filter(holiday => {
+        const holidayDate = new Date(holiday.date + 'T00:00:00'); // Treat as local time to avoid timezone shift
+        return holidayDate.getMonth() === currentMonth && holidayDate.getFullYear() === currentYear;
+    });
+
+    // Count all Sundays in the month
     let totalWeekOffs = 0;
-    let daysPresent = 0;
-    let absentDays = 0; // Initialize absent days counter
-    let lateDays = 0;
-
     for (let day = 1; day <= totalDaysInMonth; day++) {
-      const date = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), day);
-      if (date.getDay() !== 0) totalWorkingDays++;
-      else totalWeekOffs++;
+      const date = new Date(currentYear, currentMonth, day);
+      if (date.getDay() === 0) { // 0 is Sunday
+        totalWeekOffs++;
+      }
     }
 
+    // Calculate total working days: Total Days - Week Offs - Holidays (that are not already week offs)
+    const holidaysNotOnWeekOff = monthHolidays.filter(h => new Date(h.date + 'T00:00:00').getDay() !== 0).length;
+    const finalTotalWorkingDays = totalDaysInMonth - totalWeekOffs - holidaysNotOnWeekOff;
+
+    let daysPresent = 0, absentDays = 0, lateDays = 0;
     attendanceData.forEach(dayData => {
+      // Check if the day is a holiday before counting it as absent
+      const isHoliday = monthHolidays.some(holiday => {
+        const holidayDate = new Date(holiday.date + 'T00:00:00');
+        const recordDate = new Date(dayData.date);
+        return holidayDate.getFullYear() === recordDate.getFullYear() && holidayDate.getMonth() === recordDate.getMonth() && holidayDate.getDate() === recordDate.getDate();
+      });
+
       if (dayData.status === 'P') daysPresent++;
-      if (dayData.status === 'A') absentDays++; // Count absent days directly from API data
+      if (dayData.status === 'A' && !isHoliday) absentDays++; // Only count as absent if it's not a holiday
       if (dayData.status === 'P' && dayData.lateBy && dayData.lateBy !== '00:00') lateDays++;
     });
 
-    const selectedMonth = selectedDate.toLocaleString('default', { month: 'long', year: 'numeric' });
+    const selectedMonth = selectedMonthDate.toLocaleString('default', { month: 'long', year: 'numeric' });
 
     return {
       daysPresent,
@@ -145,10 +158,11 @@ useEffect(() => {
       lateDays,
       totalDaysInMonth,
       selectedMonth,
-      totalWorkingDays,
+      totalWorkingDays: finalTotalWorkingDays,
       totalWeekOffs,
+      monthHolidays,
     };
-  }, [attendanceData, viewType, selectedDate]);
+  }, [attendanceData, selectedMonthDate]);
 
   const renderLoading = () => (
     <div className="flex justify-center items-center h-full">
@@ -162,94 +176,93 @@ useEffect(() => {
     </div>
   );
 
-  // --- Day-wise Report ---
-  const renderDayReport = () => {
-    const statusColorClass = dailyStats.statusColor || 'text-gray-500';
-    return (
-      <>
-        <div className="overflow-x-auto">
-          <div className="text-right text-sm text-[#225F8B] mb-2 pr-2">
-            Note: All time values are in HH:MM format.
-          </div>
-          <h3 className="text-xl font-semibold mb-4 text-center">Day-wise Report for {dailyStats.formattedDate}</h3>
-          <table className="min-w-full bg-white rounded-lg shadow-md overflow-hidden">
-            <thead className="bg-sky-100">
-              <tr>
-                <th className="py-3 px-4 text-center font-bold text-gray-700 uppercase tracking-wider">Status</th>
-                <th className="py-3 px-4 text-center font-bold text-gray-700 uppercase tracking-wider">In-Time</th>
-                <th className="py-3 px-4 text-center font-bold text-gray-700 uppercase tracking-wider">Out-Time</th>
-                <th className="py-3 px-4 text-center font-bold text-gray-700 uppercase tracking-wider">Late By</th>
-                <th className="py-3 px-4 text-center font-bold text-gray-700 uppercase tracking-wider">Total Time</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              <tr>
-                <td className={`py-4 px-6 text-center font-medium ${statusColorClass}`}>{dailyStats.status}</td>
-                <td className="py-4 px-6 text-center whitespace-nowrap">{dailyStats.inTime || 'N/A'}</td>
-                <td className="py-4 px-6 text-center whitespace-nowrap">{dailyStats.outTime || 'N/A'}</td>
-                <td className="py-4 px-6 text-center whitespace-nowrap text-red-500">{dailyStats.lateBy}</td>
-                <td className="py-4 px-6 text-center whitespace-nowrap">{dailyStats.totalWorkingHours}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </>
-    );
-  };
-
   // --- Month-wise Report ---
   const renderMonthReport = () => {
     if (!monthlyStats) return null;
+    if (attendanceData.length === 0) {
+      return (
+        <div className="p-6 rounded-xl text-center text-slate-500 bg-slate-50">
+          No attendance data available for the selected month.
+        </div>
+      );
+    }
     return (
-      <>
-        <div className="overflow-x-auto">
-          <div className="text-right text-sm text-[#225F8B] mb-2 pr-2">
-            Note: All time values are in HH:MM format.
-          </div>
-          <h3 className="text-xl font-semibold mb-4 text-center">Month-wise Report for {monthlyStats.selectedMonth}</h3>
-          <table className="min-w-full bg-white rounded-lg shadow-md overflow-hidden">
-            <thead className="bg-sky-100">
+      <div className="overflow-x-auto">
+        <div className="text-right text-sm text-[#225F8B] mb-2 pr-2">
+          Note: All time values are in HH:MM format.
+        </div>
+        {/* <h3 className="text-xl font-semibold mb-4 text-center">Monthly Summary for {monthlyStats.selectedMonth}</h3> */}
+        <table className="min-w-full bg-white rounded-lg shadow-md overflow-hidden">
+          <thead className="bg-sky-100">
+            <tr>
+              <th className="px-4 py-3 text-left font-bold text-gray-700 uppercase tracking-wider">Employee Name</th>
+              <th className="px-4 py-3 text-center font-bold text-gray-700 uppercase tracking-wider">Present Days</th>
+              <th className="px-4 py-3 text-center font-bold text-gray-700 uppercase tracking-wider">Absent Days</th>
+              <th className="px-4 py-3 text-center font-bold text-gray-700 uppercase tracking-wider">Late Days</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-200">
+            <React.Fragment>
               <tr>
-                <th className="px-4 py-3 text-left font-bold text-gray-700 uppercase tracking-wider">Employee Code</th>
-                <th className="px-4 py-3 text-center font-bold text-gray-700 uppercase tracking-wider">Present Days</th>
-                <th className="px-4 py-3 text-center font-bold text-gray-700 uppercase tracking-wider">Absent Days</th>
-                <th className="px-4 py-3 text-center font-bold text-gray-700 uppercase tracking-wider">Late Days</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              <tr>
-                <td className="px-4 py-3 text-slate-600 font-mono">{employeeDetails.empCode || 'N/A'}</td>
+                <td className="px-4 py-3 font-medium text-slate-900">
+                  <div className="flex items-center">
+                    <button onClick={() => setIsExpanded(!isExpanded)} className="mr-2 p-1 rounded-full hover:bg-slate-200">
+                      {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                    </button>
+                    {employeeDetails.empName}
+                  </div>
+                </td>
                 <td className="px-4 py-3 text-slate-600 font-bold text-center">{monthlyStats.daysPresent}</td>
-                <td className="px-4 py-3 text-slate-600 font-bold text-center">{attendanceData.length === 0 ? '0' : monthlyStats.absentDays}</td>
+                <td className="px-4 py-3 text-slate-600 font-bold text-center">{monthlyStats.absentDays}</td>
                 <td className="px-4 py-3 text-red-500 font-bold text-center">{monthlyStats.lateDays}</td>
               </tr>
-            </tbody>
-          </table>
-        </div>
-      </>
+              {isExpanded && (
+                <tr>
+                  <td colSpan="4" className="p-4 bg-slate-50">
+                    <h4 className="font-semibold text-slate-800 mb-2">Detailed Report for {monthlyStats.selectedMonth}</h4>
+                    <table className="w-full table-auto text-left bg-white rounded-md shadow">
+                      <thead className="bg-sky-100">
+                        <tr>
+                          <th className="px-3 py-2 text-sm font-semibold text-slate-600">Date</th>
+                          <th className="px-3 py-2 text-sm font-semibold text-slate-600 text-center">Status</th>
+                          <th className="px-3 py-2 text-sm font-semibold text-slate-600 text-center">In Time</th>
+                          <th className="px-3 py-2 text-sm font-semibold text-slate-600 text-center">Out Time</th>
+                          <th className="px-3 py-2 text-sm font-semibold text-slate-600 text-center">Late By</th>
+                          <th className="px-3 py-2 text-sm font-semibold text-slate-600 text-center">Total Hours</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {detailedDayWiseData.map(record => (
+                          <tr key={record.date} className="border-b border-slate-100 last:border-b-0">
+                            <td className="px-3 py-2 text-sm text-slate-700">{record.formattedDate}</td>
+                            <td className={`px-3 py-2 text-sm font-bold text-center ${record.statusColor}`}>{record.statusText}</td>
+                            <td className="px-3 py-2 text-sm text-slate-700 text-center">{record.inTime || '-'}</td>
+                            <td className="px-3 py-2 text-sm text-slate-700 text-center">{record.outTime || '-'}</td>
+                            <td className="px-3 py-2 text-sm text-red-500 text-center">{record.lateBy || '00:00'}</td>
+                            <td className="px-3 py-2 text-sm text-slate-700 text-center">{record.totalWorkingHours || '00:00'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </td>
+                </tr>
+              )}
+            </React.Fragment>
+          </tbody>
+        </table>
+      </div>
     );
   };
 
   return (
     <div className="min-h-screen py-12 px-4 sm:px-6 lg:px-8 font-sans">
       <div className="max-w-7xl mx-auto">
-        <div className="bg-white p-6 md:p-10 rounded-3xl shadow-2xl">
+        <div className="bg-white p-6 md:p-10 rounded-3xl shadow-2xl"> 
           <h2 className="text-3xl font-bold text-center text-gray-900 mb-8">My Attendance Report</h2>
 
           {/* --- Summary Cards --- */}
-          {viewType === 'day' && dailyStats ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4 mb-6 justify-center">
-              <div className="p-4 rounded-xl shadow-lg border border-slate-200">
-                <h3 className="text-lg font-semibold text-slate-700">Selected Date</h3>
-                <p className="text-3xl font-bold text-[#225F8B] mt-2">{dailyStats.formattedDate}</p>
-              </div>
-              <div className="p-4 rounded-xl shadow-lg border border-slate-200">
-                <h3 className="text-lg font-semibold text-slate-700">Day Status</h3>
-                <p className={`text-3xl font-bold mt-2 ${dailyStats.statusColor}`}>{dailyStats.status}</p>
-              </div>
-            </div>
-          ) : viewType === 'month' && monthlyStats ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+          {monthlyStats ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
               <div className="p-4 rounded-xl shadow-lg border border-slate-200">
                 <h3 className="text-lg font-semibold text-slate-700">Selected Month</h3>
                 <p className="text-3xl font-bold text-[#225F8B] mt-2">{monthlyStats.selectedMonth}</p>
@@ -262,57 +275,48 @@ useEffect(() => {
                 <h3 className="text-lg font-semibold text-slate-700">Total Week Offs</h3>
                 <p className="text-3xl font-bold text-[#225F8B] mt-2">{monthlyStats.totalWeekOffs}</p>
               </div>
+              <div className="p-4 rounded-xl shadow-lg border border-slate-200">
+                <h3 className="text-lg font-semibold text-slate-700">Holidays in {monthlyStats.selectedMonth}</h3>
+                {monthlyStats.monthHolidays.length > 0 ? (
+                  <ul className="mt-2 space-y-1 text-sm">
+                    {monthlyStats.monthHolidays.map(holiday => (
+                      <li key={holiday.name} className="flex justify-between">
+                        <span className="font-medium text-[#225F8B]">{holiday.name}</span>
+                        <span className="text-[#225F8B]">{new Date(holiday.date + 'T00:00:00').toLocaleString('default', { month: 'short', day: 'numeric' })}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-sm text-[#225F8B] mt-2">
+                    No holidays in this month.
+                  </p>
+                )}
+              </div>
             </div>
           ) : null}
 
           {/* --- Centered Buttons + Calendar --- */}
           <div className="flex flex-col sm:flex-row items-center justify-center mb-6 space-y-4 sm:space-y-0 sm:space-x-4">
-            <div className="flex space-x-2">
-              <button
-                onClick={() => setViewType('day')}
-                className={`py-2 px-4 rounded-full transition-all duration-300 ease-in-out ${
-                  viewType === 'day'
-                    ? 'bg-gradient-to-r from-[#225F8B] to-[#225F8B]/80 text-white shadow-lg transform scale-105'
-                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                }`}
-              >
-                Day-wise
-              </button>
-              <button
-                onClick={() => setViewType('month')}
-                className={`py-2 px-4 rounded-full transition-all duration-300 ease-in-out ${
-                  viewType === 'month'
-                    ? 'bg-gradient-to-r from-[#225F8B] to-[#225F8B]/80 text-white shadow-lg transform scale-105'
-                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                }`}
-              >
-                Month-wise
-              </button>
-            </div>
-
             <div className="w-full sm:w-auto">
-              {viewType === 'day' ? (
-                <input
-                  type="date"
-                  value={selectedDate.toISOString().split('T')[0]}
-                  onChange={(e) => setSelectedDate(new Date(e.target.value))}
-                  className="p-2 border border-slate-300 rounded-full shadow-sm"
+              <div className="relative">
+                <DatePicker
+                  selected={selectedMonthDate}
+                  onChange={(date) => setSelectedMonthDate(date)}
+                  dateFormat="MMMM yyyy"
+                  showMonthYearPicker
+                  className="p-2 pl-10 border border-slate-300 rounded-full shadow-sm w-full"
                 />
-              ) : (
-                <input
-                  type="month"
-                  value={selectedDate.toISOString().substring(0, 7)}
-                  onChange={(e) => setSelectedDate(new Date(e.target.value + '-01'))}
-                  className="p-2 border border-slate-300 rounded-full shadow-sm"
-                />
-              )}
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Calendar className="h-5 w-5 text-gray-400" />
+                </div>
+              </div>
             </div>
           </div>
 
           {/* --- Report Table --- */}
           {authLoading || loading ? renderLoading() : error ? renderError() : (
             <>
-              {viewType === 'day' ? renderDayReport() : renderMonthReport()}
+              {renderMonthReport()}
             </>
           )}
         </div>

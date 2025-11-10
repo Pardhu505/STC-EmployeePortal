@@ -1,6 +1,10 @@
 import React, { useState, useEffect, useMemo, createContext, useContext } from "react";
-import { fetchUserProfile, fetchManagerTeam, fetchManagerAttendanceReport } from "../api"; // Import fetchUserProfile and fetchManagerTeam
+import { employeeAPI, managerAPI } from "../Services/api";
 import { useAuth, AuthProvider } from "../contexts/AuthContext";
+import { getHolidaysForYear } from "./Holidays";
+import { ChevronRight, ChevronDown, Calendar } from 'lucide-react';
+import DatePicker from "react-datepicker";
+import "react-datepicker/dist/react-datepicker.css";
 
 
 // ---------- HELPERS ----------
@@ -11,12 +15,12 @@ const getName = (r) => r?.empName || r?.Name || r?.["Emp Name"] || "";
 const ReportingManagerReport = () => {
   const { user, loading: authLoading } = useAuth();
   const [managerDetails, setManagerDetails] = useState({ managerName: null, managerId: null, team: [] });
-  const [reportType, setReportType] = useState("month");
-  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [selectedMonthDate, setSelectedMonthDate] = useState(new Date());
   const [attendanceData, setAttendanceData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [expandedRows, setExpandedRows] = useState({});
 
   // ---------- LOAD MANAGER DETAILS FROM API ----------
   useEffect(() => {
@@ -27,8 +31,8 @@ const ReportingManagerReport = () => {
       setError(null);
 
       try {
-        // Use the fetchUserProfile function to get manager details
-        const employee = await fetchUserProfile(user.email);
+        // Use the centralized API function to get manager details
+        const employee = await employeeAPI.getEmployeeByEmail(user.email);
 
         if (!employee) {
           throw new Error("Manager not found for this email");
@@ -38,8 +42,8 @@ const ReportingManagerReport = () => {
         const managerId = getCode(employee); // Extracts empCode
         const managerName = employee.name; // Extracts name
 
-        // Use the new fetchManagerTeam function from api.js
-        const teamResponse = await fetchManagerTeam(managerId);
+        // Use the new managerAPI function from api.js
+        const teamResponse = await managerAPI.getManagerTeam(managerId);
 
         if (!teamResponse?.team) {
           throw new Error(`Team data not found for manager ID: ${managerId}`);
@@ -79,15 +83,15 @@ const ReportingManagerReport = () => {
       try {
         const teamEmpCodes = managerDetails.team.map(emp => getCode(emp)).filter(Boolean);
         const params = {
-            managerId: managerDetails.managerId,
-            teamEmpCodes: teamEmpCodes, // Pass the list of employee codes
-            reportType,
-            date: selectedDate,
-            signal,
-          };
+          managerId: managerDetails.managerId,
+          teamEmpCodes,
+          year: selectedMonthDate.getFullYear(),
+          month: selectedMonthDate.getMonth() + 1,
+          signal
+        };
   
-          // Use the new fetch-based API function
-        const data = await fetchManagerAttendanceReport(params);
+        // Use the correct API function from the managerAPI export
+        const data = await managerAPI.getManagerAttendanceReport(params); // The params object now matches the function signature
         
 
         if (!data?.teamRecords || !Array.isArray(data.teamRecords)) {
@@ -98,6 +102,7 @@ const ReportingManagerReport = () => {
 
         const raw = data.teamRecords;
         const merged = managerDetails.team.map((emp) => {
+          // For month view, empData is the summary. For day view, it's an array of daily records.
           const empData = raw.find((r) => getCode(r) === getCode(emp));
           return {
             ...emp,
@@ -105,12 +110,14 @@ const ReportingManagerReport = () => {
             empName: emp.Name,
             P: empData?.P ?? 0,
             A: empData?.A ?? 0,
+            H: empData?.H ?? 0,
             L: empData?.L ?? 0,
             status: empData?.status ?? "-",
             inTime: empData?.inTime ?? "-",
             outTime: empData?.outTime ?? "-",
             lateBy: empData?.lateBy ?? "00:00",
             totalWorkingHours: empData?.totalWorkingHours ?? "-",
+            dailyRecords: empData?.dailyRecords ?? [], // For day-wise range view
           };
         });
 
@@ -128,7 +135,12 @@ const ReportingManagerReport = () => {
 
     fetchData();
     return () => controller.abort();
-  }, [managerDetails.managerId, managerDetails.team, reportType, selectedDate, authLoading]);
+  }, [managerDetails.managerId, managerDetails.team, selectedMonthDate, authLoading]);
+
+  // Toggle expanded row
+  const toggleRow = (empCode) => {
+    setExpandedRows(prev => ({ ...prev, [empCode]: !prev[empCode] }));
+  };
 
   // ---------- CALCULATIONS ---------- (unchanged)
   const calcLateBy = (inTime) => {
@@ -154,35 +166,42 @@ const ReportingManagerReport = () => {
   // ---------- FILTERED DATA ---------- (unchanged)
   const filteredData = useMemo(() => {
     let data = attendanceData.map((e) => {
-      let statusText = '-';
-      let statusColor = 'text-gray-500';
+      // Process each daily record for the detailed expansion view
+      const processedDailyRecords = (e.dailyRecords || []).map(record => {
+          let statusText = '-';
+          let statusColor = 'text-gray-500';
+          if (record.status === 'P' && record.lateBy && record.lateBy !== '00:00') {
+              statusText = 'Present (Late)';
+              statusColor = 'text-orange-500';
+          } else if (record.status === 'P') {
+              statusText = 'Present';
+              statusColor = 'text-green-500';
+          } else if (record.status === 'A') {
+              statusText = 'Absent';
+              statusColor = 'text-red-500';
+          } else if (record.status === 'Holiday' || record.status === 'H') {
+              statusText = 'Holiday';
+              statusColor = 'text-blue-500';
+          } else if (record.status === 'WO' || record.status === 'S') {
+              statusText = 'Week Off';
+              statusColor = 'text-blue-500';
+          }
+          return {
+              ...record,
+              formattedDate: new Date(record.date).toLocaleDateString('en-CA'),
+              statusText,
+              statusColor,
+          };
+      }).sort((a, b) => new Date(a.date) - new Date(b.date));
 
-      if (e.status) {
-        if (e.status === 'P' && e.lateBy && e.lateBy !== '00:00') {
-          statusText = 'Present (Late)';
-          statusColor = 'text-orange-500';
-        } else if (e.status === 'P') {
-          statusText = 'Present';
-          statusColor = 'text-green-500';
-        } else if (e.status === 'A') {
-          statusText = 'Absent';
-          statusColor = 'text-red-500';
-        } else if (e.status === 'WO' || e.status === 'S') {
-          statusText = 'Week Off';
-          statusColor = 'text-gray-500';
-        }
-      }
       return {
       empCode: getCode(e),
       empName: getName(e),
-      statusText,
-      statusColor,
-      inTime: e.inTime || "-",
-      outTime: e.outTime || "-",
-      lateBy: fmt(calcLateBy(e.inTime)),
-      totalWorkingHours: e.totalWorkingHours || "00:00",
+      // Detailed records for expansion
+      dailyRecords: processedDailyRecords,
       P: Number(e.P ?? 0),
       A: Number(e.A ?? 0),
+      H: Number(e.H ?? 0),
       L: Number(e.L ?? 0),
     }});
 
@@ -196,32 +215,38 @@ const ReportingManagerReport = () => {
     return data;
   }, [attendanceData, searchQuery]);
 
-  const summaryData =
-    reportType === "day"
-      ? { 
-          totalEmployees: filteredData.length, 
-          selectedDate: selectedDate.toDateString(), 
-          isWeekOff: selectedDate.getDay() === 0 
-        }
-      : (() => {
-          const year = selectedDate.getFullYear();
-          const month = selectedDate.getMonth();
+  const summaryData = useMemo(() => {
+          const year = selectedMonthDate.getFullYear();
+          const month = selectedMonthDate.getMonth();
           const totalDays = new Date(year, month + 1, 0).getDate();
+          
+          // Get holidays for the year and filter for the current month
+          const holidaysForYear = getHolidaysForYear(year);
+          const monthHolidays = holidaysForYear.filter(holiday => {
+            const holidayDate = new Date(holiday.date + 'T00:00:00');
+            return holidayDate.getMonth() === month && holidayDate.getFullYear() === year;
+          });
 
-          // Count number of Sundays
-          let sundays = 0;
-          for (let d = 1; d <= totalDays; d++) {
-            const day = new Date(year, month, d).getDay();
-            if (day === 0) sundays++;
+          let totalWeekOffs = 0;
+          for (let day = 1; day <= totalDays; day++) {
+            const date = new Date(year, month, day);
+            if (date.getDay() === 0) { // Sunday
+              totalWeekOffs++;
+            }
           }
+
+          // Exclude holidays that fall on a week off (Sunday)
+          const holidaysNotOnWeekOff = monthHolidays.filter(h => new Date(h.date + 'T00:00:00').getDay() !== 0).length;
+          const totalWorkingDays = totalDays - totalWeekOffs - holidaysNotOnWeekOff;
 
           return {
             totalEmployees: filteredData.length,
-            selectedMonth: selectedDate.toLocaleString("default", { month: "long", year: "numeric" }),
-            totalWorkingDays: totalDays - sundays,
-            totalWeekOffs: sundays,
+            selectedMonth: selectedMonthDate.toLocaleString("default", { month: "long", year: "numeric" }),
+            totalWorkingDays,
+            totalWeekOffs,
+            monthHolidays,
           };
-        })();
+        }, [filteredData, selectedMonthDate]);
 
   // ---------- RENDER ---------- (unchanged)
   return (
@@ -236,15 +261,10 @@ const ReportingManagerReport = () => {
         ) : (
           <>
             {/* Summary Cards */}
-            {reportType === "month" && (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
                 <div className="p-4 rounded-xl shadow-lg border border-slate-200">
                   <h3 className="text-lg font-semibold text-slate-700">Total Employees</h3>
                   <p className="text-3xl font-bold text-[#225F8B] mt-2">{summaryData.totalEmployees}</p>
-                </div>
-                <div className="p-4 rounded-xl shadow-lg border border-slate-200">
-                  <h3 className="text-lg font-semibold text-slate-700">Selected Month</h3>
-                  <p className="text-3xl font-bold text-[#225F8B] mt-2">{summaryData.selectedMonth}</p>
                 </div>
                 <div className="p-4 rounded-xl shadow-lg border border-slate-200">
                   <h3 className="text-lg font-semibold text-slate-700">Total Working Days</h3>
@@ -254,44 +274,40 @@ const ReportingManagerReport = () => {
                   <h3 className="text-lg font-semibold text-slate-700">Total Week Offs</h3>
                   <p className="text-3xl font-bold text-[#225F8B] mt-2">{summaryData.totalWeekOffs}</p>
                 </div>
-              </div>
-            )}
-
-            {reportType === "day" && (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
                 <div className="p-4 rounded-xl shadow-lg border border-slate-200">
-                  <h3 className="text-lg font-semibold text-slate-700">Total Employees</h3>
-                  <p className="text-3xl font-bold text-[#225F8B] mt-2">{summaryData.totalEmployees}</p>
-                </div>
-                <div className="p-4 rounded-xl shadow-lg border border-slate-200">
-                  <h3 className="text-lg font-semibold text-slate-700">Selected Date</h3>
-                  <p className="text-3xl font-bold text-[#225F8B] mt-2">{summaryData.selectedDate}</p>
-                </div>
-                <div className="p-4 rounded-xl shadow-lg border border-slate-200">
-                  <h3 className="text-lg font-semibold text-slate-700">Day Status</h3>
-                  <p className={`text-3xl font-bold mt-2 ${summaryData.isWeekOff ? "text-red-500" : "text-[#225F8B]"}`}>
-                    {summaryData.isWeekOff ? "Week Off" : "Working Day"}
-                  </p>
+                  <h3 className="text-lg font-semibold text-slate-700">Holidays in {summaryData.selectedMonth.split(' ')[0]}</h3>
+                  {summaryData.monthHolidays.length > 0 ? (
+                    <ul className="mt-2 space-y-1 text-sm max-h-24 overflow-y-auto">
+                      {summaryData.monthHolidays.map(holiday => (
+                        <li key={holiday.name} className="flex justify-between">
+                          <span className="font-medium text-[#225F8B]">{holiday.name}</span>
+                          <span className="text-[#225F8B]">{new Date(holiday.date + 'T00:00:00').toLocaleString('default', { month: 'short', day: 'numeric' })}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-sm text-[#225F8B] mt-2">
+                      No holidays in this month.
+                    </p>
+                  )}
                 </div>
               </div>
-            )}
 
             {/* Controls & Search */}
             <div className="flex flex-col md:flex-row md:justify-between md:items-center mb-6 space-y-4 md:space-y-0">
               <div className="flex flex-wrap items-center justify-center md:justify-start space-x-2">
-                <button onClick={() => setReportType("day")} className={`py-2 px-4 rounded-lg font-semibold transition-colors ${reportType === "day" ? "bg-gradient-to-r from-[#225F8B] to-[#225F8B]/80 text-white shadow-md" : "hover:bg-blue-50 hover:border-[#225F8B]/50 text-gray-700"}`}>
-                  Day-wise
-                </button>
-                <button onClick={() => setReportType("month")} className={`py-2 px-4 rounded-lg font-semibold transition-colors ${reportType === "month" ? "bg-gradient-to-r from-[#225F8B] to-[#225F8B]/80 text-white shadow-md" : "hover:bg-blue-50 hover:border-[#225F8B]/50 text-gray-700"}`}>
-                  Month-wise
-                </button>
-
-                {reportType === "day" && (
-                  <input type="date" value={selectedDate.toISOString().substring(0, 10)} onChange={(e) => setSelectedDate(new Date(e.target.value))} className="p-2 border border-slate-300 rounded-lg shadow-sm" />
-                )}
-                {reportType === "month" && (
-                  <input type="month" value={selectedDate.toISOString().substring(0, 7)} onChange={(e) => setSelectedDate(new Date(e.target.value + "-01"))} className="p-2 border border-slate-300 rounded-lg shadow-sm" />
-                )}
+                <div className="relative">
+                    <DatePicker
+                      selected={selectedMonthDate}
+                      onChange={(date) => setSelectedMonthDate(date)}
+                      dateFormat="MMMM yyyy"
+                      showMonthYearPicker
+                      className="p-2 pl-10 border border-slate-300 rounded-lg shadow-sm w-full"
+                    />
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <Calendar className="h-5 w-5 text-gray-400" />
+                    </div>
+                  </div>
               </div>
 
               <div className="flex justify-center">
@@ -315,48 +331,70 @@ const ReportingManagerReport = () => {
                 <thead>
                   <tr className="bg-sky-100">
                     <th className="px-4 py-3 font-semibold text-slate-700 rounded-tl-lg">Emp Name</th>
-                    <th className="px-4 py-3 font-semibold text-slate-700">Emp Code</th>
-                    {reportType === "day" ? (
-                      <>
-                        <th className="px-4 py-3 font-semibold text-slate-700 text-center">Status</th>
-                        <th className="px-4 py-3 font-semibold text-slate-700 text-center">In Time</th>
-                        <th className="px-4 py-3 font-semibold text-slate-700 text-center">Out Time</th>
-                        <th className="px-4 py-3 font-semibold text-slate-700 text-center">Late By</th>
-                        <th className="px-4 py-3 font-semibold text-slate-700 text-center rounded-tr-lg">Total Working Hours</th>
-                      </>
-                    ) : (
-                      <>
-                        <th className="px-4 py-3 font-semibold text-slate-700 text-center">Present</th>
-                        <th className="px-4 py-3 font-semibold text-slate-700 text-center">Absent</th>
-                        <th className="px-4 py-3 font-semibold text-slate-700 text-center rounded-tr-lg">Late</th>
-                      </>
-                    )}
+                    <th className="px-4 py-3 font-semibold text-slate-700">Emp Code</th>                   
+                    <th className="px-4 py-3 font-semibold text-slate-700 text-center">Present</th>
+                    <th className="px-4 py-3 font-semibold text-slate-700 text-center">Absent</th>
+                    <th className="px-4 py-3 font-semibold text-slate-700 text-center rounded-tr-lg">Late</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredData.map((e, i) => (
-                    <tr key={i} className="border-b border-slate-200 last:border-b-0 hover:bg-slate-50 transition-colors duration-150">
-                      <td className="px-4 py-3 font-medium text-slate-900">{e.empName}</td>
-                      <td className="px-4 py-3 text-slate-600 font-mono">{e.empCode}</td>
-                      {reportType === "day" ? (
-                        <>
-                          <td className={`px-4 py-3 text-center font-bold ${e.statusColor}`}>
-                            {e.statusText}
-                          </td>
-                          <td className="px-4 py-3 text-slate-600 font-bold text-center">{e.inTime}</td>
-                          <td className="px-4 py-3 text-slate-600 font-bold text-center">{e.outTime}</td>
-                          <td className="px-4 py-3 text-red-500 font-bold text-center">{e.lateBy}</td>
-                          <td className="px-4 py-3 text-slate-600 font-bold text-center">{e.totalWorkingHours}</td>
-                        </>
-                      ) : (
-                        <>
-                          <td className="px-4 py-3 text-slate-600 font-bold text-center">{e.P}</td>
-                          <td className="px-4 py-3 text-slate-600 font-bold text-center">{e.A}</td>
-                          <td className="px-4 py-3 text-red-500 font-bold text-center">{e.L}</td>
-                        </>
-                      )}
-                    </tr>
-                  ))}
+                  {attendanceData.some(e => e.dailyRecords.length > 0) ? (
+                    filteredData.length > 0 ? (
+                      filteredData.map((e, i) => (
+                        <React.Fragment key={i}>
+                          <tr className="border-b border-slate-200 last:border-b-0 hover:bg-slate-50 transition-colors duration-150">
+                            <td className="px-4 py-3 font-medium text-slate-900">
+                              <div className="flex items-center">
+                                <button onClick={() => toggleRow(e.empCode)} className="mr-2 p-1 rounded-full hover:bg-slate-200">
+                                    {expandedRows[e.empCode] ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                                  </button>
+                                {e.empName}
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 text-slate-600 font-mono">{e.empCode}</td>
+                            <td className="px-4 py-3 text-slate-600 font-bold text-center">{e.P}</td>
+                            <td className="px-4 py-3 text-slate-600 font-bold text-center">{e.A}</td>
+                            <td className="px-4 py-3 text-red-500 font-bold text-center">{e.L}</td>
+                          </tr>
+                          {expandedRows[e.empCode] && (
+                            <tr>
+                              <td colSpan="6" className="p-4 bg-slate-50">
+                                <h4 className="font-semibold text-slate-800 mb-2">Detailed Report for {e.empName}</h4>
+                                <table className="w-full table-auto text-left bg-white rounded-md shadow">
+                                  <thead className="bg-sky-100">
+                                    <tr>
+                                      <th className="px-3 py-2 text-sm font-semibold text-slate-600">Date</th>
+                                      <th className="px-3 py-2 text-sm font-semibold text-slate-600 text-center">Status</th>
+                                      <th className="px-3 py-2 text-sm font-semibold text-slate-600 text-center">In Time</th>
+                                      <th className="px-3 py-2 text-sm font-semibold text-slate-600 text-center">Out Time</th>
+                                      <th className="px-3 py-2 text-sm font-semibold text-slate-600 text-center">Late By</th>
+                                      <th className="px-3 py-2 text-sm font-semibold text-slate-600 text-center">Total Hours</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {e.dailyRecords.map(record => (
+                                      <tr key={record.date} className="border-b border-slate-100 last:border-b-0">
+                                        <td className="px-3 py-2 text-sm text-slate-700">{record.formattedDate}</td>
+                                        <td className={`px-3 py-2 text-sm font-bold text-center ${record.statusColor}`}>{record.statusText}</td>
+                                        <td className="px-3 py-2 text-sm text-slate-700 text-center">{record.inTime || '-'}</td>
+                                        <td className="px-3 py-2 text-sm text-slate-700 text-center">{record.outTime || '-'}</td>
+                                        <td className="px-3 py-2 text-sm text-red-500 text-center">{record.lateBy || '00:00'}</td>
+                                        <td className="px-3 py-2 text-sm text-slate-700 text-center">{record.totalWorkingHours || '00:00'}</td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </td>
+                            </tr>
+                          )}
+                        </React.Fragment>
+                      ))
+                    ) : (
+                      <tr><td colSpan="5" className="text-center py-4 text-slate-500">No employees match the current filter.</td></tr>
+                    )
+                  ) : (
+                    <tr><td colSpan="5" className="text-center py-4 text-slate-500">No attendance data available for the selected month.</td></tr>
+                  )}
                 </tbody>
               </table>
             </div>

@@ -1,6 +1,8 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { API_BASE_URL } from '../config/api';
 import * as XLSX from 'xlsx';
+import { ChevronRight, ChevronDown } from 'lucide-react';
+import { getHolidaysForYear } from './Holidays'; // Import the holiday list function
 
 // Helper function to parse time strings like "10:40" into minutes
 const parseTime = (timeStr) => {
@@ -50,6 +52,9 @@ const parseCsvData = (csvData) => {
     }
   }
 
+  // Get holidays for the parsed year
+  const holidaysForYear = getHolidaysForYear(year);
+
   // Employees
   for (let i = 0; i < lines.length; i++) {
     if (lines[i].includes('Emp. Code:')) {
@@ -74,7 +79,14 @@ const parseCsvData = (csvData) => {
         // The backend will handle timezone conversion.
         const recordDate = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day)));
         
-        const status = statusLine[index]?.trim() || '-';
+        // Check if the date is a holiday
+        const dateString = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        const isHoliday = holidaysForYear.some(h => h.date === dateString);
+
+        let status = statusLine[index]?.trim() || '-';
+        if (isHoliday && (status === 'A' || status === '-')) {
+          status = 'H'; // Mark as Holiday
+        }
         const inTimeStr = inTimeLine[index]?.trim() || '-';
         const outTimeStr = outTimeLine[index]?.trim() || '-';
         const totalTimeStr = totalTimeLine[index]?.trim() || '-';
@@ -105,7 +117,6 @@ const parseCsvData = (csvData) => {
 };
 
 const AttendanceReport = () => {
-  const [reportType, setReportType] = useState('month');
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [employeeData, setEmployeeData] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -118,6 +129,7 @@ const AttendanceReport = () => {
   // Dropdown toggle
   const [showNameDropdown, setShowNameDropdown] = useState(false);
   const [showCodeDropdown, setShowCodeDropdown] = useState(false);
+  const [expandedRows, setExpandedRows] = useState({});
   // Initialize employeeData when file uploaded
 
   const handleFileChange = (event) => {
@@ -214,12 +226,28 @@ const AttendanceReport = () => {
     setCheckedCodes(newState);
   };
 
+  // Toggle expanded row
+  const toggleRow = (empCode) => {
+    setExpandedRows(prev => ({ ...prev, [empCode]: !prev[empCode] }));
+  };
+
   // Save to DB
   const handleSaveToDB = useCallback(async () => {
     if (!employeeData) return;
     setLoading(true);
 
-    const employeesList = Object.values(employeeData);
+    // Deep clone the data to avoid mutating the state used by the UI
+    const employeesList = JSON.parse(JSON.stringify(Object.values(employeeData)));
+
+    // Transform the status 'H' to 'Holiday' before sending to the database
+    const dataToSave = employeesList.map(employee => {
+      employee.dailyRecords.forEach(record => {
+        if (record.status === 'H') {
+          record.status = 'Holiday';
+        }
+      });
+      return employee;
+    });
 
     try {
       const response = await fetch(`${API_BASE_URL}/api/attendance-report`, {
@@ -227,7 +255,8 @@ const AttendanceReport = () => {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(employeesList),
+        // Send the transformed data to the backend
+        body: JSON.stringify(dataToSave),
       });
 
       if (!response.ok) {
@@ -273,65 +302,6 @@ const AttendanceReport = () => {
     // Apply checkbox filters (include only employees checked in both lists)
     employeeList = employeeList.filter(emp => checkedNames[emp.empName] && checkedCodes[emp.empCode]);
 
-    // Day-wise
-    if (reportType === 'day') {
-      const day = selectedDate.getDate();
-      const month = selectedDate.getMonth();
-      const year = selectedDate.getFullYear();
-
-      const employees = employeeList.map(emp => {
-        const dayRecord = emp.dailyRecords.find(record => {
-          const recordDate = new Date(record.date);
-          return recordDate.getDate() === day &&
-                 recordDate.getMonth() === month &&
-                 recordDate.getFullYear() === year;
-        });
-
-        let statusText = '-';
-        let statusColor = 'text-gray-500';
-
-        if (dayRecord) {
-          if (dayRecord.status === 'P' && dayRecord.lateBy !== '00:00') {
-            statusText = 'Present (Late)';
-            statusColor = 'text-orange-500';
-          } else if (dayRecord.status === 'P') {
-            statusText = 'Present';
-            statusColor = 'text-green-500';
-          } else if (dayRecord.status === 'A') {
-            statusText = 'Absent';
-            statusColor = 'text-red-500';
-          } else if (dayRecord.status === 'WO' || dayRecord.status === 'S') {
-            statusText = 'Week Off';
-            statusColor = 'text-gray-500';
-          }
-        }
-
-        return {
-          empName: emp.empName,
-          empCode: emp.empCode,
-          statusText,
-          statusColor,
-          inTime: dayRecord?.inTime || '-',
-          outTime: dayRecord?.outTime || '-',
-          lateBy: dayRecord?.lateBy || '-',
-          totalWorkingHours: dayRecord?.totalWorkingHours || '-',
-        };
-      });
-
-      const hasDataForSelectedDay = employees.some(emp => emp.statusText !== '-');
-
-      return {
-        employees: hasDataForSelectedDay ? employees : [],
-        summary: {
-          totalEmployees: hasDataForSelectedDay ? employees.length : '-',
-          selectedDate: selectedDate.toDateString(),
-          isWeekOff: selectedDate.getDay() === 0,
-        }
-      };
-    }
-
-    // Month-wise
-    if (reportType === 'month') {
       const selectedMonth = selectedDate.getMonth();
       const selectedYear = selectedDate.getFullYear();
 
@@ -347,14 +317,47 @@ const AttendanceReport = () => {
         let absentCount = 0;
         let lateCount = 0;
 
+        // Process daily records for the expansion view
+        const processedDailyRecords = emp.dailyRecords
+          .filter(record => {
+            const recordDate = new Date(record.date);
+            return recordDate.getMonth() === selectedMonth && recordDate.getFullYear() === selectedYear;
+          })
+          .map(record => {
+            let statusText = '-';
+            let statusColor = 'text-gray-500';
+            if (record.status === 'P' && record.lateBy && record.lateBy !== '00:00') {
+                statusText = 'Present (Late)';
+                statusColor = 'text-orange-500';
+            } else if (record.status === 'P') {
+                statusText = 'Present';
+                statusColor = 'text-green-500';
+            } else if (record.status === 'A') {
+                statusText = 'Absent';
+                statusColor = 'text-red-500';
+            } else if (record.status === 'Holiday' || record.status === 'H' || record.status === 'WO' || record.status === 'S') {
+                statusText = record.status === 'H' || record.status === 'Holiday' ? 'Holiday' : 'Week Off';
+                statusColor = 'text-blue-500';
+            }
+            return { ...record, formattedDate: new Date(record.date).toLocaleDateString('en-CA'), statusText, statusColor };
+          })
+          .sort((a, b) => new Date(a.date) - new Date(b.date));
+
+        // Get holidays for the selected year to exclude them from absent count
+        const holidaysForYear = getHolidaysForYear(selectedYear);
+
         emp.dailyRecords
           .filter(record => {
             const recordDate = new Date(record.date);
             return recordDate.getMonth() === selectedMonth && recordDate.getFullYear() === selectedYear;
           })
           .forEach(record => {
+            const recordDate = new Date(record.date);
+            const dateString = `${recordDate.getFullYear()}-${String(recordDate.getMonth() + 1).padStart(2, '0')}-${String(recordDate.getDate()).padStart(2, '0')}`;
+            const isHoliday = holidaysForYear.some(h => h.date === dateString);
+
             if (record.status === 'P') presentCount++;
-            if (record.status === 'A') absentCount++;
+            if (record.status === 'A' && !isHoliday) absentCount++; // Only count absent if not a holiday
             if (record.lateBy !== '00:00' && record.status === 'P') lateCount++;
           });
 
@@ -364,15 +367,17 @@ const AttendanceReport = () => {
           presentDays: presentCount,
           absentDays: absentCount,
           lateDays: lateCount,
+          dailyRecords: processedDailyRecords,
         };
       });
 
       // total working days (Mon-Sat)
-      let totalWorkingDays = 0;
+      let calculatedWorkingDays = 0;
       const totalDaysInMonth = new Date(selectedYear, selectedMonth + 1, 0).getDate();
       for (let day = 1; day <= totalDaysInMonth; day++) {
         const date = new Date(selectedYear, selectedMonth, day);
-        if (date.getDay() !== 0) totalWorkingDays++;
+        // Count as a working day if it's not a Sunday
+        if (date.getDay() !== 0) calculatedWorkingDays++;
       }
 
       let totalWeekOffs = 0;
@@ -381,19 +386,31 @@ const AttendanceReport = () => {
         if (date.getDay() === 0) totalWeekOffs++;
       }
 
+      // Get holidays for the selected month
+      const allHolidaysForYear = getHolidaysForYear(selectedYear);
+      const monthHolidays = allHolidaysForYear.filter(holiday => {
+        const holidayDate = new Date(holiday.date + 'T00:00:00');
+        return holidayDate.getMonth() === selectedMonth && holidayDate.getFullYear() === selectedYear;
+      });
+      
+      // Subtract holidays from the calculated working days
+      const finalTotalWorkingDays = calculatedWorkingDays - monthHolidays.length;
+
+      const selectedMonthName = selectedDate.toLocaleString('default', { month: 'long' });
+
       return {
         employees,
         summary: {
           totalEmployees: employees.length > 0 ? employees.length : '-',
-          selectedMonth: selectedDate.toLocaleString('default', { month: 'long', year: 'numeric' }),
-          totalWorkingDays,
-          totalWeekOffs,
+          totalWeekOffs, // This is just Sundays
+          totalWorkingDays: finalTotalWorkingDays, // This is (Total Days - Sundays - Holidays)
+          monthHolidays, // Add holidays to summary
+          selectedMonthName, // Add month name for the card title
         }
       };
-    }
 
     return { employees: [], summary: {} };
-  }, [employeeData, reportType, selectedDate, searchQuery, checkedNames, checkedCodes]);
+  }, [employeeData, selectedDate, searchQuery, checkedNames, checkedCodes]);
 
   const filteredData = getFilteredData();
   const employeesToDisplay = filteredData.employees;
@@ -410,138 +427,7 @@ const AttendanceReport = () => {
 
     if (!uploadedFileContent) return null;
 
-    // Day-wise table
-    if (reportType === 'day') {
-      return (
-        <div className="p-6 rounded-xl overflow-x-auto">
-          <div className="text-right text-sm text-slate-500 mb-2 pr-2">
-            Note: All time values are in HH:MM format.
-          </div>
-          <table className="w-full table-auto text-left">
-            <thead>
-              <tr className="bg-sky-100">
-                <th className="px-4 py-3 font-semibold text-slate-700 rounded-tl-lg">
-                  Emp Name
-                  {/* Names dropdown with Select All */}
-                  <div className="inline-block relative ml-2">
-                    <button
-                      type="button"
-                      onClick={() => setShowNameDropdown(prev => !prev)}
-                      className="px-2 py-1 border rounded-lg border-[#225F8B]/80 "
-                    >
-                      ↴
-                    </button>
-                    {showNameDropdown && (
-                      <div className="absolute z-10 mt-1 left-0 bg-white border rounded-lg shadow-lg max-h-60 overflow-y-auto w-56">
-                        <label className="flex items-center px-3 py-1 font-semibold border-b">
-                          <input
-                            type="checkbox"
-                            checked={allEmployeesList.length > 0 && allEmployeesList.every(emp => checkedNames[emp.empName])}
-                            onChange={(e) => setAllNamesChecked(e.target.checked)}
-                            className="mr-2"
-                          />
-                          Select All
-                        </label>
-                        {allEmployeesList.map((emp) => (
-                          <label key={emp.empName} className="flex items-center px-3 py-1">
-                            <input
-                              type="checkbox"
-                              checked={!!checkedNames[emp.empName]}
-                              onChange={() => toggleNameCheck(emp.empName)}
-                              className="mr-2"
-                            />
-                            {emp.empName}
-                          </label>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </th>
-
-                <th className="px-4 py-3 font-semibold text-slate-700">
-                  Emp Code
-                  {/* Codes dropdown with Select All */}
-                  <div className="inline-block relative ml-2">
-                    <button
-                      type="button"
-                      onClick={() => setShowCodeDropdown(prev => !prev)}
-                      className="px-2 py-1 border rounded-lg border-[#225F8B]/80 "
-                    >
-                      ↴
-                    </button>
-                    {showCodeDropdown && (
-                      <div className="absolute z-10 mt-1 left-0 bg-white border rounded-lg shadow-lg max-h-60 overflow-y-auto w-40">
-                        <label className="flex items-center px-3 py-1 font-semibold border-b">
-                          <input
-                            type="checkbox"
-                            checked={allEmployeesList.length > 0 && allEmployeesList.every(emp => checkedCodes[emp.empCode])}
-                            onChange={(e) => setAllCodesChecked(e.target.checked)}
-                            className="mr-2"
-                          />
-                          Select All
-                        </label>
-                        {allEmployeesList.map((emp) => (
-                          <label key={emp.empCode} className="flex items-center px-3 py-1">
-                            <input
-                              type="checkbox"
-                              checked={!!checkedCodes[emp.empCode]}
-                              onChange={() => toggleCodeCheck(emp.empCode)}
-                              className="mr-2"
-                            />
-                            {emp.empCode}
-                          </label>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </th>
-
-                <th className="px-4 py-3 font-semibold text-slate-700 text-center">Status</th>
-                <th className="px-4 py-3 font-semibold text-slate-700 text-center">In Time</th>
-                <th className="px-4 py-3 font-semibold text-slate-700 text-center">Out Time</th>
-                <th className="px-4 py-3 font-semibold text-slate-700 text-center">Late By</th>
-                <th className="px-4 py-3 font-semibold text-slate-700 text-center rounded-tr-lg">Total Working Hours</th>
-              </tr>
-            </thead>
-            <tbody>
-              {employeesToDisplay.length === 0 ? (
-                <tr>
-                  <td colSpan="7" className="text-center py-4 text-slate-600">
-                    No data available. Please select employees or check the selected period.
-                  </td>
-                </tr>
-              ) : (
-                employeesToDisplay.map((employee, index) => (
-                  <tr key={index} className="border-b border-slate-200 last:border-b-0 hover:bg-slate-50 transition-colors duration-150">
-                    <td className="px-4 py-3 font-medium text-slate-900">{employee.empName}</td>
-                    <td className="px-4 py-3 text-slate-600 font-mono">{employee.empCode}</td>
-                    <td className="px-4 py-3 font-bold text-center">
-                      {employee.statusText === 'Present (Late)' ? (
-                        <>
-                          <span className="text-green-500">Present</span>
-                          <span className="text-orange-500"> (Late)</span>
-                        </>
-                      ) : (
-                        <span className={employee.statusColor}>
-                          {employee.statusText}
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-slate-600 font-bold text-center">{employee.inTime}</td>
-                    <td className="px-4 py-3 text-slate-600 font-bold text-center">{employee.outTime}</td>
-                    <td className="px-4 py-3 text-red-500 font-bold text-center">{employee.lateBy}</td>
-                    <td className="px-4 py-3 text-slate-600 font-bold text-center">{employee.totalWorkingHours}</td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      );
-    }
-
     // Month-wise
-    if (reportType === 'month') {
       return (
         <div className="p-6 rounded-xl overflow-x-auto">
          <div className="text-right text-sm text-[#225F8B] mb-2 pr-2">
@@ -631,28 +517,74 @@ const AttendanceReport = () => {
               </tr>
             </thead>
             <tbody>
-              {employeesToDisplay.length === 0 ? (
+              {allEmployeesList.length > 0 ? (
+                employeesToDisplay.length === 0 ? (
+                  <tr>
+                    <td colSpan="5" className="text-center py-4 text-slate-600">
+                      No employees match the current filters.
+                    </td>
+                  </tr>
+                ) : (
+                employeesToDisplay.map((employee, index) => (
+                  <React.Fragment key={index}>
+                    <tr className="border-b border-slate-200 last:border-b-0 hover:bg-slate-50 transition-colors duration-150">
+                      <td className="px-4 py-3 font-medium text-slate-900">
+                        <div className="flex items-center">
+                          <button onClick={() => toggleRow(employee.empCode)} className="mr-2 p-1 rounded-full hover:bg-slate-200">
+                            {expandedRows[employee.empCode] ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                          </button>
+                          {employee.empName}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-slate-600 font-mono">{employee.empCode}</td>
+                      <td className="px-4 py-3 text-slate-600 font-bold text-center">{employee.presentDays}</td>
+                      <td className="px-4 py-3 text-slate-600 font-bold text-center">{employee.absentDays}</td>
+                      <td className="px-4 py-3 text-red-500 font-bold text-center">{employee.lateDays}</td>
+                    </tr>
+                    {expandedRows[employee.empCode] && (
+                      <tr>
+                        <td colSpan="5" className="p-4 bg-slate-50">
+                          <h4 className="font-semibold text-slate-800 mb-2">Detailed Report for {employee.empName}</h4>
+                          <table className="w-full table-auto text-left bg-white rounded-md shadow">
+                            <thead className="bg-sky-100">
+                              <tr>
+                                <th className="px-3 py-2 text-sm font-semibold text-slate-600">Date</th>
+                                <th className="px-3 py-2 text-sm font-semibold text-slate-600 text-center">Status</th>
+                                <th className="px-3 py-2 text-sm font-semibold text-slate-600 text-center">In Time</th>
+                                <th className="px-3 py-2 text-sm font-semibold text-slate-600 text-center">Out Time</th>
+                                <th className="px-3 py-2 text-sm font-semibold text-slate-600 text-center">Late By</th>
+                                <th className="px-3 py-2 text-sm font-semibold text-slate-600 text-center">Total Hours</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {employee.dailyRecords.map(record => (
+                                <tr key={record.date} className="border-b border-slate-100 last:border-b-0">
+                                  <td className="px-3 py-2 text-sm text-slate-700">{record.formattedDate}</td>
+                                  <td className={`px-3 py-2 text-sm font-bold text-center ${record.statusColor}`}>{record.statusText}</td>
+                                  <td className="px-3 py-2 text-sm text-slate-700 text-center">{record.inTime || '-'}</td>
+                                  <td className="px-3 py-2 text-sm text-slate-700 text-center">{record.outTime || '-'}</td>
+                                  <td className="px-3 py-2 text-sm text-red-500 text-center">{record.lateBy || '00:00'}</td>
+                                  <td className="px-3 py-2 text-sm text-slate-700 text-center">{record.totalWorkingHours || '00:00'}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
+                ))
+              )) : (
                 <tr>
                   <td colSpan="5" className="text-center py-4 text-slate-600">
-                    No data available. Please select employees or check the selected period.
+                    No attendance data available for the selected month.
                   </td>
                 </tr>
-              ) : (
-                employeesToDisplay.map((employee, index) => (
-                  <tr key={index} className="border-b border-slate-200 last:border-b-0 hover:bg-slate-50 transition-colors duration-150">
-                    <td className="px-4 py-3 font-medium text-slate-900">{employee.empName}</td>
-                    <td className="px-4 py-3 text-slate-600 font-mono">{employee.empCode}</td>
-                    <td className="px-4 py-3 text-slate-600 font-bold text-center">{employee.presentDays}</td>
-                    <td className="px-4 py-3 text-slate-600 font-bold text-center">{employee.absentDays}</td>
-                    <td className="px-4 py-3 text-red-500 font-bold text-center">{employee.lateDays}</td>
-                  </tr>
-                ))
-              )}
+              ) }
             </tbody>
           </table>
         </div>
       );
-    }
   };
 
   return (
@@ -686,15 +618,10 @@ const AttendanceReport = () => {
             </div>
 
             {/* Cards */}
-            {reportType === 'month' && (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
                 <div className="p-4 rounded-xl shadow-lg border border-slate-200">
                   <h3 className="text-lg font-semibold text-slate-700">Total Employees</h3>
                   <p className="text-3xl font-bold text-[#225F8B] mt-2">{summaryData?.totalEmployees}</p>
-                </div>
-                <div className="p-4 rounded-xl shadow-lg border border-slate-200">
-                  <h3 className="text-lg font-semibold text-slate-700">Selected Month</h3>
-                  <p className="text-3xl font-bold text-[#225F8B] mt-2">{summaryData?.selectedMonth}</p>
                 </div>
                 <div className="p-4 rounded-xl shadow-lg border border-slate-200">
                   <h3 className="text-lg font-semibold text-slate-700">Total Working Days</h3>
@@ -704,61 +631,37 @@ const AttendanceReport = () => {
                   <h3 className="text-lg font-semibold text-slate-700">Total Week Offs</h3>
                   <p className="text-3xl font-bold text-[#225F8B] mt-2">{summaryData?.totalWeekOffs}</p>
                 </div>
+                {/* Holidays Card */}
+                <div className="p-4 rounded-xl shadow-lg border border-slate-200 lg:col-span-2">
+                  <h3 className="text-lg font-semibold text-slate-700">
+                    {summaryData?.selectedMonthName} Holidays
+                  </h3>
+                  {summaryData?.monthHolidays?.length > 0 ? (
+                    <ul className="mt-2 space-y-1 text-sm max-h-24 overflow-y-auto">
+                      {summaryData.monthHolidays.map(holiday => (
+                        <li key={holiday.name} className="flex justify-between">
+                          <span className="font-medium text-[#225F8B]">{holiday.name}</span>
+                          <span className="text-[#225F8B]">{new Date(holiday.date + 'T00:00:00').toLocaleString('default', { month: 'short', day: 'numeric' })}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-sm text-[#225F8B] mt-2">
+                      No holidays in this month.
+                    </p>
+                  )}
+                </div>
               </div>
-            )}
-
-            {reportType === 'day' && (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-                <div className="p-4 rounded-xl shadow-lg border border-slate-200">
-                  <h3 className="text-lg font-semibold text-slate-700">Total Employees</h3>
-                  <p className="text-3xl font-bold text-[#225F8B] mt-2">{summaryData?.totalEmployees}</p>
-                </div>
-                <div className="p-4 rounded-xl shadow-lg border border-slate-200">
-                  <h3 className="text-lg font-semibold text-slate-700">Selected Date</h3>
-                  <p className="text-3xl font-bold text-[#225F8B] mt-2">{summaryData?.selectedDate}</p>
-                </div>
-                <div className="p-4 rounded-xl shadow-lg border border-slate-200">
-                  <h3 className="text-lg font-semibold text-slate-700">Day Status</h3>
-                  <p className={`text-3xl font-bold mt-2 ${summaryData?.isWeekOff ? 'text-red-500' : 'text-[#225F8B]'}`}>
-                    {summaryData?.isWeekOff ? 'Week Off' : 'Working Day'}
-                  </p>
-                </div>
-              </div>
-            )}
 
             {/* Controls */}
             <div className="flex flex-col md:flex-row md:justify-between md:items-center mb-6 space-y-4 md:space-y-0">
               <div className="flex flex-wrap items-center justify-center md:justify-start space-x-2">
-                <button
-                  onClick={() => setReportType('day')}
-                  className={`py-2 px-4 rounded-lg font-semibold transition-colors ${reportType === 'day' ? 'bg-gradient-to-r from-[#225F8B] to-[#225F8B]/80 text-white shadow-md' : 'hover:bg-blue-50 hover:border-[#225F8B]/50 text-gray-700'}`}
-                >
-                  Day-wise
-                </button>
-                <button
-                  onClick={() => setReportType('month')}
-                  className={`py-2 px-4 rounded-lg font-semibold transition-colors ${reportType === 'month' ? 'bg-gradient-to-r from-[#225F8B] to-[#225F8B]/80 text-white shadow-md' : 'hover:bg-blue-50 hover:border-[#225F8B]/50 text-gray-700'}`}
-                >
-                  Month-wise
-                </button>
-
-                {reportType === 'day' && (
-                  <input
-                    type="date"
-                    value={selectedDate.toISOString().substring(0,10)}
-                    onChange={(e) => setSelectedDate(new Date(e.target.value))}
-                    className="p-2 border border-slate-300 rounded-lg shadow-sm"
-                  />
-                )}
-
-                {reportType === 'month' && (
                   <input
                     type="month"
                     value={selectedDate.toISOString().substring(0,7)}
                     onChange={(e) => setSelectedDate(new Date(e.target.value + '-01'))}
                     className="p-2 border border-slate-300 rounded-lg shadow-sm"
                   />
-                )}
               </div>
 
               <div className="flex justify-center ">

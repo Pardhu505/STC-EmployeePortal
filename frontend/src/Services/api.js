@@ -255,33 +255,26 @@ export const managerAPI = {
   // Get attendance report for a manager's team
   // This function was inconsistent with the `fetch` version.
   // The backend likely expects a POST request with a body for this complex query.
-  getManagerAttendanceReport: async ({ manager_code, team_emp_codes, reportType, date, signal }) => {
+  getManagerAttendanceReport: async ({ managerId, teamEmpCodes, year, month, signal }) => {
     try {
       const url = `/attendance-report/manager`;
       const body = {
-        manager_code: manager_code,
-        team_emp_codes: team_emp_codes, // Added team_emp_codes
-        view_type: reportType,
+        manager_code: managerId,
+        team_emp_codes: teamEmpCodes,
+        reportType: 'month', // Hardcode to month as it's the only view now
+        year: year,
+        month: month,
       };
-
-      if (reportType === 'day') {
-        body.date = date.toISOString().split('T')[0];
-      } else { // month
-        body.year = date.getFullYear();
-        body.month = date.getMonth() + 1;
-      }
 
       const response = await api.post(url, body, {
         signal,
       });
       return response.data;
     } catch (error) {
-      console.error(`Error fetching attendance report for manager ${manager_code}:`, error);
+      console.error(`Error fetching attendance report for manager ${managerId}:`, error);
       throw error;
     }
   },
 };
 
 export default api;
-
-

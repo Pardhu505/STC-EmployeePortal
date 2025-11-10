@@ -46,21 +46,3 @@ export function usePageVisibility() {
   return { requestNotificationPermission, showNotificationOnInactive, notificationPermission };
 }
 
-/**
- * Example of how to use this hook in a component:
- *
- * import { usePageVisibility } from './hooks/usePageVisibility';
- *
- * function MyChatComponent() {
- *   const { requestNotificationPermission, showNotificationOnInactive, notificationPermission } = usePageVisibility();
- *
- *   // On new message received:
- *   // showNotificationOnInactive('New Message', { body: 'You have a new message from John Doe.' });
- *
- *   return (
- *     <button onClick={requestNotificationPermission} disabled={notificationPermission !== 'default'}>
- *       Enable Notifications
- *     </button>
- *   );
- * }
- */

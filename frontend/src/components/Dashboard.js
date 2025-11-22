@@ -8,6 +8,7 @@ import UserProfile from './UserProfile';
 import InternalCommunication from './InternalCommunication';
 import AdminPanel from './AdminPanel';
 import AdminRoute from './AdminRoute'; // Import the AdminRoute component
+import Projects from './Projects';
 // import PayslipManagement from './PayslipManagement';
 
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
@@ -203,6 +204,7 @@ const Dashboard = () => {
     switch (activeSection) {
       case 'portals': return <PortalCards />;
       case 'announcements': return <Announcements announcements={announcements} setAnnouncements={setAnnouncements} fetchAnnouncements={fetchAnnouncements} />;
+      case 'projects': return <Projects />;
       case 'profile': return <UserProfile />;
       case 'communication': return <InternalCommunication />;
       case 'admin': 
@@ -231,6 +233,7 @@ const Dashboard = () => {
     // { id: 'payslips', label: 'Payslips', icon: FileText },
     // Use the new isAdmin check from AuthContext to show/hide the Admin Panel button
     ...(isAdmin ? [{ id: 'admin', label: 'Admin Panel', icon: Shield }] : []),
+    { id: 'projects', label: 'Projects', icon: FileText },
     { id: 'profile', label: 'Profile', icon: Users }
   ];
 

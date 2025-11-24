@@ -34,9 +34,11 @@ dist
 
 *token.json*
 *credentials.json*
+service-account-key.json
 
 # Logs and debug files
 npm-debug.log*
+npm_output.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*

@@ -16,7 +16,8 @@ import asyncio
 from bson.json_util import dumps
 from typing import Optional, Any
 # from mock_data_module import DEPARTMENT_DATA
-import urllib.parse 
+import urllib.parse
+import gsheets
 from pydantic import field_validator
 from download_file import router as download_router
 from passlib.context import CryptContext
@@ -1288,7 +1289,6 @@ async def save_google_sheet_url(
     )
     return {"message": "Google Sheet URL saved successfully."}
 
-import gsheets
 # In server.py
 
 @api_router.get("/projects/google-sheet/data")
@@ -1298,9 +1298,14 @@ async def get_google_sheet_data():
         raise HTTPException(status_code=404, detail="Google Sheet URL not configured.")
 
     try:
-        sheets = gsheets.Sheets()
+        creds_json_str = os.environ.get("GOOGLE_SHEETS_CREDENTIALS")
+        if not creds_json_str:
+            raise HTTPException(status_code=500, detail="Google Sheets credentials not configured.")
+
+        creds_dict = json.loads(creds_json_str)
+        sheets = gsheets.Sheets(creds_dict)
         sheet = sheets.get(config["url"])
-        return sheet.to_json()
+        return sheet.to_list()
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch or parse Google Sheet data: {e}")
 

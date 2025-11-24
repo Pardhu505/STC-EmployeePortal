@@ -6,9 +6,11 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Checkbox } from './ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { useToast } from '../../hooks/use-toast';
 
 const Projects = () => {
   const { user } = useAuth();
+  const { toast } = useToast();
   const [showFilters, setShowFilters] = useState(false);
   const [googleSheetUrl, setGoogleSheetUrl] = useState('');
   const [district, setDistrict] = useState('');
@@ -18,6 +20,33 @@ const Projects = () => {
   const [rlb, setRlb] = useState(false);
   const [data, setData] = useState([]);
   const [allData, setAllData] = useState([]);
+  const [districtOptions, setDistrictOptions] = useState([]);
+  const [parliamentOptions, setParliamentOptions] = useState([]);
+  const [assemblyOptions, setAssemblyOptions] = useState([]);
+
+  useEffect(() => {
+    const fetchDataForDropdowns = async () => {
+      if (showFilters && allData.length === 0) {
+        try {
+          const response = await fetch(`${API_BASE_URL}/api/projects/google-sheet/data`);
+          const fetchedData = await response.json();
+          setAllData(fetchedData);
+
+          const districts = [...new Set(fetchedData.map(item => item.district))].filter(Boolean);
+          const parliaments = [...new Set(fetchedData.map(item => item.parliament))].filter(Boolean);
+          const assemblies = [...new Set(fetchedData.map(item => item.assembly))].filter(Boolean);
+
+          setDistrictOptions(districts);
+          setParliamentOptions(parliaments);
+          setAssemblyOptions(assemblies);
+        } catch (error) {
+          console.error('Failed to fetch data for filters', error);
+        }
+      }
+    };
+
+    fetchDataForDropdowns();
+  }, [showFilters, allData.length]);
 
   const handleSaveUrl = async () => {
     try {
@@ -29,32 +58,33 @@ const Projects = () => {
         },
         body: JSON.stringify({ url: googleSheetUrl }),
       });
-      alert('Google Sheet URL saved successfully!');
+      toast({
+        title: "Success",
+        description: "Google Sheet URL saved successfully!",
+      });
     } catch (error) {
       console.error('Failed to save Google Sheet URL', error);
-      alert('Failed to save Google Sheet URL.');
+      toast({
+        title: "Error",
+        description: "Failed to save Google Sheet URL.",
+        variant: "destructive",
+      });
     }
   };
 
-  const handleGetData = async () => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/projects/google-sheet/data`);
-      const fetchedData = await response.json();
-      setAllData(fetchedData);
+  const handleGetData = () => {
+    const filteredData = allData.filter(item => {
+      const ulbMatch = ulb ? item.ulb : false;
+      const rlbMatch = rlb ? item.rlb : false;
 
-      const filteredData = fetchedData.filter(item => {
-        return (
-          (district ? item.district === district : true) &&
-          (parliament ? item.parliament === parliament : true) &&
-          (assembly ? item.assembly === assembly : true) &&
-          (ulb ? item.ulb : true) &&
-          (rlb ? item.rlb : true)
-        );
-      });
-      setData(filteredData);
-    } catch (error) {
-      console.error('Failed to fetch data', error);
-    }
+      return (
+        (district ? item.district === district : true) &&
+        (parliament ? item.parliament === parliament : true) &&
+        (assembly ? item.assembly === assembly : true) &&
+        (!ulb && !rlb ? true : ulbMatch || rlbMatch)
+      );
+    });
+    setData(filteredData);
   };
 
   return (
@@ -91,8 +121,9 @@ const Projects = () => {
                   <SelectValue placeholder="District" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="District A">District A</SelectItem>
-                  <SelectItem value="District B">District B</SelectItem>
+                  {districtOptions.map((option) => (
+                    <SelectItem key={option} value={option}>{option}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
               <Select onValueChange={setParliament}>
@@ -100,8 +131,9 @@ const Projects = () => {
                   <SelectValue placeholder="Parliament Constituency" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Parliament 1">Parliament 1</SelectItem>
-                  <SelectItem value="Parliament 2">Parliament 2</SelectItem>
+                  {parliamentOptions.map((option) => (
+                    <SelectItem key={option} value={option}>{option}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
               <Select onValueChange={setAssembly}>
@@ -109,9 +141,9 @@ const Projects = () => {
                   <SelectValue placeholder="Assembly Constituency" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Assembly X">Assembly X</SelectItem>
-                  <SelectItem value="Assembly Y">Assembly Y</SelectItem>
-                  <SelectItem value="Assembly Z">Assembly Z</SelectItem>
+                  {assemblyOptions.map((option) => (
+                    <SelectItem key={option} value={option}>{option}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

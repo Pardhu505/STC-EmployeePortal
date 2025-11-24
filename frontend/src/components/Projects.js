@@ -3,10 +3,10 @@ import { useAuth } from '../contexts/AuthContext';
 import { API_BASE_URL } from '../config/api';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
-import { Input } from './ui/input';
-import { Checkbox } from './ui/checkbox';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { useToast } from '../../hooks/use-toast';
+import { Input } from '@/components/ui/input';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useToast } from '@/hooks/use-toast';
 
 const Projects = () => {
   const { user } = useAuth();

@@ -20,6 +20,7 @@ const Projects = () => {
   const [rlb, setRlb] = useState(false);
   const [data, setData] = useState([]);
   const [allData, setAllData] = useState([]);
+  const [loading, setLoading] = useState(false);
   const [districtOptions, setDistrictOptions] = useState([]);
   const [parliamentOptions, setParliamentOptions] = useState([]);
   const [assemblyOptions, setAssemblyOptions] = useState([]);
@@ -27,10 +28,12 @@ const Projects = () => {
   useEffect(() => {
     const fetchDataForDropdowns = async () => {
       if (showFilters && allData.length === 0) {
+        setLoading(true);
         try {
           const response = await fetch(`${API_BASE_URL}/api/projects/google-sheet/data`);
           const fetchedData = await response.json();
           setAllData(fetchedData);
+          setData(fetchedData);
 
           const districts = [...new Set(fetchedData.map(item => item.district))].filter(Boolean);
           const parliaments = [...new Set(fetchedData.map(item => item.parliament))].filter(Boolean);
@@ -41,6 +44,8 @@ const Projects = () => {
           setAssemblyOptions(assemblies);
         } catch (error) {
           console.error('Failed to fetch data for filters', error);
+        } finally {
+          setLoading(false);
         }
       }
     };
@@ -74,17 +79,33 @@ const Projects = () => {
 
   const handleGetData = () => {
     const filteredData = allData.filter(item => {
-      const ulbMatch = ulb ? item.ulb : false;
-      const rlbMatch = rlb ? item.rlb : false;
+      const districtMatch = !district || item.district === district;
+      const parliamentMatch = !parliament || item.parliament === parliament;
+      const assemblyMatch = !assembly || item.assembly === assembly;
+      const ulbMatch = ulb ? item.ulb === 'ULB' : false;
+      const rlbMatch = rlb ? item.rlb === 'RLB' : false;
 
-      return (
-        (district ? item.district === district : true) &&
-        (parliament ? item.parliament === parliament : true) &&
-        (assembly ? item.assembly === assembly : true) &&
-        (!ulb && !rlb ? true : ulbMatch || rlbMatch)
-      );
+      if (ulb && rlb) {
+        return districtMatch && parliamentMatch && assemblyMatch && (ulbMatch || rlbMatch);
+      }
+      if (ulb) {
+        return districtMatch && parliamentMatch && assemblyMatch && ulbMatch;
+      }
+      if (rlb) {
+        return districtMatch && parliamentMatch && assemblyMatch && rlbMatch;
+      }
+      return districtMatch && parliamentMatch && assemblyMatch;
     });
     setData(filteredData);
+  };
+
+  const handleClearFilters = () => {
+    setDistrict('');
+    setParliament('');
+    setAssembly('');
+    setUlb(false);
+    setRlb(false);
+    setData(allData);
   };
 
   return (
@@ -157,9 +178,14 @@ const Projects = () => {
                 <label htmlFor="rlb">RLB</label>
               </div>
             </div>
-            <Button onClick={handleGetData} className="mt-4">Get Data</Button>
+            <div className="flex gap-2">
+              <Button onClick={handleGetData} className="mt-4">Get Data</Button>
+              <Button onClick={handleClearFilters} className="mt-4">Clear Filters</Button>
+            </div>
 
-            {data.length > 0 && (
+            {loading ? (
+              <p>Loading...</p>
+            ) : data.length > 0 ? (
               <table className="w-full mt-4">
                 <thead>
                   <tr>
@@ -184,6 +210,8 @@ const Projects = () => {
                   ))}
                 </tbody>
               </table>
+            ) : (
+              <p>No data found for the selected filters.</p>
             )}
           </CardContent>
         </Card>

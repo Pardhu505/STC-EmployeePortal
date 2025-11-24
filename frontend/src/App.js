@@ -7,6 +7,7 @@ import Login from "./components/Login";
 import Dashboard from "./components/Dashboard";
 import Signup from "./components/signup";
 import LoadingSpinner from "./LoadingSpinner";
+import Projects from "./components/Projects";
 
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth();
@@ -48,6 +49,11 @@ function App() {
               <Route path="/dashboard" element={
                 <ProtectedRoute>
                   <Dashboard />
+                </ProtectedRoute>
+              } />
+              <Route path="/projects" element={
+                <ProtectedRoute>
+                  <Projects />
                 </ProtectedRoute>
               } />
               <Route path="/" element={<Navigate to="/dashboard" />} />

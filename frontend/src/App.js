@@ -4,9 +4,10 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { Toaster } from "./components/ui/toaster";
 import Login from "./components/Login";
-import Dashboard from "./components/Dashboard";
-import Signup from "./components/signup";
-import LoadingSpinner from "./LoadingSpinner";
+import Dashboard from "@/components/Dashboard";
+import Signup from "@/components/signup";
+import LoadingSpinner from "@/LoadingSpinner";
+import APMapping from "@/components/APMapping";
 
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth();
@@ -48,6 +49,11 @@ function App() {
               <Route path="/dashboard" element={
                 <ProtectedRoute>
                   <Dashboard />
+                </ProtectedRoute>
+              } />
+              <Route path="/ap-mapping" element={
+                <ProtectedRoute>
+                  <APMapping />
                 </ProtectedRoute>
               } />
               <Route path="/" element={<Navigate to="/dashboard" />} />

@@ -37,6 +37,7 @@ dist
 service-account-key.json
 
 # Logs and debug files
+*.log
 npm-debug.log*
 npm_output.log*
 yarn-debug.log*

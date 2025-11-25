@@ -1271,44 +1271,6 @@ async def delete_message_permanently(message_id: str, admin_user: dict = Depends
         return {"message": "Message permanently deleted successfully"}
     except HTTPException:
         raise
-class GoogleSheetURL(BaseModel):
-    url: HttpUrl
-
-@api_router.post("/projects/google-sheet")
-async def save_google_sheet_url(
-    data: GoogleSheetURL,
-    user: dict = Depends(get_current_admin_user)
-):
-    if user.get("email") != "pardhasaradhi@showtimeconsulting.in":
-        raise HTTPException(status_code=403, detail="Not authorized to perform this action")
-
-    await stc_db.google_sheet_config.update_one(
-        {"_id": "google_sheet_url"},
-        {"$set": {"url": str(data.url)}},
-        upsert=True
-    )
-    return {"message": "Google Sheet URL saved successfully."}
-
-# In server.py
-
-@api_router.get("/projects/google-sheet/data")
-async def get_google_sheet_data():
-    config = await stc_db.google_sheet_config.find_one({"_id": "google_sheet_url"})
-    if not config or "url" not in config:
-        raise HTTPException(status_code=404, detail="Google Sheet URL not configured.")
-
-    try:
-        creds_json_str = os.environ.get("GOOGLE_SHEETS_CREDENTIALS")
-        if not creds_json_str:
-            raise HTTPException(status_code=500, detail="Google Sheets credentials not configured.")
-
-        creds_dict = json.loads(creds_json_str)
-        sheets = gsheets.Sheets(creds_dict)
-        sheet = sheets.get(config["url"])
-        return sheet.to_list()
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to fetch or parse Google Sheet data: {e}")
-
 @api_router.post("/messages/{message_id}/delete-everyone")
 async def delete_message_for_everyone(
     message_id: str,

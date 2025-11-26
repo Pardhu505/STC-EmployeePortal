@@ -228,7 +228,7 @@ const Dashboard = () => {
   const navigationItems = [
     { id: 'portals', label: 'Portal Access', icon: BarChart3 },
     { id: 'announcements', label: 'Announcements', icon: Bell },
-    { id: 'projects', label: 'Projects', icon: MapIcon },
+    { id: 'projects', label: 'Projects', icon: Map },
     { id: 'communication', label: 'Communication', icon: MessageSquare },
     { id: 'attendance', label: user?.isAdmin ? 'Attendance Report' : 'Attendance', icon: CalendarCheck },
     // { id: 'payslips', label: 'Payslips', icon: FileText },

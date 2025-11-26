@@ -13,7 +13,7 @@ import AdminRoute from './AdminRoute'; // Import the AdminRoute component
 
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
-import { Calendar, Users, BarChart3, Bell, MessageSquare, Gift, Shield, FileText, CalendarCheck } from 'lucide-react';
+import { Calendar, Users, BarChart3, Bell, MessageSquare, Gift, Shield, FileText, CalendarCheck,Map as MapIcon } from 'lucide-react';
 import EAttendance from './EMPAttedence';
 import ManagerReport from './Manger Attendence';
 import AttendanceReport from './AdminAttedenceReport';

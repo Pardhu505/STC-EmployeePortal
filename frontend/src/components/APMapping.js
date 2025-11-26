@@ -31,30 +31,68 @@ const APMapping = () => {
 
   const fetchData = async (url, sheetName, setDataCallback, setFilteredDataCallback) => {
     setLoading(true);
-    setError(null); // Reset error state on new fetch
+    setError(null);
+
+    // Resolve base URL safely
+    const base = (typeof API_BASE_URL === 'string' && API_BASE_URL.trim()) ? API_BASE_URL.replace(/\/$/, '') : window?.location?.origin || '';
+
+    if (!base) {
+      console.error('API base URL is not defined. Check frontend/src/config/api.js');
+      setError('Frontend configuration error: API base URL is not defined.');
+      setLoading(false);
+      return;
+    }
+
     try {
-      const response = await fetch(`${API_BASE_URL}/api/sheets/data`, {
+      const payload = {
+        // send both keys to be compatible with different backend implementations
+        url,
+        sheet_url: url,
+        sheet_name: sheetName,
+      };
+
+      const response = await fetch(`${base}/api/sheets/data`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url, sheet_name: sheetName }),
+        body: JSON.stringify(payload),
       });
 
-      // Always try to parse the JSON body to get backend error details
-      const data = await response.json();
-
-      if (!response.ok) {
-        // Use the detailed error message from the backend if available
-        throw new Error(data.detail || `Failed to fetch data. Status: ${response.status}`);
+      // Try parsing JSON safely
+      let json = null;
+      try {
+        json = await response.json();
+      } catch (parseErr) {
+        // response had no JSON body
+        console.error('Failed to parse JSON from response', parseErr);
+        json = null;
       }
 
-      // If response is OK, set the data
-      setDataCallback(data);
-      setFilteredDataCallback(data);
+      if (!response.ok) {
+        const backendMsg = json && (json.detail || json.error || json.message);
+        throw new Error(backendMsg || `Failed to fetch data. Status: ${response.status}`);
+      }
 
-    } catch (error) {
-      console.error("Error fetching sheet data:", error);
-      // Set the error state with the detailed message
-      setError(error.message);
+      // Normalize response shape: prefer direct array, otherwise json.data or json.rows
+      let rows = [];
+      if (Array.isArray(json)) {
+        rows = json;
+      } else if (json && Array.isArray(json.data)) {
+        rows = json.data;
+      } else if (json && Array.isArray(json.rows)) {
+        rows = json.rows;
+      } else if (json && typeof json === 'object') {
+        // try to find the first array property
+        const arrProp = Object.values(json).find(v => Array.isArray(v));
+        if (Array.isArray(arrProp)) rows = arrProp;
+      }
+
+      if (!Array.isArray(rows)) rows = [];
+
+      setDataCallback(rows);
+      setFilteredDataCallback(rows);
+    } catch (err) {
+      console.error("Error fetching sheet data:", err);
+      setError(err.message || 'Unknown error fetching sheet data');
     } finally {
       setLoading(false);
     }
@@ -64,18 +102,19 @@ const APMapping = () => {
     // Pass null for sheetName to allow the backend to parse the GID from the URL
     fetchData(rlbSheetUrl, null, setRlbData, setFilteredRlbData);
     fetchData(ulbSheetUrl, null, setUlbData, setFilteredUlbData);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleRlbFilter = () => {
-    let data = rlbData;
+    let data = Array.isArray(rlbData) ? rlbData : [];
     if (rlbDistrict) {
-      data = data.filter(row => row.District === rlbDistrict);
+      data = data.filter(row => row && row.District === rlbDistrict);
     }
     if (rlbParliament) {
-      data = data.filter(row => row['Parliament Constituency'] === rlbParliament);
+      data = data.filter(row => row && row['Parliament Constituency'] === rlbParliament);
     }
     if (rlbAssembly) {
-      data = data.filter(row => row['Assembly Constituency'] === rlbAssembly);
+      data = data.filter(row => row && row['Assembly Constituency'] === rlbAssembly);
     }
     setFilteredRlbData(data);
   };
@@ -84,16 +123,16 @@ const APMapping = () => {
     setRlbDistrict('');
     setRlbParliament('');
     setRlbAssembly('');
-    setFilteredRlbData(rlbData);
+    setFilteredRlbData(Array.isArray(rlbData) ? rlbData : []);
   };
 
   const handleUlbFilter = () => {
-    let data = ulbData;
+    let data = Array.isArray(ulbData) ? ulbData : [];
     if (ulbDistrict) {
-      data = data.filter(row => row.District === ulbDistrict);
+      data = data.filter(row => row && row.District === ulbDistrict);
     }
     if (ulbName) {
-      data = data.filter(row => row['Urban Local Body Name'] === ulbName);
+      data = data.filter(row => row && row['Urban Local Body Name'] === ulbName);
     }
     setFilteredUlbData(data);
   };
@@ -101,15 +140,15 @@ const APMapping = () => {
   const clearUlbFilters = () => {
     setUlbDistrict('');
     setUlbName('');
-    setFilteredUlbData(ulbData);
+    setFilteredUlbData(Array.isArray(ulbData) ? ulbData : []);
   };
 
   const renderTable = (data) => {
     if (loading) return <p>Loading...</p>;
     if (error) return <p className="text-red-500">Error: {error}</p>;
-    if (!data.length) return <p>No data available.</p>;
+    if (!Array.isArray(data) || data.length === 0) return <p>No data available.</p>;
 
-    const headers = Object.keys(data[0]);
+    const headers = Object.keys(data[0] || {});
     return (
       <div className="overflow-x-auto">
         <table className="min-w-full bg-white border">
@@ -121,7 +160,7 @@ const APMapping = () => {
           <tbody>
             {data.map((row, index) => (
               <tr key={index}>
-                {headers.map(header => <td key={header} className="py-2 px-4 border-b">{row[header]}</td>)}
+                {headers.map(header => <td key={header} className="py-2 px-4 border-b">{row ? row[header] : ''}</td>)}
               </tr>
             ))}
           </tbody>
@@ -132,7 +171,8 @@ const APMapping = () => {
 
   // Get unique values for dropdowns
   const getUniqueValues = (data, key) => {
-    return [...new Set(data.map(item => item[key]))].filter(Boolean);
+    if (!Array.isArray(data)) return [];
+    return [...new Set(data.map(item => item && item[key]).filter(Boolean))];
   };
 
   return (

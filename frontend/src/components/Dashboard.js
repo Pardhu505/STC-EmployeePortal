@@ -13,7 +13,7 @@ import AdminRoute from './AdminRoute'; // Import the AdminRoute component
 
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
-import { Calendar, Users, BarChart3, Bell, MessageSquare, Gift, Shield, FileText, CalendarCheck } from 'lucide-react';
+import { Calendar, Users, BarChart3, Bell, MessageSquare, Gift, Shield, FileText, CalendarCheck,Map as MapIcon } from 'lucide-react';
 import EAttendance from './EMPAttedence';
 import ManagerReport from './Manger Attendence';
 import AttendanceReport from './AdminAttedenceReport';
@@ -228,7 +228,7 @@ const Dashboard = () => {
   const navigationItems = [
     { id: 'portals', label: 'Portal Access', icon: BarChart3 },
     { id: 'announcements', label: 'Announcements', icon: Bell },
-    { id: 'projects', label: 'Projects', icon: Map },
+    { id: 'projects', label: 'Projects', icon: MapIcon },
     { id: 'communication', label: 'Communication', icon: MessageSquare },
     { id: 'attendance', label: user?.isAdmin ? 'Attendance Report' : 'Attendance', icon: CalendarCheck },
     // { id: 'payslips', label: 'Payslips', icon: FileText },

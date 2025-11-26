@@ -1,13 +1,31 @@
 import gsheets
+import re
 
-def get_data_from_sheet(spreadsheet_url, sheet_name):
+def _get_gid_from_url(url):
+    """Extracts the gid from a Google Sheets URL."""
+    match = re.search(r'[#&]gid=(\d+)', url)
+    if match:
+        return int(match.group(1))
+    return 0  # Default to the first sheet
+
+def get_data_from_sheet(spreadsheet_url, sheet_name=None):
     """
     Connects to Google Sheets and fetches data from a specific sheet.
     """
     # The service account key is expected to be in an environment variable.
     gs = gsheets.connect()
     sheet = gs.url(spreadsheet_url)
-    worksheet = sheet.worksheet(sheet_name)
+
+    if sheet_name is None:
+        gid = _get_gid_from_url(spreadsheet_url)
+        try:
+            worksheet = sheet.worksheet(gid=gid)
+        except Exception:
+            # Fallback to the first sheet if gid is not found
+            worksheet = sheet.worksheet(0)
+    else:
+        worksheet = sheet.worksheet(sheet_name)
+
     data = worksheet.to_frame()
     return data.to_dict(orient='records')
 

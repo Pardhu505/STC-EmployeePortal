@@ -15,6 +15,7 @@ const APMapping = () => {
   const [filteredRlbData, setFilteredRlbData] = useState([]);
   const [filteredUlbData, setFilteredUlbData] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
   // RLB Filters
   const [rlbDistrict, setRlbDistrict] = useState('');
@@ -40,10 +41,16 @@ const APMapping = () => {
         throw new Error('Failed to fetch data');
       }
       const data = await response.json();
-      setDataCallback(data);
-      setFilteredDataCallback(data);
+      if (response.ok) {
+        setDataCallback(data);
+        setFilteredDataCallback(data);
+        setError(null);
+      } else {
+        throw new Error(data.detail || 'Failed to fetch data');
+      }
     } catch (error) {
       console.error("Error fetching sheet data:", error);
+      setError(error.message);
     } finally {
       setLoading(false);
     }
@@ -94,6 +101,7 @@ const APMapping = () => {
 
   const renderTable = (data) => {
     if (loading) return <p>Loading...</p>;
+    if (error) return <p className="text-red-500">Error: {error}</p>;
     if (!data.length) return <p>No data available.</p>;
 
     const headers = Object.keys(data[0]);

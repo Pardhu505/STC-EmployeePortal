@@ -887,7 +887,7 @@ async def health_check():
 
 class SheetRequest(BaseModel):
     url: str
-    sheet_name: Union[str, int]
+    sheet_name: Optional[Union[str, int]] = None
 
 @api_router.post("/sheets/data")
 async def get_sheet_data(request: SheetRequest):

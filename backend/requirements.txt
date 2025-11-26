@@ -44,3 +44,4 @@ blinker>=1.7.0  # Signal system for events
 marshmallow>=3.20.0  # Data serialization
 apispec>=6.3.0  # API documentation
 gsheets>=0.4.2
+pandas>=2.2.0

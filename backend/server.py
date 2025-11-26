@@ -30,6 +30,8 @@ from database import (
     main_client, attendance_client
 )
 
+from sheets import get_data_from_sheet
+
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
@@ -882,6 +884,23 @@ def serialize_document(obj):
 @api_router.get("/health")
 async def health_check():
     return {"status": "ok"}
+
+class SheetRequest(BaseModel):
+    url: str
+    sheet_name: Optional[Union[str, int]] = None
+
+@api_router.post("/sheets/data")
+async def get_sheet_data(request: SheetRequest):
+    """
+    Fetches data from a Google Sheet.
+    The service account key should be set as GOOGLE_SHEETS_CREDENTIALS environment variable.
+    """
+    try:
+        data = get_data_from_sheet(request.url, request.sheet_name)
+        return data
+    except Exception as e:
+        logging.error(f"Failed to fetch sheet data: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to fetch sheet data: {e}")
 
 @api_router.get("/")
 async def root():

@@ -31,25 +31,29 @@ const APMapping = () => {
 
   const fetchData = async (url, sheetName, setDataCallback, setFilteredDataCallback) => {
     setLoading(true);
+    setError(null); // Reset error state on new fetch
     try {
       const response = await fetch(`${API_BASE_URL}/api/sheets/data`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url, sheet_name: sheetName }),
       });
-      if (!response.ok) {
-        throw new Error('Failed to fetch data');
-      }
+
+      // Always try to parse the JSON body to get backend error details
       const data = await response.json();
-      if (response.ok) {
-        setDataCallback(data);
-        setFilteredDataCallback(data);
-        setError(null);
-      } else {
-        throw new Error(data.detail || 'Failed to fetch data');
+
+      if (!response.ok) {
+        // Use the detailed error message from the backend if available
+        throw new Error(data.detail || `Failed to fetch data. Status: ${response.status}`);
       }
+
+      // If response is OK, set the data
+      setDataCallback(data);
+      setFilteredDataCallback(data);
+
     } catch (error) {
       console.error("Error fetching sheet data:", error);
+      // Set the error state with the detailed message
       setError(error.message);
     } finally {
       setLoading(false);
@@ -57,8 +61,9 @@ const APMapping = () => {
   };
 
   useEffect(() => {
-    fetchData(rlbSheetUrl, 0, setRlbData, setFilteredRlbData);
-    fetchData(ulbSheetUrl, 0, setUlbData, setFilteredUlbData);
+    // Pass null for sheetName to allow the backend to parse the GID from the URL
+    fetchData(rlbSheetUrl, null, setRlbData, setFilteredRlbData);
+    fetchData(ulbSheetUrl, null, setUlbData, setFilteredUlbData);
   }, []);
 
   const handleRlbFilter = () => {

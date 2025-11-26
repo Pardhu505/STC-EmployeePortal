@@ -899,7 +899,8 @@ async def get_sheet_data(request: SheetRequest):
         data = get_data_from_sheet(request.url, request.sheet_name)
         return data
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logging.error(f"Failed to fetch sheet data: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to fetch sheet data: {e}")
 
 @api_router.get("/")
 async def root():

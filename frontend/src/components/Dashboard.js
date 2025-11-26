@@ -5,6 +5,7 @@ import Header from './Header';
 import PortalCards from './PortalCards';
 import Announcements from './Announcements';
 import UserProfile from './UserProfile';
+import Projects from '@/components/Projects';
 import InternalCommunication from './InternalCommunication';
 import AdminPanel from './AdminPanel';
 import AdminRoute from './AdminRoute'; // Import the AdminRoute component
@@ -203,6 +204,7 @@ const Dashboard = () => {
     switch (activeSection) {
       case 'portals': return <PortalCards />;
       case 'announcements': return <Announcements announcements={announcements} setAnnouncements={setAnnouncements} fetchAnnouncements={fetchAnnouncements} />;
+      case 'projects': return <Projects />;
       case 'profile': return <UserProfile />;
       case 'communication': return <InternalCommunication />;
       case 'admin': 
@@ -226,6 +228,7 @@ const Dashboard = () => {
   const navigationItems = [
     { id: 'portals', label: 'Portal Access', icon: BarChart3 },
     { id: 'announcements', label: 'Announcements', icon: Bell },
+    { id: 'projects', label: 'Projects', icon: Map },
     { id: 'communication', label: 'Communication', icon: MessageSquare },
     { id: 'attendance', label: user?.isAdmin ? 'Attendance Report' : 'Attendance', icon: CalendarCheck },
     // { id: 'payslips', label: 'Payslips', icon: FileText },

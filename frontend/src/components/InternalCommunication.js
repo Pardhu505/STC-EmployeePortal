@@ -33,7 +33,8 @@ import {
   ArrowLeft,
   MoreVertical,
   Circle,
-  X
+  X,
+  Check
 } from 'lucide-react';
 import {
   // COMMUNICATION_CHANNELS, // Now fetched from API
@@ -42,10 +43,26 @@ import {
 } from '../data/mock';
 import { employeeAPI } from '../Services/api';
 import DirectChat from './DirectChat'; // This component will handle the 1-on-1 chat
+import chatImage from '../data/chat.jpg'; // Import the placeholder image
 import ChatInput from './ChatInput'; // Extracted input logic for reusability
 
+const MessageStatus = ({ status }) => {
+  // In channel chat, we only show the 'sent' status (single tick).
+  // The logic is simplified to just show one tick if the status is 'sent'.
+  if (status !== 'sent') {
+    return null;
+  }
+
+  return (
+    <div className="relative flex items-center w-4 h-4">
+      {/* Single grey tick for sent */}
+      <Check className="absolute left-0 h-4 w-4 text-gray-400" />
+    </div>
+  );
+};
+
 const InternalCommunication = () => {
-  const { user, sendWebSocketMessage, userStatuses, setCurrentChannel, setCurrentChatUser, showNotification, requestNotificationPermission, newMessages, setNewMessages, allChannels, allEmployees, navigationTarget } = useAuth();
+  const { user, sendWebSocketMessage, userStatuses, setCurrentChannel, setCurrentChatUser, showNotification, requestNotificationPermission, newMessages, setNewMessages, allChannels, allEmployees, navigationTarget, clearChatNotifications } = useAuth();
   const [selectedChannel, setSelectedChannel] = useState(null);
   const [channels, setChannels] = useState([]);
   const [messages, setMessages] = useState([]); // Messages will come from WebSocket and API
@@ -59,17 +76,43 @@ const InternalCommunication = () => {
   const [selectedFile, setSelectedFile] = useState(null);
   const [showOldChats, setShowOldChats] = useState(false);
   const messagesEndRef = useRef(null);
+  const [unreadCounts, setUnreadCounts] = useState({});
   const fileInputRef = useRef(null);
   
   // Use a ref to track the selected channel to avoid stale closures in the WebSocket listener
   const selectedChannelRef = useRef(selectedChannel);
   selectedChannelRef.current = selectedChannel;
+  const [reactionPopup, setReactionPopup] = useState({
+    open: false,
+    emoji: null,
+    users: [],
+  });
   const [replyTo, setReplyTo] = useState(null);
 
   // Use pre-fetched data from AuthContext
   useEffect(() => {
     setAllEmployeesList(allEmployees);
   }, [allEmployees]);
+
+  // Fetch unread counts from the backend
+  const fetchUnreadCounts = useCallback(async () => {
+    if (user?.email) {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/messages/unread-count?user_id=${user.email}`);
+        if (response.ok) {
+          const counts = await response.json();
+          setUnreadCounts(counts);
+        }
+      } catch (error) {
+        console.error("Failed to fetch unread counts:", error);
+      }
+    }
+  }, [user?.email]);
+
+  useEffect(() => {
+    fetchUnreadCounts();
+  }, [fetchUnreadCounts]); // Only fetch on initial load
+
 
   // Format channels and calculate member counts in a single effect
   useEffect(() => {
@@ -101,42 +144,10 @@ const InternalCommunication = () => {
   useEffect(() => {
     if (!user || channels.length === 0) return; // Wait for user and channels to be ready
 
-    const savedChannelName = localStorage.getItem('selectedChannelName');
-    let channel;
-    if (savedChannelName) {
-      channel = channels.find(c => c.name === savedChannelName);
-      if (channel) {
-        console.log('Restoring selected channel from localStorage:', channel);
-        setSelectedChannel(channel);
-      } else {
-        channel = channels[0];
-        setSelectedChannel(channel);
-      }
-    } else {
-      channel = channels[0];
-      setSelectedChannel(channel);
-    }
+    // Do NOT auto-select any channel on load.
+    // This ensures the placeholder is shown until the user makes a selection.
+    setSelectedChannel(null);
 
-    // Fetch old messages for the channel
-    const fetchMessages = async () => {
-      if (channel) {
-        try {
-          console.log('Fetching messages for channel:', channel.name, 'for user:', user.email);
-          const response = await fetch(`${API_BASE_URL}/api/channel-messages?channel_id=${channel.name}&user_id=${user.email}&limit=50`);
-          console.log('Fetch response status:', response.status);
-          if (response.ok) {
-            const oldMessages = await response.json();
-            console.log('Fetched old messages:', oldMessages);
-            setMessages(oldMessages);
-          } else {
-            console.error('Failed to fetch messages:', response.statusText);
-          }
-        } catch (error) {
-          console.error('Error fetching messages:', error);
-        }
-      }
-    };
-    fetchMessages();
   }, [user?.email, channels]);
 
   useEffect(() => {
@@ -212,28 +223,33 @@ const InternalCommunication = () => {
       const incomingMessage = event.detail;
       console.log("InternalCommunication received WS message:", incomingMessage);
 
+      // CANCEL NOTIFICATION IF USER IS CURRENTLY VIEWING THIS CHANNEL
+      if (
+        incomingMessage.type === "channel_message" &&
+        incomingMessage.channel_id === selectedChannelRef.current?.name
+      ) {
+        // Do NOT notify; user is inside this channel
+        // The message will still be processed and added to the view below.
+        // return; // This was the original instruction, but we need to process the message to display it. The check is good for clarity.
+      }
+
       if (incomingMessage.type === 'channel_message') {
         // This is a channel message. We need to check if it belongs to the currently selected channel.
         // Use the ref to get the current channel without causing re-renders or stale state.
         const currentSelectedChannel = selectedChannelRef.current;
         if (currentSelectedChannel && (incomingMessage.channel_id === currentSelectedChannel.name || incomingMessage.recipient_id === currentSelectedChannel.name)) {
-          // The message is for the currently open channel, so we update the messages state.
+          // Message for the currently open channel, add it to the view.
           setMessages(prevMessages => {
             const isDuplicate = prevMessages.some(m => m.id === incomingMessage.id);
             if (isDuplicate) return prevMessages;
-
-            // Replace optimistic message if it exists
-            const optimisticIndex = prevMessages.findIndex(m => m.isOptimistic && m.sender_id === incomingMessage.sender_id && m.content === incomingMessage.content);
-            if (optimisticIndex !== -1) {
-              const newMessages = [...prevMessages];
-              newMessages[optimisticIndex] = incomingMessage;
-              return newMessages;
-            }
             return [...prevMessages, incomingMessage];
           });
+          // No need to fetch counts; the backend will push an 'unread_count_update' event.
         } else {
-          // Message for a different channel, could update a notification badge here.
-          console.log(`Received message for other channel: ${incomingMessage.channel_id || incomingMessage.recipient_id}`);
+          // Message for a different channel. The badge is handled by AuthContext.
+          // The backend will push an 'unread_count_update' event to update the badge.
+          // No need to add it to the current `messages` state.
+          console.log(`Received message for other channel: ${incomingMessage.channel_id}`);
         }
       } else if (incomingMessage.type === 'personal_message') {
         // This is a direct message. It's handled in the DirectChat component.
@@ -242,16 +258,15 @@ const InternalCommunication = () => {
         // Handle missed messages sent upon reconnection
         const missed = incomingMessage.messages || [];
         console.log(`Received ${missed.length} missed messages`);
-        setMessages(prevMessages => {
-          const newMessages = [...prevMessages];
-          missed.forEach(missedMsg => {
-            if (!newMessages.some(m => m.id === missedMsg.id)) {
-              newMessages.push(missedMsg);
+        // These messages are already in the `newMessages` state via AuthContext.
+        // We just need to merge them into the current view if the channel matches.
+        const currentSelectedChannel = selectedChannelRef.current;
+        if (currentSelectedChannel) {
+            const relevantMissedMessages = missed.filter(msg => msg.channel_id === currentSelectedChannel.name);
+            if (relevantMissedMessages.length > 0) {
+                setMessages(prev => [...prev, ...relevantMissedMessages].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp)));
             }
-          });
-          newMessages.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
-          return newMessages;
-        });
+        }
       } else if (incomingMessage.type === 'reaction_update') {
         console.log("InternalCommunication received reaction update:", incomingMessage);
         setMessages(prevMessages => prevMessages.map(msg =>
@@ -267,6 +282,18 @@ const InternalCommunication = () => {
               : msg
           )
         );
+      } else if (incomingMessage.type === 'message_confirmation') {
+        // Server confirms a channel message is saved (✔ single tick)
+        setMessages(prev =>
+          prev.map(m =>
+            m.id === incomingMessage.optimistic_id
+              ? { ...m, id: incomingMessage.final_id, timestamp: incomingMessage.timestamp, isOptimistic: false, status: 'sent' }
+              : m)
+        );
+      } else if (incomingMessage.type === 'unread_count_update') {
+        // Server pushed new unread counts, update the state directly.
+        console.log("Received unread_count_update from WS:", incomingMessage.counts);
+        setUnreadCounts(incomingMessage.counts);
       }
     };
 
@@ -278,26 +305,15 @@ const InternalCommunication = () => {
 
   // Scroll to bottom on new messages
   useEffect(() => {
-    if (messages.length > 0) {
-      // Trigger a browser notification for new messages from other users
-      const latestMessage = messages[messages.length - 1];
-          if (latestMessage.sender_id !== user?.email && user?.email) {
-            // Disabled alert notifications for channel messages as per request
-            // showNotification(`New message from ${latestMessage.sender_name}`, {
-            //   body: latestMessage.content,
-            //   icon: "/favicon.ico",
-            // });
-          }
-        }
-      }, [messages, user?.email, showNotification]);
+    const chatContainer = messagesEndRef.current?.parentElement;
+    if (!chatContainer) return;
 
+    // Only auto-scroll if the user is already near the bottom
+    const isScrolledToBottom = chatContainer.scrollHeight - chatContainer.clientHeight <= chatContainer.scrollTop + 100;
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
-
-  useEffect(() => {
-    scrollToBottom();
+    if (isScrolledToBottom) {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
   }, [messages]);
 
 // In InternalCommunication.js
@@ -364,6 +380,18 @@ const handleDeleteMessages = async () => {
   } catch (error) {
     alert('Error clearing chat.');
   }
+};
+
+const handleReactionClick = (message, emoji) => {
+  const reactionUsers = message.reactions
+     .filter(r => r.reaction_type === emoji)
+     .map(r => r.user_id);
+
+  setReactionPopup({
+    open: true,
+    emoji,
+    users: reactionUsers,
+  });
 };
 
 
@@ -454,6 +482,22 @@ const handleDeleteMessages = async () => {
   const handleEmployeeClick = (employee) => {
     setSelectedEmployee(employee); // employee object should have an 'id' or 'Email ID'
     setViewMode('directChat');
+
+    // Instantly clear notifications for this user from the notification center.
+    clearChatNotifications(employee.email, false);
+    
+    // Clear unread count for this user
+    // This is now the ONLY state update needed. It will trigger a re-render
+    // and the unreadCounts will be recalculated correctly.
+    // Mark ALL messages from this user as read
+    sendWebSocketMessage({
+        type: "mark_messages_read",
+        message_ids: newMessages
+          .filter(msg => msg.sender_id === employee.email)
+          .map(m => m.id),
+        chat_partner_id: employee.email
+    });
+    
     // Persist the view mode and selected user for better UX on refresh
     localStorage.setItem('viewMode', 'directChat');
     localStorage.setItem('selectedEmployeeId', employee.email); // Use email as the unique ID
@@ -531,6 +575,7 @@ const handleDeleteMessages = async () => {
       type: 'channel_message',
       isOptimistic: true,
       reactions: [],
+      status: 'sending', // Initial status
       file_name: file ? file.file_name : null,
       file_type: file ? file.file_type : null,
       file_size: file ? file.file_size : null,
@@ -610,7 +655,7 @@ const handleDeleteMessages = async () => {
   };
 
   const renderSidebar = () => (
-    <div className={`w-full md:w-80 bg-white/90 backdrop-blur-sm border-r border-gray-200 flex flex-col ${selectedChannel ? 'hidden md:flex' : 'flex'}`}>
+    <div className={`w-full md:w-80 bg-white/90 backdrop-blur-sm border-r border-gray-200 flex flex-col ${selectedChannel || selectedEmployee ? 'hidden md:flex' : 'flex'}`}>
       <div className="p-4 border-b border-gray-200">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-bold text-gray-900">ShowTime Chat</h2>
@@ -692,13 +737,26 @@ const handleDeleteMessages = async () => {
                   }`}
                   onClick={() => {
                     setSelectedChannel(channel);
+                    clearChatNotifications(channel.name, true);
                     localStorage.setItem('selectedChannelName', channel.name);
                     fetchMessagesForChannel(channel);
+                    // Clear unread count for this channel by updating the central state
+                    sendWebSocketMessage({
+                      type: 'mark_messages_read',
+                      // We no longer send message_ids for channels.
+                      // The backend will mark all messages in this channel as read for the user.
+                      channel_id: channel.name,
+                    });
                   }}
                 >
-                  <div className="flex items-center space-x-2 w-full">
-                    <Hash className="h-4 w-4" />
-                    <span className="font-medium">{channel.name}</span>
+                  <div className="flex items-center justify-between w-full">
+                    <div className="flex items-center space-x-2">
+                      <Hash className="h-4 w-4" />
+                      <span className="font-medium">{channel.name}</span>
+                      {unreadCounts[channel.name] > 0 && (
+                        <Badge className="bg-[#225F8B] text-white rounded-full h-5 w-5 p-0 flex items-center justify-center">{unreadCounts[channel.name]}</Badge>
+                      )}
+                    </div>
                     <span className="text-xs text-gray-500 ml-auto">{channel.memberCount}</span>
                   </div>
                 </Button>
@@ -720,13 +778,24 @@ const handleDeleteMessages = async () => {
                   }`}
                   onClick={() => {
                     setSelectedChannel(channel);
+                    clearChatNotifications(channel.name, true);
                     localStorage.setItem('selectedChannelName', channel.name);
                     fetchMessagesForChannel(channel);
+                    // Clear unread count for this channel by updating the central state
+                    sendWebSocketMessage({
+                      type: 'mark_messages_read',
+                      channel_id: channel.name,
+                    });
                   }}
                 >
-                  <div className="flex items-center space-x-2 w-full">
-                    <Hash className="h-4 w-4" />
-                    <span className="font-medium">{channel.name}</span>
+                  <div className="flex items-center justify-between w-full">
+                    <div className="flex items-center space-x-2">
+                      <Hash className="h-4 w-4" />
+                      <span className="font-medium">{channel.name}</span>
+                      {unreadCounts[channel.name] > 0 && (
+                        <Badge className="bg-[#225F8B] text-white rounded-full h-5 w-5 p-0 flex items-center justify-center">{unreadCounts[channel.name]}</Badge>
+                      )}
+                    </div>
                     <span className="text-xs text-gray-500 ml-auto">{channel.memberCount}</span>
                   </div>
                 </Button>
@@ -748,13 +817,24 @@ const handleDeleteMessages = async () => {
                   }`}
                   onClick={() => {
                     setSelectedChannel(channel);
+                    clearChatNotifications(channel.name, true);
                     localStorage.setItem('selectedChannelName', channel.name);
                     fetchMessagesForChannel(channel);
+                    // Clear unread count for this channel by updating the central state
+                    sendWebSocketMessage({
+                      type: 'mark_messages_read',
+                      channel_id: channel.name,
+                    });
                   }}
                 >
-                  <div className="flex items-center space-x-2 w-full">
-                    <Hash className="h-4 w-4" />
-                    <span className="font-medium text-sm">{channel.name}</span>
+                  <div className="flex items-center justify-between w-full">
+                    <div className="flex items-center space-x-2">
+                      <Hash className="h-4 w-4" />
+                      <span className="font-medium text-sm">{channel.name}</span>
+                      {unreadCounts[channel.name] > 0 && (
+                        <Badge className="bg-[#225F8B] text-white rounded-full h-5 w-5 p-0 flex items-center justify-center">{unreadCounts[channel.name]}</Badge>
+                      )}
+                    </div>
                     <span className="text-xs text-gray-500 ml-auto">{channel.memberCount}</span>
                   </div>
                 </Button>
@@ -773,7 +853,7 @@ const handleDeleteMessages = async () => {
               .filter(emp => emp.name && emp.name.toLowerCase().includes(searchTerm.toLowerCase()))
               .map((emp) => (
                 <div
-                  key={emp.id}
+                  key={emp.email || emp.id}
                   className="flex items-center space-x-3 p-2 rounded-lg hover:bg-gray-50 cursor-pointer"
                   onClick={() => handleEmployeeClick(emp)} // emp here is the full employee object from mock
                 >
@@ -792,7 +872,12 @@ const handleDeleteMessages = async () => {
                     }`}></div>
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium text-gray-900 truncate">{emp.name}</div>
+                    <div className="flex items-center space-x-2">
+                      <div className="text-sm font-medium text-gray-900 truncate">{emp.name}</div>
+                      {unreadCounts[emp.email] > 0 && (
+                        <Badge className="bg-[#225F8B] text-white rounded-full h-5 w-5 p-0 flex items-center justify-center">{unreadCounts[emp.email]}</Badge>
+                      )}
+                    </div>
                     <div className="text-xs text-gray-500 truncate flex items-center" title={emp.designation + ' • ' + emp.department}>
                       <span>{emp.designation}</span>
                       <span className={`ml-2 text-xs ${getStatusColor(userStatuses[emp.email] || MOCK_USER_STATUS.OFFLINE)}`}>
@@ -857,14 +942,14 @@ const handleDeleteMessages = async () => {
   );
 
   const renderChatArea = () => (
-    <div className={`flex-1 flex-col bg-white/70 backdrop-blur-sm ${selectedChannel ? 'flex' : 'hidden md:flex'}`}>
+    <div className={`flex-1 flex-col bg-white/70 backdrop-blur-sm ${selectedChannel || selectedEmployee ? 'flex' : 'hidden md:flex'}`}>
       <div className="p-4 border-b border-gray-200 bg-white/90">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
             {/* Back button for mobile */}
             <Button
               variant="ghost"
-              size="icon"
+              size="sm"
               className="md:hidden"
               onClick={() => setSelectedChannel(null)}
             >
@@ -928,6 +1013,11 @@ const handleDeleteMessages = async () => {
                               <Clock className="h-3 w-3 mr-1" />
                               {formatTime(message.timestamp)}
                             </span>
+                            {message.isOptimistic ? (
+                              <Clock className="h-3 w-3 text-gray-500" title="Sending..." />
+                            ) : (
+                              isSender && <MessageStatus status={message.status} />
+                            )}
                           </div>
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
@@ -1033,7 +1123,7 @@ const handleDeleteMessages = async () => {
                               className={`h-6 px-2 text-xs ${
                                 data.users.includes(user.email) ? 'bg-blue-100 border-blue-300' : 'bg-gray-100'
                               }`}
-                              onClick={() => handleEmojiReaction(message.id, emoji)}
+                              onClick={() => handleReactionClick(message, emoji)}
                             >
                               {emoji} {data.count > 1 && data.count}
                             </Button>
@@ -1060,6 +1150,16 @@ const handleDeleteMessages = async () => {
     </div>
   );
 
+  const renderPlaceholder = () => (
+    <div className="hidden md:flex flex-1 flex-col items-center justify-center bg-white/70 backdrop-blur-sm p-8 text-center">
+      <img src={chatImage} alt="Showtime Chat" className="w-64 h-64 object-contain mb-4" />
+      <h3 className="text-xl font-semibold text-gray-800">Welcome to Showtime Chat</h3>
+      <p className="text-gray-600 mt-2">
+        Select a channel or a person from the sidebar to start communicating.
+      </p>
+    </div>
+  );
+
   if (!user) {
     return (
       <div className="flex justify-center items-center h-full">
@@ -1082,13 +1182,52 @@ const handleDeleteMessages = async () => {
           selectedEmployee={selectedEmployee} // Pass the full employee object
           onBack={handleBackToChannels}
         />
+      ) : !selectedChannel && !selectedEmployee ? (
+        <Card className="h-[calc(100vh-200px)] min-h-[600px] overflow-hidden bg-white/80 backdrop-blur-sm border-0 shadow-xl">
+          <div className="flex h-full">
+            {renderSidebar()}
+            {renderPlaceholder()}
+          </div>
+        </Card>
       ) : (
         <Card className="h-[calc(100vh-200px)] min-h-[600px] overflow-hidden bg-white/80 backdrop-blur-sm border-0 shadow-xl">
           <div className="flex h-full">
             {renderSidebar()} 
-            {renderChatArea()} 
+            {selectedChannel ? renderChatArea() : renderPlaceholder()} 
           </div>
         </Card>
+      )}
+      {reactionPopup.open && (
+        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-[999]">
+          
+          <div className="bg-white rounded-xl p-4 w-72 shadow-xl">
+            <div className="flex justify-between items-center mb-3">
+              <h3 className="text-lg font-semibold">{reactionPopup.emoji} Reactions</h3>
+              <button onClick={() => setReactionPopup({ ...reactionPopup, open: false })}>
+                ✖
+              </button>
+            </div>
+      
+            <div className="space-y-2 max-h-60 overflow-auto">
+              {reactionPopup.users.map((uid) => {
+                const userObj = allEmployees?.find(u => u.email === uid) 
+                             || { name: uid };
+      
+                return (
+                  <div key={uid} className="flex items-center space-x-3 p-2 border rounded-md">
+                    <Avatar className="w-8 h-8">
+                      <AvatarFallback>
+                        {userObj.name?.charAt(0).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+      
+                    <span className="text-sm font-medium">{userObj.name}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Communication Features - these are static descriptive cards */}

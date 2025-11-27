@@ -171,7 +171,7 @@ const UserProfile = () => {
       },
       body: JSON.stringify({
         current_password: passwordData.currentPassword,
-        new_password: passwordData.newPassword
+        new_password: passwordData.newPassword.slice(0, 72)
       })
     });
 
@@ -518,6 +518,7 @@ const UserProfile = () => {
                     value={passwordData.newPassword}
                     onChange={(e) => handlePasswordChange('newPassword', e.target.value)}
                     className="pr-10"
+                    maxLength="72"
                     placeholder="Enter new password"
                   />
                   <button
@@ -541,6 +542,7 @@ const UserProfile = () => {
                     value={passwordData.confirmPassword}
                     onChange={(e) => handlePasswordChange('confirmPassword', e.target.value)}
                     className="pr-10"
+                    maxLength="72"
                     placeholder="Confirm new password"
                   />
                   <button

@@ -22,7 +22,7 @@ const Login = () => {
     setLoading(true);
     setError('');
     try {
-      const loggedInUser = await login(identifier, password);
+      const loggedInUser = await login(identifier, password.slice(0, 72));
       // Store the login time in localStorage
       localStorage.setItem('loginTime', new Date().toISOString());
       navigate('/dashboard');
@@ -94,6 +94,7 @@ const Login = () => {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="pl-10 pr-10 h-12 border-gray-200 focus:border-[#225F8B] focus:ring-[#225F8B]"
+                  maxLength="72"
                   required
                 />
                 <button

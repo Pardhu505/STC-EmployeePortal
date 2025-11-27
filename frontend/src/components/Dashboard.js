@@ -9,23 +9,37 @@ import Projects from '@/components/Projects';
 import InternalCommunication from './InternalCommunication';
 import AdminPanel from './AdminPanel';
 import AdminRoute from './AdminRoute'; // Import the AdminRoute component
+import Meetings from './Meetings'; // Import the new Meetings component
 // import PayslipManagement from './PayslipManagement';
 
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
-import { Calendar, Users, BarChart3, Bell, MessageSquare, Gift, Shield, FileText, CalendarCheck,Map as MapIcon } from 'lucide-react';
+import { Calendar, Users, BarChart3, Bell, MessageSquare, Gift, Shield, FileText, CalendarCheck } from 'lucide-react';
 import EAttendance from './EMPAttedence';
 import ManagerReport from './Manger Attendence';
 import AttendanceReport from './AdminAttedenceReport';
 import HRAttendance from './HRAttendance';
 import { employeeAPI } from '../Services/api';
 
-const CalendarWidget = () => {
+const DateTimeWidget = () => {
+  const [time, setTime] = useState(new Date());
   const today = new Date();
   const year = today.getFullYear();
   const month = today.getMonth();
   const currentDate = today.getDate();
 
+  useEffect(() => {
+    const timerId = setInterval(() => setTime(new Date()), 1000);
+    return () => clearInterval(timerId);
+  }, []);
+
+  const formatTime = (date) => {
+    return date.toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    });
+  };
   const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
   const dayNames = ["S", "M", "T", "W", "T", "F", "S"];
 
@@ -54,8 +68,13 @@ const CalendarWidget = () => {
   }
 
   return (
-    <div className="p-3 bg-white/90 backdrop-blur-sm rounded-lg shadow-md w-50 !h-30">
-      <div className="text-center text-xs font-semibold text-gray-800 mb-2">{monthNames[month]} {year}</div>
+    <div className="p-3 bg-white/90 backdrop-blur-sm rounded-lg shadow-md w-50 !h-30" suppressHydrationWarning>
+      <div className="text-center text-xs font-semibold text-gray-800 mb-1">
+        <span>{formatTime(time)}</span>
+      </div>
+      <div className="text-center text-xs font-semibold text-gray-800 mb-2">
+        <span>{monthNames[month]} {year}</span>
+      </div>
       <div className="grid grid-cols-7 gap-1 text-center text-xs text-gray-500 mb-1">
         {dayNames.map(day => <div key={day} className="w-3 h-3 flex items-center justify-center">{day}</div>)}
       </div>
@@ -207,6 +226,7 @@ const Dashboard = () => {
       case 'projects': return <Projects />;
       case 'profile': return <UserProfile />;
       case 'communication': return <InternalCommunication />;
+      case 'meetings': return <Meetings />;
       case 'admin': 
         // Use the new isAdmin check from AuthContext
         return isAdmin ? <AdminPanel /> : <PortalCards />;
@@ -230,6 +250,7 @@ const Dashboard = () => {
     { id: 'announcements', label: 'Announcements', icon: Bell },
     { id: 'projects', label: 'Projects', icon: MapIcon },
     { id: 'communication', label: 'Communication', icon: MessageSquare },
+    { id: 'meetings', label: 'Meetings', icon: Video },
     { id: 'attendance', label: user?.isAdmin ? 'Attendance Report' : 'Attendance', icon: CalendarCheck },
     // { id: 'payslips', label: 'Payslips', icon: FileText },
     // Use the new isAdmin check from AuthContext to show/hide the Admin Panel button
@@ -276,7 +297,7 @@ const Dashboard = () => {
                 </div>
                 <div className="hidden md:block">
                   <div className="flex flex-col items-center" suppressHydrationWarning>
-                    <CalendarWidget />
+                    <DateTimeWidget />
                   </div>
                 </div>
               </div>

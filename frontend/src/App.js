@@ -4,11 +4,11 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { Toaster } from "./components/ui/toaster";
 import Login from "./components/Login";
-import Dashboard from "@/components/Dashboard";
-import Signup from "@/components/signup";
-import LoadingSpinner from "@/LoadingSpinner";
-import APMapping from "@/components/APMapping";
-import ExcelDataViewer from "@/pages/ExcelDataViewer";
+import Dashboard from "./components/Dashboard";
+import Signup from "./components/signup";
+import LoadingSpinner from "./LoadingSpinner";
+import PrivacyPolicy from "./components/PrivacyPolicy";
+import TermsAndConditions from "./components/TermsAndConditions";
 
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth();
@@ -52,17 +52,10 @@ function App() {
                   <Dashboard />
                 </ProtectedRoute>
               } />
-              <Route path="/ap-mapping" element={
-                <ProtectedRoute>
-                  <APMapping />
-                </ProtectedRoute>
-              } />
-              <Route path="/excel-data" element={
-                <ProtectedRoute>
-                  <ExcelDataViewer />
-                </ProtectedRoute>
-              } />
               <Route path="/" element={<Navigate to="/dashboard" />} />
+              <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+          <Route path="/terms-and-conditions" element={<TermsAndConditions />} />
+
             </Routes>
           </BrowserRouter>
           <Toaster />

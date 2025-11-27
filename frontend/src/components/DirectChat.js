@@ -17,6 +17,7 @@ import {
   ArrowLeft,
   Send,
   Clock,
+  Check,
   MoreVertical,
   Trash2,
   Paperclip,
@@ -25,12 +26,38 @@ import {
 } from 'lucide-react';
 import { USER_STATUS as MOCK_USER_STATUS } from '../data/mock'; // Renamed for clarity
 
+const MessageStatus = ({ status }) => {
+  // Always show at least one tick if the status is 'sent', 'delivered', or 'read'
+  if (!['sent', 'delivered', 'read'].includes(status)) {
+    return null;
+  }
+  
+  const isRead = status === 'read';
+  const isDelivered = status === 'delivered' || isRead;
+
+  return (
+    <div className="relative flex items-center w-4 h-4">
+      {/* First tick, always present */}
+      <Check className={`absolute left-0 h-4 w-4 ${isRead ? 'text-blue-500' : 'text-gray-400'}`} />
+      {/* Second tick, for delivered or read status */}
+      {isDelivered && (
+        <Check className={`absolute left-1 h-4 w-4 ${isRead ? 'text-blue-500' : 'text-gray-400'}`} />
+      )}
+    </div>
+  );
+};
+
 const DirectChat = ({ selectedEmployee, onBack }) => {
-  const { user, sendWebSocketMessage, userStatuses, setCurrentChatUser, showNotification, newMessages, setNewMessages } = useAuth();
+  const { user, sendWebSocketMessage, userStatuses, setCurrentChatUser, showNotification, newMessages, setNewMessages, allEmployees, clearChatNotifications } = useAuth();
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
   const [selectedFile, setSelectedFile] = useState(null);
   const [replyTo, setReplyTo] = useState(null);
+  const [reactionPopup, setReactionPopup] = useState({
+    open: false,
+    emoji: null,
+    users: [],
+  });
 
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -41,11 +68,12 @@ const DirectChat = ({ selectedEmployee, onBack }) => {
   useEffect(() => {
     if (recipientId) {
       setCurrentChatUser(recipientId);
+      clearChatNotifications(recipientId, false);
     }
     return () => {
       setCurrentChatUser(null);
     };
-  }, [recipientId, setCurrentChatUser]);
+  }, [recipientId, setCurrentChatUser, clearChatNotifications]);
 
   // Fetch old messages when direct chat opens
   useEffect(() => {
@@ -54,8 +82,21 @@ const DirectChat = ({ selectedEmployee, onBack }) => {
         try {
           const response = await fetch(`${API_BASE_URL}/api/direct-messages?sender_id=${user.email}&recipient_id=${recipientId}&user_id=${user.email}&limit=50`);
           if (response.ok) {
-            const oldMessages = await response.json();
-            setMessages(oldMessages);
+            let oldMessages = await response.json();
+            // Process messages to add the status field
+            const processedMessages = oldMessages.map(msg => {
+              let status = 'sent'; // Default to sent
+              // If the message is from the current user, determine its status based on recipient's actions
+              if (msg.sender_id === user.email) {
+                if (msg.read_by && msg.read_by.includes(recipientId)) {
+                  status = 'read';
+                } else if (msg.delivered_to && msg.delivered_to.includes(recipientId)) {
+                  status = 'delivered';
+                }
+              }
+              return { ...msg, status };
+            });
+            setMessages(processedMessages);
           } else {
             console.error('Failed to fetch direct messages:', response.statusText);
           }
@@ -81,6 +122,16 @@ const DirectChat = ({ selectedEmployee, onBack }) => {
         const incomingMessage = event.detail;
         console.log("DirectChat received WS message:", incomingMessage);
 
+        // CANCEL NOTIFICATION IF USER IS CURRENTLY VIEWING THIS DM
+        if (
+          incomingMessage.type === "personal_message" &&
+          incomingMessage.sender_id === recipientId
+        ) {
+          // We are inside this chat → skip notifications by stopping further processing in this component
+          // The message will still be added to the chat window below.
+          // return; // This was the original instruction, but we need to process the message to display it. The check is good for clarity.
+        }
+
         if (incomingMessage.type === 'chat_message' || incomingMessage.type === 'personal_message') {
           // Check if the message is part of this direct chat
           const isFromSenderToRecipient = incomingMessage.sender_id === user.email && incomingMessage.recipient_id === recipientId;
@@ -101,17 +152,7 @@ const DirectChat = ({ selectedEmployee, onBack }) => {
                 return prevMessages;
               }
 
-              // Check if there's an optimistic message to replace
-              const optimisticIndex = prevMessages.findIndex(m => m.isOptimistic && m.sender_id === incomingMessage.sender_id && m.content === incomingMessage.content && m.recipient_id === incomingMessage.recipient_id);
-              if (optimisticIndex !== -1) {
-                console.log("Replacing optimistic message with real message:", incomingMessage);
-                const newMessages = [...prevMessages];
-                newMessages[optimisticIndex] = incomingMessage;
-                return newMessages;
-              } else {
-                console.log("Adding new message to chat:", incomingMessage);
-                return [...prevMessages, incomingMessage];
-              }
+              return [...prevMessages, incomingMessage];
             });
           } else {
             console.log("Message not for this direct chat, ignoring:", incomingMessage);
@@ -121,18 +162,25 @@ const DirectChat = ({ selectedEmployee, onBack }) => {
           const missedMessages = incomingMessage.messages || [];
           console.log(`DirectChat received ${missedMessages.length} missed messages`);
 
-          setMessages(prevMessages => {
-            const newMessages = [...prevMessages];
+          setMessages(prev => {
+            const newMessages = [...prev];
             missedMessages.forEach(missedMsg => {
               const isDuplicate = newMessages.find(msg => msg.id === missedMsg.id);
               if (!isDuplicate) {
                 // Add missed message if it's part of this direct chat
+                let status = 'sent';
+                if (missedMsg.sender_id === user.email) {
+                  if (missedMsg.read_by && missedMsg.read_by.includes(recipientId)) {
+                    status = 'read';
+                  } else if (missedMsg.delivered_to && missedMsg.delivered_to.includes(recipientId)) {
+                    status = 'delivered';
+                  }
+                }
                 const isFromSenderToRecipient = missedMsg.sender_id === user.email && missedMsg.recipient_id === recipientId;
                 const isFromRecipientToSender = missedMsg.sender_id === recipientId && missedMsg.recipient_id === user.email;
 
                 if (isFromSenderToRecipient || isFromRecipientToSender) {
-                  console.log("Adding missed message:", missedMsg);
-                  newMessages.push(missedMsg);
+                  newMessages.push({ ...missedMsg, status });
                 }
               }
             });
@@ -155,6 +203,40 @@ const DirectChat = ({ selectedEmployee, onBack }) => {
           // Handle message updates (like delete for everyone)
           console.log("DirectChat received message update:", incomingMessage);
           setMessages(prev => prev.map(m => m.id === incomingMessage.message_id ? { ...m, deleted: true, content: 'This message was deleted' } : m));
+        } else if (incomingMessage.type === 'message_confirmation') {
+          // Server confirms message is saved (✔ single tick)
+          setMessages(prev => prev.map(m => 
+            m.id === incomingMessage.optimistic_id 
+              ? { ...m, id: incomingMessage.final_id, timestamp: incomingMessage.timestamp, isOptimistic: false, status: 'sent' } 
+              : m
+          ));
+        } else if (incomingMessage.type === 'delivery_receipt') {
+          // Message delivered to recipient (✔✔ double tick)
+          setMessages(prev => prev.map(m => 
+            m.id === incomingMessage.message_id && m.status !== 'read'
+              ? { ...m, status: 'delivered' } 
+              : m
+          ));
+        } else if (incomingMessage.type === 'read_receipt') {
+          // Message read by recipient (✔✔ blue tick)
+          const messageIdsToUpdate = new Set(incomingMessage.message_ids);
+          setMessages(prev => prev.map(m => 
+            messageIdsToUpdate.has(m.id)
+              ? { ...m, status: 'read' } 
+              : m
+          ));
+        } else if (incomingMessage.type === 'mark_messages_read') {
+          // When the other user reads our messages, we need to inform the server
+          // so it can update the database and notify the sender.
+          // This client-side logic sends the read confirmation.
+          const messageIdsToMark = incomingMessage.message_ids || [];
+          if (messageIdsToMark.length > 0) {
+            sendWebSocketMessage({
+              type: 'mark_messages_read',
+              message_ids: messageIdsToMark,
+              chat_partner_id: incomingMessage.chat_partner_id, // The original sender
+            });
+          }
         }
         // Status updates are handled by AuthContext and reflected via userStatuses prop
       };
@@ -168,20 +250,35 @@ const DirectChat = ({ selectedEmployee, onBack }) => {
     }
   }, [user, recipientId, user?.email]);
 
+  // Mark messages as read when chat is opened or new messages arrive
+  useEffect(() => {
+    const unreadMessages = messages.filter(
+      (msg) => msg.sender_id === recipientId && (!msg.read_by || !msg.read_by.includes(user.email))
+    );
+
+    if (unreadMessages.length > 0) {
+      const messageIds = unreadMessages.map((msg) => msg.id);
+      sendWebSocketMessage({
+        type: 'mark_messages_read',
+        message_ids: messageIds,
+        chat_partner_id: recipientId, // The person who sent these messages
+      });
+    }
+  }, [messages, recipientId, user.email, sendWebSocketMessage]);
+
 
   // Scroll to bottom when messages change and trigger notifications
   useEffect(() => {
-    if (messages.length > 0) {
-      // Disabled alert notifications for direct messages as per request
-      // const latestMessage = messages[messages.length - 1];
-      // if (latestMessage.sender_id !== user?.id && user?.id) {
-      //   showNotification(`New message from ${latestMessage.sender_name}`, {
-      //     body: latestMessage.content,
-      //   });
-      // }
+    const chatContainer = messagesEndRef.current?.parentElement;
+    if (!chatContainer) return;
+
+    // Only auto-scroll if the user is already near the bottom
+    const isScrolledToBottom = chatContainer.scrollHeight - chatContainer.clientHeight <= chatContainer.scrollTop + 100;
+
+    if (isScrolledToBottom) {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, user?.email, showNotification]);
+  }, [messages]); // Dependency array simplified to just `messages`
 
 
 
@@ -225,6 +322,7 @@ const DirectChat = ({ selectedEmployee, onBack }) => {
         file_name: fileData ? fileData.file_name : null,
         file_type: fileData ? fileData.file_type : null,
         file_size: fileData ? fileData.file_size : null,
+        id: `optimistic-${Date.now()}`, // Add optimistic ID
         // timestamp and id will be added by backend
       };
       sendWebSocketMessage(messagePayload);
@@ -232,6 +330,7 @@ const DirectChat = ({ selectedEmployee, onBack }) => {
       // Optimistically add the message to the state for immediate display
       const optimisticMessage = {
         id: `optimistic-${Date.now()}`,
+        optimistic_id: messagePayload.id, // Keep track of the ID sent to the server
         sender_id: user.email,
         sender_name: user.name,
         content: newMessage || (fileData ? `${fileData.file_name} (${(fileData.file_size / 1024).toFixed(1)} KB)` : ''),
@@ -244,6 +343,7 @@ const DirectChat = ({ selectedEmployee, onBack }) => {
         recipient_id: recipientId,
         type: 'personal_message',
         isOptimistic: true,
+        status: 'sending', // Initial status
       };
       setMessages(prevMessages => [...prevMessages, optimisticMessage]);
 
@@ -324,6 +424,19 @@ const handleClearChat = async () => {
     // Allow deletion of any message sent by the current user (no time limit)
     return true;
   };
+
+  const handleReactionClick = (message, emoji) => {
+    const reactionUsers = message.reactions
+       .filter(r => r.reaction_type === emoji)
+       .map(r => r.user_id);
+  
+    setReactionPopup({
+      open: true,
+      emoji,
+      users: reactionUsers,
+    });
+  };
+  
 
   const handleReplyMessage = (message) => {
     setReplyTo(message);
@@ -620,6 +733,11 @@ const handleClearChat = async () => {
                                       <Clock className="h-3 w-3 mr-1" />
                                       {formatTime(message.timestamp)}
                                     </span>
+                                    {message.isOptimistic ? (
+                                      <Clock className="h-3 w-3 text-gray-500" title="Sending..." />
+                                    ) : (
+                                      <MessageStatus status={message.status} />
+                                    )}
                                   </div>
                                   {!message.deleted && !message.deleted_for_me && (
                                     <DropdownMenu>
@@ -738,7 +856,7 @@ const handleClearChat = async () => {
                                       className={`h-6 px-2 text-xs ${
                                         data.users.includes(user.email) ? 'bg-blue-100 border-blue-300' : 'bg-gray-100'
                                       }`}
-                                      onClick={() => handleEmojiReaction(message.id, emoji)}
+                                      onClick={() => handleReactionClick(message, emoji)}
                                     >
                                       {emoji} {data.count > 1 && data.count}
                                     </Button>
@@ -867,7 +985,7 @@ const handleClearChat = async () => {
                                       className={`h-6 px-2 text-xs ${
                                         data.users.includes(user.email) ? 'bg-blue-100 border-blue-300' : 'bg-gray-100'
                                       }`}
-                                      onClick={() => handleEmojiReaction(message.id, emoji)}
+                                      onClick={() => handleReactionClick(message, emoji)}
                                     >
                                       {emoji} {data.count > 1 && data.count}
                                     </Button>
@@ -963,6 +1081,38 @@ const handleClearChat = async () => {
         )}
       </div>
       </CardContent>
+      {reactionPopup.open && (
+        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-[999]">
+          
+          <div className="bg-white rounded-xl p-4 w-72 shadow-xl">
+            <div className="flex justify-between items-center mb-3">
+              <h3 className="text-lg font-semibold">{reactionPopup.emoji} Reactions</h3>
+              <button onClick={() => setReactionPopup({ ...reactionPopup, open: false })}>
+                ✖
+              </button>
+            </div>
+      
+            <div className="space-y-2 max-h-60 overflow-auto">
+              {reactionPopup.users.map((uid) => {
+                const userObj = allEmployees?.find(u => u.email === uid) 
+                             || { name: uid };
+      
+                return (
+                  <div key={uid} className="flex items-center space-x-3 p-2 border rounded-md">
+                    <Avatar className="w-8 h-8">
+                      <AvatarFallback>
+                        {userObj.name?.charAt(0).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+      
+                    <span className="text-sm font-medium">{userObj.name}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
     </Card>
   );
 };

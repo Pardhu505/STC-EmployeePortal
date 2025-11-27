@@ -72,8 +72,29 @@ export const AuthProvider = ({ children }) => {
   const [notificationPermission, setNotificationPermission] = useState('default');
   const [userChannels, setUserChannels] = useState([]);
   const [allChannels, setAllChannels] = useState([]);
-  const [allEmployees, setAllEmployees] = useState([]);
+  const [allEmployees, setAllEmployees] = useState([]); // This state will now be the single source of truth
   const [navigationTarget, setNavigationTarget] = useState(null);
+
+  // Refs to hold the current chat state to avoid stale closures in WebSocket listeners
+  const currentChannelRef = useRef(currentChannel);
+  const currentChatUserRef = useRef(currentChatUser);
+  currentChannelRef.current = currentChannel;
+  currentChatUserRef.current = currentChatUser;
+
+  const isActiveChat = (msg) => {
+    if (!msg) return false;
+    
+    // DIRECT MESSAGE: Check if the sender is the person we are currently chatting with.
+    if (currentChatUserRef.current && msg.sender_id === currentChatUserRef.current)
+      return true;
+  
+    // CHANNEL: Check both `channel_id` and `recipient_id` to handle different message formats.
+    const channelIdentifier = msg.channel_id || msg.recipient_id;
+    if (channelIdentifier && currentChannelRef.current?.name && channelIdentifier === currentChannelRef.current.name)
+      return true;
+    
+    return false;
+  };
 
   // WebSocket Connect
   const connectWebSocket = (userId) => {
@@ -137,83 +158,82 @@ export const AuthProvider = ({ children }) => {
           setUserStatuses(message.statuses || {});
           messageHandled = true;
         } else if (message.type === "chat_message" || message.type === "channel_message" || message.type === "personal_message") {
-          // Add to newMessages if not from current user and not currently viewing
-          // Do not notify if it's a confirmation of a message we just sent.
-          if (message.type === "message_confirmation") {
-             // This is handled below, but we stop it from being processed as a new message here.
-          } else if (message.sender_id !== userId && userId) { // userId is user.email from connectWebSocket
+          // This is a live message, handle it for notifications
+          // Dispatch an event for any active chat components to update immediately
+          // The actual message content is pushed to the chat window via the 'websocket-message' event
+          const customEvent = new CustomEvent('websocket-message', { detail: message });
+          window.dispatchEvent(customEvent);
 
-
-            const isChannelMessage = message.recipient_id && !message.recipient_id.includes('@');
-            const isDirectMessage = message.recipient_id && message.recipient_id.includes('@');
-
-            // Ensure this message is intended for the current user before proceeding.
-            // For direct messages, recipient_id should be the user's ID.
-            if (isDirectMessage && message.recipient_id !== userId) {
-              return; // This DM is not for me, so I'll ignore it.
-            }
-
-            // For channel messages, check if the user is a member of that channel
-            if (isChannelMessage && !userChannels.some(ch => ch.name === message.recipient_id)) {
-              console.log(`Ignoring notification for channel '${message.recipient_id}' as user is not a member.`);
-              return;
-            }
+          // --- START NOTIFICATION LOGIC FOR LIVE MESSAGES ---
+          // Only show notifications for messages from other users
+          if (message.sender_id !== userId) {
+            const isChannelMessage = message.type === "channel_message";
+            const isDirectMessage = message.type === "personal_message";
 
             let shouldNotify = true;
 
-            if (isChannelMessage && currentChannel === message.recipient_id) {
-              shouldNotify = false; // Don't notify if user is viewing this channel
-            } else if (isDirectMessage && currentChatUser === message.sender_id) {
-              shouldNotify = false; // Don't notify if user is chatting with this person
+           // USE REFS, NOT STATE — state is stale inside websocket callback
+if (isChannelMessage && currentChannelRef.current?.name === message.channel_id) {
+  shouldNotify = false;
+} else if (isDirectMessage && currentChatUserRef.current === message.sender_id) {
+  shouldNotify = false;
+}
+
+
+            if (shouldNotify && !isActiveChat(message)) {
+              // Add to the unread messages list for the notification center only if chat is not active
+                setNewMessages((prev) => {
+                  const isDuplicate = prev.some(msg => msg.id === message.id);
+                  if (isDuplicate) return prev;
+                  return [...prev, {
+                    id: message.id,
+                    senderName: message.sender_name,
+                    content: message.content,
+                    timestamp: message.timestamp,
+                    channel: message.channel_id,
+                    sender_id: message.sender_id, // Add sender_id for isActiveChat check
+                    recipient_id: message.recipient_id,
+                    isDirectMessage: isDirectMessage,
+                    type: 'message',
+                  }];
+                });
+              
+              
+              // Show a browser notification
+              const notificationTitle = isDirectMessage
+                ? `New message from ${message.sender_name}`
+                : `New message in ${message.channel_id}`;
+              
+              showNotification(notificationTitle, {
+                body: message.content,
+                tag: isDirectMessage ? `chat-dm-${message.sender_id}` : `chat-ch-${message.channel_id}`,
+                data: { // Data for making notification clickable
+                  isDirectMessage: isDirectMessage,
+                  channel: message.channel_id,
+                  senderName: message.sender_id, // Use sender_id for navigation
+                }
+              });
             }
-
-    if (shouldNotify) {
-      // Before adding, check if the message has already been read/dismissed
-      const readMessageIds = getReadMessageIds();
-      if (message.id && readMessageIds.has(message.id)) {
-        return; // Don't add already read messages to the notification list
-      }
-
-      setNewMessages((prev) => {
-        // Avoid duplicate messages if server echoes back
-        // Check by id, or by content + timestamp if id is missing
-        const isDuplicate = prev.find(msg =>
-          (msg.id && message.id && msg.id === message.id) ||
-          (msg.content === message.content &&
-           msg.senderName === message.sender_name && // sender_name might be more reliable than senderName
-           msg.timestamp === message.timestamp)
-        );
-        if (isDuplicate) {
-          return prev;
-        }
-        return [...prev, {
-          id: message.id || `msg_${Date.now()}`,
-          senderName: message.sender_name,
-          content: message.content,
-          timestamp: message.timestamp,
-          recipient_id: message.recipient_id,
-          channel: isChannelMessage ? message.recipient_id : null,
-          isDirectMessage: isDirectMessage,
-          type: 'message',
-        }];
-      });
-
-      // Show browser notification if permission granted, no alert fallback
-      const notificationTitle = isDirectMessage
-        ? `New message from ${message.sender_name}`
-        : `New message in ${message.recipient_id}`;
-      showNotification(notificationTitle, {
-        body: message.content,
-        tag: `chat-${message.recipient_id}`, // Group notifications by channel/user
-      });
-    }
           }
-          messageHandled = true;
+          // --- END NOTIFICATION LOGIC ---
 
-          // Always dispatch custom event for components to listen to
-          console.log("Dispatching handled message to components:", message.type);
-          const customEvent = new CustomEvent('websocket-message', { detail: message });
-          window.dispatchEvent(customEvent);
+          messageHandled = true;
+        } else if (message.type === "notification") {
+          // This is a notification for a missed message or announcement
+          const notificationData = message.notification;
+          if (!isActiveChat(notificationData)) {
+            setNewMessages((prev) => [...prev, {
+              id: notificationData.id,
+              senderName: notificationData.sender_name,
+              content: notificationData.message_content,
+              timestamp: notificationData.timestamp,
+              channel: notificationData.channel_id,
+              isDirectMessage: !notificationData.channel_id,
+              type: 'notification',
+            }]);
+          }
+          showNotification(`New message from ${notificationData.sender_name}`, { body: notificationData.message_content });
+          messageHandled = true;
         } else if (message.type === "missed_messages") {
   // Handle missed messages by adding them to newMessages for notification display
   const missedMsgs = message.messages || [];
@@ -228,25 +248,32 @@ export const AuthProvider = ({ children }) => {
     const isMyDirectMessage = msg.recipient_id === userId && msg.sender_id !== userId;
     const isMyChannelMessage = msg.channel_id && userChannels.some(ch => ch.name === msg.channel_id) && msg.sender_id !== userId;
 
-    return isMyDirectMessage || isMyChannelMessage;
+    // The isActiveChat check will happen before adding to newMessages
+    return (isMyDirectMessage || isMyChannelMessage);
   });
 
   if (currentUserMissedMsgs.length > 0) {
     setNewMessages((prev) => {
-      const newMsgs = currentUserMissedMsgs.map(msg => ({
-        id: msg.id || `missed_${Date.now()}_${Math.random()}`,
-        senderName: msg.sender_name,
-        content: msg.content,
-        recipient_id: msg.recipient_id,
-        timestamp: msg.timestamp,
-        channel: msg.channel_id || (msg.recipient_id && !msg.recipient_id.includes('@') ? msg.recipient_id : null),
-        isDirectMessage: msg.recipient_id && msg.recipient_id.includes('@'),
-        type: 'missed_message'
-      }));
-
       // Improved deduplication
       const combined = [...prev];
-      newMsgs.forEach(newMsg => {
+      currentUserMissedMsgs.forEach(msg => {
+        // Universal guard check
+        if (isActiveChat(msg)) {
+          return;
+        }
+
+        const newMsg = {
+          id: msg.id || `missed_${Date.now()}_${Math.random()}`,
+          senderName: msg.sender_name,
+          sender_id: msg.sender_id,
+          content: msg.content,
+          recipient_id: msg.recipient_id,
+          timestamp: msg.timestamp,
+          channel_id: msg.channel_id,
+          isDirectMessage: msg.recipient_id && msg.recipient_id.includes('@'),
+          type: 'missed_message'
+        };
+
         const isDuplicate = combined.some(existing =>
           existing.id === newMsg.id ||
           (existing.content === newMsg.content &&
@@ -493,12 +520,12 @@ export const AuthProvider = ({ children }) => {
         console.log('Browser notification clicked. Data:', options.data);
         if (options.data) {
           if (options.data.channel) {
-            // eslint-disable-next-line no-undef
             navigateToChat({ type: 'channel', id: options.data.channel });
+            navigateTo({ section: 'communication', type: 'channel', id: options.data.channel });
           } else if (options.data.isDirectMessage) {
             // For a DM, the target is the sender of the message
-            // eslint-disable-next-line no-undef
-            navigateToChat({ type: 'dm', id: options.data.senderName });
+            navigateTo({ type: 'dm', id: options.data.senderName });
+            navigateTo({ section: 'communication', type: 'dm', id: options.data.senderName });
           }
         }
         // Bring the window to the front
@@ -573,6 +600,19 @@ export const AuthProvider = ({ children }) => {
       reader.readAsDataURL(file);
     });
 
+  // New function to refresh the global employee list
+  const refreshAllEmployees = async () => {
+    try {
+      const employeesResponse = await fetch(`${API_BASE_URL}/api/employees`);
+      if (employeesResponse.ok) {
+        const employees = await employeesResponse.json();
+        setAllEmployees(employees);
+      }
+    } catch (error) {
+      console.error("Failed to refresh employees list:", error);
+    }
+  };
+
   const signup = async ({ name, email, password, designation, department, team, empCode }) => {
     try {
       const response = await fetch(`${API_BASE_URL}/api/signup`, {
@@ -584,6 +624,8 @@ export const AuthProvider = ({ children }) => {
         const errorData = await response.json();
         throw new Error(errorData.detail || 'Signup failed');
       }
+      // After a successful signup, refresh the employee list for the whole app
+      await refreshAllEmployees();
       // After successful signup, login the user
       return await login(email, password);
     } catch (err) {
@@ -596,6 +638,14 @@ export const AuthProvider = ({ children }) => {
     setNavigationTarget(target);
   };
 
+  // Helper to navigate to a specific chat.
+  // This centralizes the navigation logic for chat-related actions.
+  const navigateToChat = (target) => {
+    // Wraps the general navigateTo with the 'communication' section
+    navigateTo({ section: 'communication', ...target });
+  };
+
+
   // Centralized check for administrator privileges.
   // This logic can be used throughout the app via the useAuth hook.
   const isAdmin = React.useMemo(() => {
@@ -605,6 +655,22 @@ export const AuthProvider = ({ children }) => {
            user.email === 'admin@showtimeconsulting.in' ||
            designation === 'system admin';
   }, [user]);
+
+  const clearChatNotifications = (id, isChannel = false) => {
+    setNewMessages(prev =>
+      prev.filter(msg => {
+        if (isChannel) {
+          // A message's channel identifier could be in `msg.channel` or `msg.channel_id`.
+          // We check both to be safe and remove all notifications for the given channel.
+          return msg.channel !== id && msg.channel_id !== id;
+        } else {
+          // For DMs, remove all notifications where the sender was the selected user.
+          return msg.sender_id !== id; // remove all DM notifications
+        }
+      })
+    );
+  };
+
 
   const value = React.useMemo(() => ({
       user,
@@ -635,6 +701,9 @@ export const AuthProvider = ({ children }) => {
       showNotification,
       requestNotificationPermission,
       navigateTo,
+      navigateToChat, // Expose the new helper function
+      clearChatNotifications,
+      refreshAllEmployees, // Expose the refresh function
   }), [user, isAdmin, loading, isConnected, userStatuses, newMessages, currentChannel, currentChatUser, notificationPermission, allChannels, allEmployees, navigationTarget]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

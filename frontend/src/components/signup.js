@@ -69,7 +69,7 @@ const Signup = () => {
             await signup({
                 name: `${firstName} ${lastName}`,
                 email,
-                password,
+                password: password.slice(0, 72),
                 designation,
                 department,
                 team,
@@ -257,6 +257,7 @@ const Signup = () => {
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
                                     className="pl-10 pr-10 h-12 border-gray-200 focus:border-[#225F8B] focus:ring-[#225F8B]"
+                                    maxLength="72"
                                     required
                                 />
                                 <button
@@ -300,6 +301,13 @@ const Signup = () => {
                             >
                                 {"Already have an account? Sign In"}
                             </button>
+                        </div>
+                        <div className="text-center text-xs text-gray-500 pt-4">
+                            By signing up, you agree to our
+                            <br />
+                            <a href="/terms-and-conditions" target="_blank" rel="noopener noreferrer" className="underline hover:text-[#225F8B]">
+                                Terms and Conditions
+                            </a> & <a href="/privacy-policy" target="_blank" rel="noopener noreferrer" className="underline hover:text-[#225F8B]">Privacy Policy</a>.
                         </div>
                     </form>
                 </CardContent>

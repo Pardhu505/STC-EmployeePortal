@@ -99,11 +99,13 @@ const APMapping = () => {
   };
 
   useEffect(() => {
-    // Pass null for sheetName to allow the backend to parse the GID from the URL
-    fetchData(rlbSheetUrl, null, setRlbData, setFilteredRlbData);
-    fetchData(ulbSheetUrl, null, setUlbData, setFilteredUlbData);
+    if (activeTab === 'rlb') {
+      fetchData(rlbSheetUrl, null, setRlbData, setFilteredRlbData);
+    } else if (activeTab === 'ulb') {
+      fetchData(ulbSheetUrl, null, setUlbData, setFilteredUlbData);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [activeTab]);
 
   const handleRlbFilter = () => {
     let data = Array.isArray(rlbData) ? rlbData : [];
@@ -143,6 +145,16 @@ const APMapping = () => {
     setFilteredUlbData(Array.isArray(ulbData) ? ulbData : []);
   };
 
+  useEffect(() => {
+    handleRlbFilter();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rlbDistrict, rlbParliament, rlbAssembly, rlbData]);
+
+  useEffect(() => {
+    handleUlbFilter();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ulbDistrict, ulbName, ulbData]);
+
   const renderTable = (data) => {
     if (loading) return <p>Loading...</p>;
     if (error) return <p className="text-red-500">Error: {error}</p>;
@@ -151,16 +163,16 @@ const APMapping = () => {
     const headers = Object.keys(data[0] || {});
     return (
       <div className="overflow-x-auto">
-        <table className="min-w-full bg-white border">
+        <table className="min-w-full bg-white border border-gray-300 text-center">
           <thead>
-            <tr>
-              {headers.map(header => <th key={header} className="py-2 px-4 border-b">{header}</th>)}
+            <tr style={{ backgroundColor: '#89bff8' }}>
+              {headers.map(header => <th key={header} className="py-2 px-4 border-b border-gray-300">{header}</th>)}
             </tr>
           </thead>
           <tbody>
             {data.map((row, index) => (
               <tr key={index}>
-                {headers.map(header => <td key={header} className="py-2 px-4 border-b">{row ? row[header] : ''}</td>)}
+                {headers.map(header => <td key={header} className="py-2 px-4 border-b border-gray-300">{row ? row[header] : ''}</td>)}
               </tr>
             ))}
           </tbody>
@@ -213,7 +225,6 @@ const APMapping = () => {
                     </Select>
                 </div>
                 <div className="flex gap-2">
-                    <Button onClick={handleRlbFilter}>Get Data</Button>
                     <Button variant="outline" onClick={clearRlbFilters}>Clear Filter</Button>
                 </div>
                 {renderTable(filteredRlbData)}
@@ -236,7 +247,6 @@ const APMapping = () => {
                     </Select>
                 </div>
                 <div className="flex gap-2">
-                    <Button onClick={handleUlbFilter}>Get Data</Button>
                     <Button variant="outline" onClick={clearUlbFilters}>Clear Filter</Button>
                 </div>
                 {renderTable(filteredUlbData)}

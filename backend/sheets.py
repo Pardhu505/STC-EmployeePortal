@@ -42,6 +42,14 @@ def get_data_from_sheet(spreadsheet_url, sheet_name=None):
     else:
         worksheet = sheet.worksheet(sheet_name)
 
-    data = worksheet.get_all_records()
+    # Use get_all_values() and manually construct the dictionary
+    # to avoid issues with gspread's get_all_records() which can be brittle
+    # if the header row has empty cells or formatting issues.
+    values = worksheet.get_all_values()
+    if not values:
+        return []
+
+    headers = values[0]
+    data = [dict(zip(headers, row)) for row in values[1:]]
     df = pd.DataFrame(data)
     return df.to_dict(orient='records')

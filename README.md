@@ -234,3 +234,72 @@ This project is proprietary software for Showtime Communications.
 ## 👥 Support
 
 For support or questions, please contact the development team.
+
+## Google Sheets and MongoDB Integration Guide
+
+This guide provides instructions on how to integrate Google Sheets with `server.py` and connect to a MongoDB database.
+
+### Google Sheets Integration
+
+To allow the application to read data from a Google Sheet, you need to use a Google Service Account.
+
+#### Steps:
+
+1.  **Create a Google Service Account:**
+    *   Go to the [Google Cloud Console](https://console.cloud.google.com/).
+    *   Create a new project or select an existing one.
+    *   Navigate to **IAM & Admin > Service Accounts**.
+    *   Click **+ CREATE SERVICE ACCOUNT**.
+    *   Give it a name and description, then click **CREATE AND CONTINUE**.
+    *   Grant the service account the **Viewer** role.
+    *   Click **CONTINUE**, then **DONE**.
+
+2.  **Create and Download JSON Credentials:**
+    *   Find the service account you just created in the list.
+    *   Click the three-dot menu under **Actions** and select **Manage keys**.
+    *   Click **ADD KEY > Create new key**.
+    *   Select **JSON** as the key type and click **CREATE**. A JSON file containing your credentials will be downloaded.
+
+3.  **Share Your Google Sheet:**
+    *   Open the JSON file you downloaded. Find the `client_email` value (e.g., `your-service-account@your-project.iam.gserviceaccount.com`).
+    *   Open your Google Sheet.
+    *   Click the **Share** button in the top-right corner.
+    *   Paste the `client_email` into the sharing dialog and grant it at least **Viewer** access.
+
+4.  **Set Environment Variable:**
+    *   The application reads the Google Sheets credentials from an environment variable named `GOOGLE_SHEETS_CREDENTIALS`.
+    *   You must set this variable to the **entire content** of the JSON credentials file.
+
+    **Example (`.env` file):**
+    ```
+    GOOGLE_SHEETS_CREDENTIALS='{"type": "service_account", "project_id": "...", ...}'
+    ```
+
+5.  **Usage in `server.py`:**
+    *   The `/api/sheets/data` endpoint in `server.py` calls the `get_data_from_sheet` function from `sheets.py` to fetch and parse the data.
+
+### MongoDB Connection
+
+The application uses MongoDB as its database.
+
+#### Steps:
+
+1.  **Get MongoDB Connection String:**
+    *   You need a valid MongoDB connection string (URI) from your MongoDB provider (e.g., MongoDB Atlas).
+    *   The URI typically looks like this: `mongodb+srv://<username>:<password>@<cluster-url>/<database-name>?retryWrites=true&w=majority`
+
+2.  **Set Environment Variable:**
+    *   The application reads the MongoDB URI from environment variables. The main database connection is defined in `database.py`.
+    *   Set the following variables in your environment (e.g., in a `.env` file):
+
+    ```
+    # Main application database
+    MAIN_DB_URI=mongodb+srv://...
+
+    # Attendance database
+    ATTENDANCE_DB_URI=mongodb+srv://...
+    ```
+
+3.  **Connection Logic:**
+    *   The file `backend/database.py` contains the logic for establishing the connection to the MongoDB server and selecting the appropriate databases.
+    *   The database objects are then imported and used throughout `server.py` to interact with the collections.

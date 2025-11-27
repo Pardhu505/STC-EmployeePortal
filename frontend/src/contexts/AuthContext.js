@@ -493,9 +493,11 @@ export const AuthProvider = ({ children }) => {
         console.log('Browser notification clicked. Data:', options.data);
         if (options.data) {
           if (options.data.channel) {
+            // eslint-disable-next-line no-undef
             navigateToChat({ type: 'channel', id: options.data.channel });
           } else if (options.data.isDirectMessage) {
             // For a DM, the target is the sender of the message
+            // eslint-disable-next-line no-undef
             navigateToChat({ type: 'dm', id: options.data.senderName });
           }
         }

@@ -1,0 +1,24 @@
+.table-container {
+    overflow-x: auto;
+  }
+
+  .custom-table {
+    min-width: 100%;
+    background-color: white;
+    border: 1px solid #ddd;
+    text-align: center;
+  }
+
+  .custom-table th,
+  .custom-table td {
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+  }
+
+  .custom-table thead tr {
+    background-color: #89bff8;
+  }
+
+  .custom-table th {
+    font-weight: bold;
+  }

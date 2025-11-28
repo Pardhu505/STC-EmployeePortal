@@ -110,7 +110,6 @@ const ExcelDataViewer = () => {
                   <SelectValue placeholder={`All ${key}`} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All {key}</SelectItem>
                   {dropdownOptions[key].map(option => (
                     <SelectItem key={option} value={String(option)}>{option}</SelectItem>
                   ))}

@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import * as XLSX from 'xlsx';
 import DataTable from '../components/DataTable';
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from '../components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
+import { uploadAPMapping, fetchAPMappingData } from '../api';
 
 const ExcelDataViewer = () => {
   const { user } = useAuth();
@@ -23,6 +23,19 @@ const ExcelDataViewer = () => {
     'Assembly Constituency': [],
   });
 
+  const fetchData = async () => {
+    try {
+      const response = await fetchAPMappingData({});
+      setData(response);
+    } catch (error) {
+      console.error('Error fetching data:', error);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
   useEffect(() => {
     if (data.length > 0) {
       const options = {
@@ -36,20 +49,16 @@ const ExcelDataViewer = () => {
     }
   }, [data]);
 
-  const handleFileUpload = (e) => {
+  const handleFileUpload = async (e) => {
     const file = e.target.files[0];
     if (file) {
       setFileName(file.name);
-      const reader = new FileReader();
-      reader.onload = (evt) => {
-        const bstr = evt.target.result;
-        const wb = XLSX.read(bstr, { type: 'binary' });
-        const wsname = wb.SheetNames[0];
-        const ws = wb.Sheets[wsname];
-        const data = XLSX.utils.sheet_to_json(ws);
-        setData(data);
-      };
-      reader.readAsBinaryString(file);
+      try {
+        await uploadAPMapping(file);
+        fetchData(); // Refresh data after upload
+      } catch (error) {
+        console.error('Error uploading file:', error);
+      }
     }
   };
 
@@ -57,14 +66,13 @@ const ExcelDataViewer = () => {
     setFilters(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleGetData = () => {
-    let filtered = data;
-    Object.keys(filters).forEach(key => {
-      if (filters[key]) {
-        filtered = filtered.filter(item => String(item[key]) === String(filters[key]));
-      }
-    });
-    setFilteredData(filtered);
+  const handleGetData = async () => {
+    try {
+      const response = await fetchAPMappingData(filters);
+      setFilteredData(response);
+    } catch (error) {
+      console.error('Error fetching filtered data:', error);
+    }
   };
 
   const handleClearFilter = () => {

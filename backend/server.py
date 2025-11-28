@@ -31,6 +31,8 @@ from database import (
 )
 
 from sheets import get_data_from_sheet
+import pandas as pd
+import io
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -2205,6 +2207,47 @@ async def upload_file(request: Request, file: UploadFile = File(...)):
     except Exception as e:
         logging.error(f"File upload failed: {e}")
         raise HTTPException(status_code=500, detail="File upload failed")
+
+@api_router.post("/upload-ap-mapping")
+async def upload_ap_mapping(file: UploadFile = File(...)):
+    try:
+        contents = await file.read()
+        df = pd.read_excel(io.BytesIO(contents))
+        data = df.to_dict('records')
+
+        # Clear existing data
+        await main_db.ap_booth_mapping.delete_many({})
+        # Insert new data
+        await main_db.ap_booth_mapping.insert_many(data)
+
+        return {"message": "AP mapping data uploaded successfully"}
+    except Exception as e:
+        logging.error(f"AP mapping file upload failed: {e}")
+        raise HTTPException(status_code=500, detail=f"AP mapping file upload failed: {e}")
+
+@api_router.get("/ap-mapping-data")
+async def get_ap_mapping_data(
+    zone: Optional[str] = None,
+    district: Optional[str] = None,
+    parliament: Optional[str] = None,
+    assembly: Optional[str] = None,
+):
+    try:
+        query = {}
+        if zone:
+            query["Zone"] = zone
+        if district:
+            query["District"] = district
+        if parliament:
+            query["Parliament Constituency"] = parliament
+        if assembly:
+            query["Assembly Constituency"] = assembly
+
+        data = await main_db.ap_booth_mapping.find(query).to_list(length=None)
+        return serialize_document(data)
+    except Exception as e:
+        logging.error(f"Failed to fetch AP mapping data: {e}")
+        raise HTTPException(status_code=500, detail="Failed to fetch AP mapping data")
     
 @api_router.post("/attendance-report")
 async def save_attendance_report(employees: List[EmployeeAttendance] = Body(...)):

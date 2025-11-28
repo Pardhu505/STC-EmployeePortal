@@ -3,6 +3,7 @@ import * as XLSX from 'xlsx';
 import DataTable from '../components/DataTable';
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from '../components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 
 const ExcelDataViewer = () => {
   const { user } = useAuth();
@@ -25,10 +26,10 @@ const ExcelDataViewer = () => {
   useEffect(() => {
     if (data.length > 0) {
       const options = {
-        Zone: [...new Set(data.map(item => item.Zone))],
-        District: [...new Set(data.map(item => item.District))],
-        'Parliament Constituency': [...new Set(data.map(item => item['Parliament Constituency']))],
-        'Assembly Constituency': [...new Set(data.map(item => item['Assembly Constituency']))],
+        Zone: [...new Set(data.map(item => item.Zone))].sort(),
+        District: [...new Set(data.map(item => item.District))].sort(),
+        'Parliament Constituency': [...new Set(data.map(item => item['Parliament Constituency']))].sort(),
+        'Assembly Constituency': [...new Set(data.map(item => item['Assembly Constituency']))].sort(),
       };
       setDropdownOptions(options);
       setFilteredData(data);
@@ -52,16 +53,15 @@ const ExcelDataViewer = () => {
     }
   };
 
-  const handleFilterChange = (e) => {
-    const { name, value } = e.target;
-    setFilters({ ...filters, [name]: value });
+  const handleFilterChange = (name, value) => {
+    setFilters(prev => ({ ...prev, [name]: value }));
   };
 
   const handleGetData = () => {
     let filtered = data;
     Object.keys(filters).forEach(key => {
       if (filters[key]) {
-        filtered = filtered.filter(item => item[key] === filters[key]);
+        filtered = filtered.filter(item => String(item[key]) === String(filters[key]));
       }
     });
     setFilteredData(filtered);
@@ -79,39 +79,51 @@ const ExcelDataViewer = () => {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <h1 className="text-2xl font-bold mb-4">Excel Data Viewer</h1>
-      {user && user.email === 'pardhasaradhi@showtimeconsulting.in' && (
-        <div className="mb-4">
-          <input
-            type="file"
-            accept=".xlsx, .xls"
-            onChange={handleFileUpload}
-            className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-          />
-          {fileName && <p className="text-sm text-gray-600 mt-2">Uploaded file: {fileName}</p>}
-        </div>
-      )}
+      <h1 className="text-3xl font-bold text-gray-800 mb-6">Excel Data Viewer</h1>
 
-      {data.length > 0 && (
-        <div className="flex flex-wrap gap-4 mb-4">
-          {Object.keys(dropdownOptions).map(key => (
-            <select
-              key={key}
-              name={key}
-              value={filters[key]}
-              onChange={handleFilterChange}
-              className="block w-full md:w-auto px-3 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
-            >
-              <option value="">All {key}</option>
-              {dropdownOptions[key].map(option => (
-                <option key={option} value={option}>{option}</option>
-              ))}
-            </select>
-          ))}
-          <Button onClick={handleGetData}>Get Data</Button>
-          <Button variant="outline" onClick={handleClearFilter}>Clear Filter</Button>
-        </div>
-      )}
+      <div className="flex flex-wrap items-center gap-4 mb-6 bg-white p-4 rounded-lg shadow-sm">
+        {user && user.email === 'pardhasaradhi@showtimeconsulting.in' && (
+          <div className="flex items-center gap-2">
+            <label htmlFor="excel-upload" className="inline-flex items-center justify-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 cursor-pointer">
+              Choose File
+            </label>
+            <input
+              id="excel-upload"
+              type="file"
+              accept=".xlsx, .xls"
+              onChange={handleFileUpload}
+              className="hidden"
+            />
+            {fileName && <span className="text-sm text-gray-600">{fileName}</span>}
+          </div>
+        )}
+
+        {data.length > 0 && (
+          <>
+            {Object.keys(dropdownOptions).map(key => (
+              <Select
+                key={key}
+                onValueChange={(value) => handleFilterChange(key, value)}
+                value={filters[key]}
+              >
+                <SelectTrigger className="w-auto">
+                  <SelectValue placeholder={`All ${key}`} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">All {key}</SelectItem>
+                  {dropdownOptions[key].map(option => (
+                    <SelectItem key={option} value={String(option)}>{option}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ))}
+            <Button onClick={handleGetData}>Get Data</Button>
+            <Button variant="outline" onClick={handleClearFilter}>Clear Filter</Button>
+          </>
+        )}
+      </div>
+
+      {fileName && <p className="text-sm text-gray-500 mb-4">Uploaded file: {fileName}</p>}
 
       <DataTable data={filteredData} />
     </div>

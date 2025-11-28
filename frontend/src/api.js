@@ -1,8 +1,8 @@
 // This file centralizes API calls for the application.
 
-const API_BASE_URL = 'https://stc-employeeportal.onrender.com/api'
+// const API_BASE_URL = 'https://stc-employeeportal.onrender.com/api'
 
-// const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
 
 
 /**
@@ -22,6 +22,35 @@ export const fetchUserProfile = async (email) => {
     throw new Error(errorData.detail || 'Failed to fetch user profile');
   }
   
+  return response.json();
+};
+
+export const uploadAPMapping = async (file) => {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const response = await fetch(`${API_BASE_URL}/upload-ap-mapping`, {
+    method: 'POST',
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.detail || 'Failed to upload file');
+  }
+
+  return response.json();
+};
+
+export const fetchAPMappingData = async (filters) => {
+  const query = new URLSearchParams(filters).toString();
+  const response = await fetch(`${API_BASE_URL}/ap-mapping-data?${query}`);
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.detail || 'Failed to fetch AP mapping data');
+  }
+
   return response.json();
 };
 

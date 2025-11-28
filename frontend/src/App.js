@@ -8,6 +8,7 @@ import Dashboard from "@/components/Dashboard";
 import Signup from "@/components/signup";
 import LoadingSpinner from "@/LoadingSpinner";
 import APMapping from "@/components/APMapping";
+import ExcelDataViewer from "@/pages/ExcelDataViewer";
 
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth();
@@ -54,6 +55,11 @@ function App() {
               <Route path="/ap-mapping" element={
                 <ProtectedRoute>
                   <APMapping />
+                </ProtectedRoute>
+              } />
+              <Route path="/excel-data" element={
+                <ProtectedRoute>
+                  <ExcelDataViewer />
                 </ProtectedRoute>
               } />
               <Route path="/" element={<Navigate to="/dashboard" />} />

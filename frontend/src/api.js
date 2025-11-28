@@ -25,6 +25,35 @@ export const fetchUserProfile = async (email) => {
   return response.json();
 };
 
+export const uploadAPMapping = async (file) => {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const response = await fetch(`${API_BASE_URL}/upload-ap-mapping`, {
+    method: 'POST',
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.detail || 'Failed to upload file');
+  }
+
+  return response.json();
+};
+
+export const fetchAPMappingData = async (filters) => {
+  const query = new URLSearchParams(filters).toString();
+  const response = await fetch(`${API_BASE_URL}/ap-mapping-data?${query}`);
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.detail || 'Failed to fetch AP mapping data');
+  }
+
+  return response.json();
+};
+
 /**
  * Updates a user's profile details in the database.
  * @param {string} email - The email of the user to update.

@@ -24,6 +24,15 @@ const PROJECTS_DATA = [
     category: 'Analytics',
     url: '#', // Not yet implemented
   },
+  {
+    id: 'ap-zone-booth-mapping',
+    title: 'Andhra Pradesh Zone to Booth Mapping',
+    description: 'Upload and view zone-to-booth mapping data for Andhra Pradesh.',
+    icon: <Map className="w-8 h-8 text-white" />,
+    gradient: 'from-purple-500 to-purple-700',
+    category: 'Data Management',
+    url: '/excel-data',
+  },
 ];
 
 const Projects = () => {

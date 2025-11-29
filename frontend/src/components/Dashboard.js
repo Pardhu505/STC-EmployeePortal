@@ -20,6 +20,7 @@ import ManagerReport from './Manger Attendence';
 import AttendanceReport from './AdminAttedenceReport';
 import HRAttendance from './HRAttendance';
 import { employeeAPI } from '../Services/api';
+import { fetchEmployeesWorkDetails } from '../api'; // Import the centralized fetch function
 
 const DateTimeWidget = () => {
   const [time, setTime] = useState(new Date());
@@ -76,7 +77,7 @@ const DateTimeWidget = () => {
         <span>{monthNames[month]} {year}</span>
       </div>
       <div className="grid grid-cols-7 gap-1 text-center text-xs text-gray-500 mb-1">
-        {dayNames.map(day => <div key={day} className="w-3 h-3 flex items-center justify-center">{day}</div>)}
+        {dayNames.map((day, i) => <div key={`${day}-${i}`} className="w-3 h-3 flex items-center justify-center">{day}</div>)}
       </div>
       <div className="grid grid-cols-7 gap-1">{calendarDays}</div>
     </div>
@@ -84,11 +85,10 @@ const DateTimeWidget = () => {
 };
 
 const Dashboard = () => {
-  const { user, isAdmin, loading: authLoading, navigationTarget } = useAuth();
+  const { user, isAdmin, loading: authLoading, navigationTarget, allEmployees, setAllEmployees } = useAuth();
   const [activeSection, setActiveSection] = useState('portals');
   const [readAnnouncementIds, setReadAnnouncementIds] = useState(new Set());
   const [announcements, setAnnouncements] = useState([]);
-  const [allEmployees, setAllEmployees] = useState([]);
 
   // Helper to check for birthdays
   const checkBirthdays = (employees) => {
@@ -144,13 +144,10 @@ const Dashboard = () => {
       const data = await response.json();
       
       // Fetch all employees' work details to check for birthdays. This endpoint is accessible to all users.
-      const employeesResponse = await fetch(`${API_BASE_URL}/api/employees/work-details/`);
-      if (!employeesResponse.ok) throw new Error('Failed to fetch employees');
-      const employees = await employeesResponse.json();
-      setAllEmployees(employees);
+      // The employee list is now managed by AuthContext, so we just use it.
 
       // Generate birthday announcements
-      const birthdayEmployees = checkBirthdays(employees, user);
+      const birthdayEmployees = checkBirthdays(allEmployees, user);
       const birthdayAnns = generateBirthdayAnnouncements(birthdayEmployees, user);
 
       // Combine fetched announcements with birthday announcements
@@ -163,6 +160,7 @@ const Dashboard = () => {
 
   useEffect(() => {
     fetchAnnouncements();
+    // The global employee list is fetched in AuthContext, so no need to fetch it here.
 
     const handleNewAnnouncement = (event) => {
       const message = event.detail;
@@ -179,7 +177,7 @@ const Dashboard = () => {
     
     window.addEventListener('websocket-message', handleNewAnnouncement);
     return () => window.removeEventListener('websocket-message', handleNewAnnouncement);
-  }, []);
+  }, [user, allEmployees]); // Depend on allEmployees so birthday announcements update if the list changes.
 
   // Periodically re-fetch announcements to catch newly active scheduled ones
   useEffect(() => {

@@ -34,7 +34,13 @@ dist
 
 *token.json*
 *credentials.json*
+<<<<<<< HEAD
 service-account-key.json
+=======
+.env
+.env.*
+!.env.example
+>>>>>>> 2a3f81a (meetings module)
 
 # Logs and debug files
 *.log

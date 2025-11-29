@@ -15,7 +15,7 @@ export const fetchUserProfile = async (email) => {
   if (!email) {
     throw new Error('Email is required to fetch user profile.');
   }
-  const response = await fetch(`${API_BASE_URL}/employees/email/${encodeURIComponent(email.trim())}`);
+  const response = await fetch(`${API_BASE_URL}/api/employees/email/${encodeURIComponent(email.trim())}`);
   
   if (!response.ok) {
     const errorData = await response.json();
@@ -66,7 +66,7 @@ export const updateUserProfile = async (email, profileData) => {
     throw new Error('Email is required to update user profile.');
   }
   
-  const response = await fetch(`${API_BASE_URL}/users/${encodeURIComponent(email.trim())}/profile`, {
+  const response = await fetch(`${API_BASE_URL}/api/users/${encodeURIComponent(email.trim())}/profile`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(profileData),
@@ -90,7 +90,7 @@ export const updateUserProfile = async (email, profileData) => {
  * @throws {Error} - Throws an error if the API call fails.
  */
 export const fetchEmployeesWorkDetails = async () => {
-  const response = await fetch(`${API_BASE_URL}/employees/work-details/`); // Note the trailing slash
+  const response = await fetch(`${API_BASE_URL}/api/employees/work-details`);
   
   if (!response.ok) {
     const errorData = await response.json();
@@ -110,7 +110,7 @@ export const fetchManagerTeam = async (managerId) => {
   if (!managerId) {
     throw new Error('Manager ID is required to fetch the team.');
   }
-  const response = await fetch(`${API_BASE_URL}/manager/${encodeURIComponent(managerId)}/team`);
+  const response = await fetch(`${API_BASE_URL}/api/manager/${encodeURIComponent(managerId)}/team`);
 
   if (!response.ok) {
     const errorData = await response.json();
@@ -136,7 +136,7 @@ export const fetchManagerAttendanceReport = async ({ managerId, teamEmpCodes, re
   }
 
   // The endpoint is now just /attendance-report/manager
-  const url = `${API_BASE_URL}/attendance-report/manager`;
+  const url = `${API_BASE_URL}/api/attendance-report/manager`;
 
   // Prepare the request body
   const body = {

@@ -205,9 +205,19 @@ const InternalCommunication = () => {
         const response = await fetch(`${API_BASE_URL}/api/channel-messages?channel_id=${channel.name}&user_id=${user.email}&limit=50`);
         console.log('Fetch response status:', response.status);
         if (response.ok) {
-          const oldMessages = await response.json();
-          console.log('Fetched old messages:', oldMessages);
-          setMessages(oldMessages);
+          let oldMessages = await response.json();
+          console.log('Fetched old messages:', oldMessages.length);
+          
+          // Process fetched messages to add status
+          const processedMessages = oldMessages.map(msg => {
+            // For channel messages, we can simplify the status.
+            // If it's from the current user and has an ID, it's 'sent'.
+            // The backend doesn't provide read receipts for channels in this implementation.
+            const status = (msg.sender_id === user.email && msg.id) ? 'sent' : 'none';
+            return { ...msg, status };
+          });
+
+          setMessages(processedMessages);
         } else {
           console.error('Failed to fetch messages:', response.statusText);
         }

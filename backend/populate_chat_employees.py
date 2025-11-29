@@ -6,6 +6,9 @@ from datetime import datetime, timezone, timedelta
 from typing import Union, Any
 import logging
 
+# Import the mock data
+from mock_data_module import DEPARTMENT_DATA
+
 
 # Load environment variables
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -191,4 +194,3 @@ if __name__ == "__main__":
     import asyncio
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
     asyncio.run(update_employee_reviewers())
-

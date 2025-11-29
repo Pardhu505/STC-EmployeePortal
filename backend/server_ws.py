@@ -1,24 +1,327 @@
-import json
+from fastapi import FastAPI, APIRouter, WebSocket, WebSocketDisconnect, HTTPException, Request, Body, File, UploadFile
+from fastapi.responses import FileResponse
+from starlette.middleware.cors import CORSMiddleware
+import os
 import logging
-import asyncio
-import re
+from pathlib import Path
+from motor.motor_asyncio import AsyncIOMotorGridFSBucket
+from pydantic import BaseModel, Field, HttpUrl
+from typing import List, Dict, Union
+import base64
 import uuid
+from datetime import datetime, timedelta, timezone, time, date
+import json
+import re
+import asyncio
+from bson.json_util import dumps
+from typing import Optional, Any
+# from mock_data_module import DEPARTMENT_DATA
 import urllib.parse
-from datetime import datetime, timezone, timedelta, date
-from typing import List, Dict, Union, Optional
+import gsheets
+from pydantic import field_validator
+from download_file import router as download_router
+from passlib.context import CryptContext
+from fastapi import Depends, Header
+from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
+# Import all database objects and dependencies from the central database module
+from database import (
+    main_db, attendance_db, chat_db, stc_db, grid_fs, get_grid_fs,
+    main_client, attendance_client
+)
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException, Depends, Query, Request, File, UploadFile
-from bson import ObjectId
-
-from database import chat_db, stc_db, get_all_employees_emails, get_employees_by_department, sanitize_team
 from models import (
-    Message, DeletedMessage, Notification, Announcement, AnnouncementCreate, AnnouncementUpdate, UserProfileUpdate,
-    MarkReadRequest, get_user_info, get_user_info_with_collection, get_current_admin_user, serialize_document,
-    TEAMS, DEPARTMENT_TEAMS, get_department_from_team
-) 
+    Message, DeletedMessage, Notification, Announcement, AnnouncementCreate, AnnouncementUpdate,
+    Employee, EmployeeCreate, UserProfileUpdate, AdminUserUpdate, AdminPasswordReset,
+    LoginRequest, SignupRequest, PasswordChangeRequest, DailyRecord, EmployeeAttendance,
+    get_user_info_with_collection, get_user_info, serialize_document, get_department_from_team,
+    TEAMS, DEPARTMENT_TEAMS)
+from sheets import get_data_from_sheet
 
-router = APIRouter()
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+
+# DeletedMessages
+# Messages
+
+
+# Define IST timezone
 ist_tz = timezone(timedelta(hours=5, minutes=30))
+# --- Allowed Origins for CORS ---
+ALLOWED_ORIGINS = [
+    "http://localhost:3000",
+    "http://localhost:3001",
+    "https://showtime-consulting-employee-portal.onrender.com",
+    "https://showtime-employeeportal.vercel.app",
+    "https://stc-employeeportal.vercel.app"
+]
+
+# --- Custom Exception Handlers to ensure CORS headers on errors ---
+
+async def http_exception_handler(request: Request, exc: HTTPException):
+    """
+    Custom handler for HTTPException to ensure all error responses include
+    the necessary CORS headers. This prevents the frontend from seeing
+    a generic "Network Error" on 4xx/5xx responses.
+    """
+    origin = request.headers.get('origin')
+    headers = getattr(exc, "headers", None) or {}
+    if origin in ALLOWED_ORIGINS:
+        headers["Access-Control-Allow-Origin"] = origin
+        headers["Access-Control-Allow-Credentials"] = "true"
+
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail},
+        headers=headers,
+    )
+
+async def generic_exception_handler(request: Request, exc: Exception):
+    """
+    Catch-all handler for unhandled exceptions to return a 500 error
+    with CORS headers.
+    """
+    logging.error(f"Unhandled exception: {exc}", exc_info=True)
+    origin = request.headers.get('origin')
+    headers = {}
+    if origin in ALLOWED_ORIGINS:
+        headers["Access-Control-Allow-Origin"] = origin
+        headers["Access-Control-Allow-Credentials"] = "true"
+
+    return JSONResponse(status_code=500, content={"detail": "An internal server error occurred."}, headers=headers)
+
+# Create the main app and register exception handlers
+app = FastAPI()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=ALLOWED_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Register the custom exception handlers
+app.add_exception_handler(HTTPException, http_exception_handler)
+app.add_exception_handler(Exception, generic_exception_handler)
+
+# Create a router with the /api prefix
+api_router = APIRouter(prefix="/api")
+
+# --- Constants for Teams and Departments ---
+# Moved these definitions to the top to resolve NameError issues in methods
+# that depend on them, like get_channel_members.
+
+TEAMS = [
+    "Research",
+    "Media",
+    "Data",
+    "Digital Production",
+    "Digital Communication",
+    "Propagation",
+    "Neagitive Propagation",
+    "Digital Marketing/Networking",
+    "HIVE",
+    "Campaign",
+    "Soul Central",
+    "Field Team AP-1",
+    "Field Team AP-2",
+    "Field Team TG",
+    "PMU",
+    "Directors Team-1",
+    "Directors Team-2",
+    "HR",
+    "Directors Team-3",
+    "Operations",
+    "System Admin"
+]
+
+DEPARTMENT_TEAMS = {
+    "Research": ["Research"],
+    "Media": ["Media"],
+    "Data": ["Data"],
+    "DMC": [
+        "Digital Production",
+        "Digital Communication",
+        "Propagation",
+        "Neagitive Propagation",
+        "Digital Marketing/Networking",
+        "HIVE"
+    ],
+    "Campaign": ["Campaign"],
+    "Soul Central": [
+        "Soul Central",
+        "Field Team AP-1",
+        "Field Team AP-2",
+        "Field Team TG",
+        "PMU"
+    ],
+    "Directors team": [
+        "Directors Team-1",
+        "Directors Team-2",
+        "Directors Team-3"
+    ],
+    "HR": ["HR"],
+    "Admin": [
+        "Operations",
+        "System Admin"
+    ]
+}
+
+def get_department_from_team(team: str) -> str:
+    """
+    Helper function to find the department for a given team.
+    This needs DEPARTMENT_TEAMS to be defined before it's called.
+    """
+    for dept, teams in DEPARTMENT_TEAMS.items():
+        if team in teams:
+            return dept
+    return None
+
+
+# --- Dependencies ---
+
+
+async def get_current_admin_user(authorization: Optional[str] = Header(None, alias="Authorization")):
+    """
+    Dependency to get and validate the current admin user from a token.
+    This checks if the user associated with the token is an admin.
+    If no token is provided, it returns None. If a token is provided but invalid, it raises an error.
+    """
+    if not authorization:
+        return None # No token provided, this is not an error for optional auth.
+
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    token_str = authorization.split(" ")[1]
+    logging.info(f"Admin auth attempt with token: {token_str[:100]}...") # Log token safely
+
+    user_email_from_token = None
+    try:
+        # The token is a Base64-encoded JSON string of the user object.
+        # First, decode from Base64, then parse the JSON.
+        decoded_token = base64.b64decode(token_str).decode('utf-8')
+        user_data_from_token = json.loads(decoded_token)
+        user_email_from_token = user_data_from_token.get("email") if isinstance(user_data_from_token, dict) else None
+    except (json.JSONDecodeError, base64.binascii.Error, AttributeError, TypeError) as e:
+        logging.warning(f"Admin auth failed: Could not decode or parse token. Error: {e}. Token: {token_str[:100]}...")
+        raise HTTPException(status_code=401, detail="Invalid token format.")
+
+    if not user_email_from_token:
+        logging.warning("Admin auth failed: Could not extract email from token.")
+        raise HTTPException(status_code=401, detail="Invalid token: email missing.")
+
+    user, _ = await get_user_info_with_collection(stc_db, user_email_from_token)
+
+    if not user:
+        logging.warning(f"Admin auth failed: User '{user_email_from_token}' not found in database")
+        raise HTTPException(status_code=401, detail="User not found or token is invalid")
+
+    # Check if the user exists and has an admin designation.
+    # Also check the 'isAdmin' flag for robustness.
+    designation = user.get("designation", "").lower().strip()
+    if user.get("isAdmin") or "admin" in designation or "director" in designation:
+        logging.info(f"Admin access granted for user: {user_email_from_token}")
+        return user
+
+    raise HTTPException(status_code=403, detail="User is not an administrator")
+
+
+# --- Admin Routes ---
+
+class AdminUserUpdate(BaseModel):
+    """
+    Pydantic model for admin updates. All fields are optional.
+    """
+    name: Optional[str] = None
+    email: Optional[str] = None
+    designation: Optional[str] = None
+    department: Optional[str] = None
+    team: Optional[str] = None
+    empCode: Optional[str] = None
+
+    class Config:
+        extra = 'ignore'
+
+class AdminPasswordReset(BaseModel):
+    new_password: str
+
+@api_router.put("/admin/users/{original_email}/details")
+async def admin_update_user_details(
+    original_email: str, 
+    user_data: AdminUserUpdate, 
+    admin_user: dict = Depends(get_current_admin_user)
+):
+    """
+    Admin endpoint to update a user's details.
+    """
+    decoded_email = urllib.parse.unquote(original_email)
+    user, collection = await get_user_info_with_collection(stc_db, decoded_email)
+
+    if not user or collection is None:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    update_payload = user_data.model_dump(exclude_unset=True)
+
+    if not update_payload:
+        raise HTTPException(status_code=400, detail="No update data provided.")
+
+    # If the email is being changed, we need to handle it carefully
+    new_email = update_payload.get("email")
+    if new_email and new_email.lower() != decoded_email.lower():
+        # Check if the new email is already taken
+        existing_user, _ = await get_user_info_with_collection(stc_db, new_email)
+        if existing_user:
+            raise HTTPException(status_code=400, detail="New email is already in use.")
+        # Update the 'id' field as well if it's based on email
+        update_payload['id'] = new_email
+
+    await collection.update_one(
+        {"email": re.compile(f"^{re.escape(decoded_email)}$", re.IGNORECASE)},
+        {"$set": update_payload}
+    )
+
+    logging.info(f"Admin '{admin_user.get('email')}' updated details for user '{decoded_email}'.")
+    return {"message": f"User {decoded_email} updated successfully."}
+
+@api_router.delete("/admin/users/{email}")
+async def admin_delete_user(email: str, admin_user: dict = Depends(get_current_admin_user)):
+    """
+    Admin endpoint to permanently delete a user.
+    """
+    decoded_email = urllib.parse.unquote(email)
+    user, collection = await get_user_info_with_collection(stc_db, decoded_email)
+
+    if not user or collection is None:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    result = await collection.delete_one({"email": re.compile(f"^{re.escape(decoded_email)}$", re.IGNORECASE)})
+
+    if result.deleted_count > 0:
+        logging.info(f"Admin '{admin_user.get('email')}' permanently deleted user '{decoded_email}'.")
+        return {"message": f"User {decoded_email} has been permanently deleted."}
+    
+    raise HTTPException(status_code=500, detail="Failed to delete user.")
+
+@api_router.post("/admin/users/{email}/reset-password")
+async def admin_reset_password(
+    email: str, 
+    password_data: AdminPasswordReset, 
+    admin_user: dict = Depends(get_current_admin_user)
+):
+    """
+    Admin endpoint to reset a user's password.
+    """
+    decoded_email = urllib.parse.unquote(email)
+    # We pass an empty current_password because the check will be bypassed by is_admin_reset=True
+    # The admin_user dependency ensures this is an authorized action.
+    response = await change_password(
+        user_id=decoded_email,
+        request=PasswordChangeRequest(current_password="", new_password=password_data.new_password),
+        request=UserPasswordResetRequest(current_password="", new_password=password_data.new_password),
+        admin_user=admin_user
+    )
+    return response
 
 # --- WebSocket Connection Manager ---
 class ConnectionManager:
@@ -157,8 +460,6 @@ class ConnectionManager:
                     channels.append(f"dept-{dept_slug}")
                 # Add team channel
                 team_slug = user["team"].lower().replace(' ', '-').replace('/', '-')
-                # Add team channel, ensuring slashes are preserved if they are part of the name
-                team_slug = user["team"].lower().replace(' ', '-')
                 channels.append(f"team-{team_slug}")
         except Exception as e:
             logging.error(f"Failed to get channels for user {user_id}: {e}")
@@ -318,11 +619,307 @@ class ConnectionManager:
 
 manager = ConnectionManager()
 
-class StatusCheckCreate(Message):
+# --- Models ---
+class Message(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    channel_id: str | None = None
+    recipient_id: Union[str, List[str], None] = None
+    sender_id: str
+    sender_name: str
+    content: str = ""
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(ist_tz))
+    type: str = "text"
+    # Added fields for file messages
+    file_name: str | None = None
+    file_type: str | None = None
+    file_size: int | None = None
+    file_url: str | None = None
+    # Added field for reactions
+    reactions: List[Dict[str, str]] = Field(default_factory=list)
+
+class DeletedMessage(BaseModel):
+    user_id: str
+    message_id: str
+
+class Notification(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    user_id: str  # The user who should receive the notification
+    sender_id: str  # The user who sent the message
+    sender_name: str
+    message_id: str  # Reference to the original message
+    message_content: str  # Preview of the message content
+    channel_id: str | None = None
+    recipient_id: str | None = None
+    type: str = "message"  # "message", "channel_message", etc.
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(ist_tz))
+    is_read: bool = False
+
+class Announcement(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    title: str
+    content: str
+    priority: str
+    author: str
+    date: datetime = Field(default_factory=lambda: datetime.now(ist_tz))
+
+    # New fields for scheduling
+    status: str = "published" # Can be 'published' or 'scheduled'
+    scheduled_at: Optional[datetime] = None
+
+class AnnouncementCreate(BaseModel):
+    title: str
+    content: str
+    priority: str
+class Employee(BaseModel):
+    id: str
+    name: str
+    email: str
+    designation: str
+    department: str
+    team: str
+    empCode: str
+    password_hash: str
+    reviewer: str | None = None
+    phone: str | None = None
+    emergency_contact: str | None = None
+    date_of_birth: str | None = None
+    last_online: datetime | None = None
+    profilePicture: str | None = None
+    active: bool = True
+
+class EmployeeCreate(BaseModel):
+    scheduled_at: Optional[datetime] = None
+    """Model for creating a new employee, without database-generated fields."""
+    id: str
+    name: str
+    email: str
+    designation: str
+    department: str
+    team: str
+    empCode: str
+    password_hash: str
+    reviewer: str | None = None
+    phone: str | None = None
+    emergency_contact: str | None = None
+    date_of_birth: datetime | None = None
+    profilePicture: str | None = None
+
+
+class StatusCheck(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     client_name: str
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(ist_tz))
     status: str
 
-@router.get("/users/status", response_model=List[Dict])
+class StatusCheckCreate(BaseModel):
+    client_name: str
+    status: str
+    
+class DailyRecord(BaseModel):
+    date: datetime = Field(default_factory=lambda: datetime.now(ist_tz))
+    status: str
+    inTime: str
+    outTime: str
+    lateBy: str
+    totalWorkingHours: str
+
+    @field_validator('date', mode='before')
+    @classmethod
+    def validate_date(cls, v):
+        # Handle string input from the frontend CSV parser
+        if isinstance(v, str):
+            try:
+                # The frontend sends a string like 'YYYY-MM-DDTHH:MM:SS'
+                v = datetime.fromisoformat(v)
+            except ValueError:
+                raise ValueError(f"Invalid date format: {v}")
+
+        if isinstance(v, datetime):
+            if v.tzinfo is None:
+                # Assume UTC if no timezone is provided, as from the frontend
+                v = v.replace(tzinfo=timezone.utc)
+            # Normalize to just the date part at midnight UTC
+            v = datetime.combine(v.date(), time(0, 0, 0, tzinfo=timezone.utc))
+        return v
+
+class EmployeeAttendance(BaseModel):
+    empCode: str
+    empName: str
+    dailyRecords: List[DailyRecord]
+class EmployeeData(BaseModel):
+    empCode: str
+    empName: str
+    dailyRecords: List[DailyRecord]
+
+class AttendanceReportData(BaseModel):
+    employees: Dict[str, EmployeeData]
+
+class User(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    email: str
+    password_hash: str
+    name: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(ist_tz))
+
+
+async def get_user_info(stc_db, user_id: str) -> Optional[dict]:
+    """
+    Get user info by id or email. This function is less efficient as it scans all collections.
+    Prefer get_user_info_with_collection where possible.
+    """
+    user, _ = await get_user_info_with_collection(stc_db, user_id)
+    return user
+
+
+async def get_user_info_with_collection(stc_db, user_id: str, include_hash: bool = False) -> tuple[Optional[dict], Optional[any]]:
+    """
+    Get user info and their collection by id or email with a case-insensitive search.
+    This function is now more robust and searches across all defined team collections.
+    """
+    # Fetch all non-system collections directly from the database for robustness.
+    all_collection_names = await stc_db.list_collection_names()
+    team_collection_names = [name for name in all_collection_names if not name.startswith('system.')]
+
+    projection = None if include_hash else {"password_hash": 0}
+    
+    # Use a case-insensitive regex for both id and email search
+    # The user_id might be URL-encoded, so decode it first.
+    decoded_user_id = urllib.parse.unquote(user_id)
+    search_regex = re.compile(f"^{re.escape(decoded_user_id)}$", re.IGNORECASE)
+
+    for collection_name in team_collection_names:
+        try:
+            collection = stc_db[collection_name]
+            # Search by 'email' field case-insensitively
+            user = await collection.find_one({"email": search_regex}, projection)
+
+            if user:
+                return user, collection
+        except Exception as e:
+            logging.warning(f"Could not search in collection {collection_name}: {e}")
+    return None, None
+
+
+async def get_all_employees_emails(stc_db) -> List[str]:
+    """Get all unique employee emails from stc_db."""
+    collection_names = await stc_db.list_collection_names()
+    team_collections = [stc_db[name] for name in collection_names]
+    all_emails = set()
+    for collection in team_collections:
+        users = await collection.find({}, {"email": 1, "_id": 0}).to_list(None)
+        for u in users:
+            all_emails.add(u['email'])
+    return list(all_emails)
+
+
+async def get_employees_by_department(stc_db, dept_name: str) -> List[str]:
+    """Get emails of employees in a specific department from stc_db."""
+    all_emails = set()
+    collection_names = await stc_db.list_collection_names()
+    team_collections = [stc_db[name] for name in collection_names]
+    for collection in team_collections:
+        # Use case-insensitive regex for matching department
+        users = await collection.find({"department": re.compile(f"^{re.escape(dept_name)}$", re.IGNORECASE)}, {"email": 1, "_id": 0}).to_list(None)
+        for u in users:
+            all_emails.add(u['email'])
+    return list(all_emails)
+
+def sanitize_team(team: str) -> str:
+    """Sanitize team name for MongoDB collection name."""
+    sanitized = re.sub(r'[ /-]', '_', team)
+    # Remove any other invalid chars if needed, but keep alphanumeric and _
+    return sanitized
+    
+class StatusCheck(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    client_name: str
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(ist_tz))
+    status: str
+
+class UserProfileUpdate(BaseModel):
+    """
+    Pydantic model for validating incoming user profile update data.
+    All fields are optional, allowing partial updates.
+    """
+    name: Optional[str] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    emergency_contact: Optional[str] = None
+    date_of_birth: Optional[Any] = None # Using Any to be flexible with date string formats
+    profilePicture: Optional[str] = None
+    address: Optional[str] = None
+    city: Optional[str] = None
+    state: Optional[str] = None
+    zipcode: Optional[str] = None
+    country: Optional[str] = None
+    secondary_phone: Optional[str] = None
+
+    class Config:
+        extra = 'ignore' # Ignore any extra fields sent by the client
+
+class LoginRequest(BaseModel):
+    identifier: str
+    password: str
+
+class SignupRequest(BaseModel):
+    name: str
+    email: str
+    password: str
+    team: str
+    empCode: str
+    designation: Optional[str] = None
+    # New optional fields for signup
+    phone: Optional[str] = None
+    emergency_contact: Optional[str] = None
+    date_of_birth: Optional[str] = None
+    profilePicture: Optional[str] = None
+    department: Optional[str] = None
+
+# --- Helper Functions ---
+def serialize_document(obj):
+    """Recursively convert ObjectId and datetime fields to strings in a document for JSON serialization."""
+    if isinstance(obj, dict):
+        return {key: serialize_document(value) for key, value in obj.items()}
+    elif isinstance(obj, list):
+        return [serialize_document(item) for item in obj]
+    elif isinstance(obj, ObjectId):
+        return str(obj)
+    elif isinstance(obj, datetime):
+        # If the datetime is naive, assume it's UTC and make it aware
+        if obj.tzinfo is None:
+            obj = obj.replace(tzinfo=timezone.utc)
+        # Convert to IST and then to ISO format string
+        return obj.astimezone(ist_tz).isoformat()
+    else:
+        return obj
+
+# --- API Routes ---
+@api_router.get("/health")
+async def health_check():
+    return {"status": "ok"}
+
+class SheetRequest(BaseModel):
+    url: str
+    sheet_name: Optional[Union[str, int]] = None
+
+@api_router.post("/sheets/data")
+async def get_sheet_data(request: SheetRequest):
+    """
+    Fetches data from a Google Sheet.
+    The service account key should be set as GOOGLE_SHEETS_CREDENTIALS environment variable.
+    """
+    try:
+        data = get_data_from_sheet(request.url, request.sheet_name)
+        return data
+    except Exception as e:
+        logging.error(f"Failed to fetch sheet data: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to fetch sheet data: {e}")
+
+@api_router.get("/")
+async def root():
+    return {"message": "Hello World from API"}
+
+@api_router.get("/users/status", response_model=List[Dict])
 async def get_all_user_statuses():
     try:
         all_employee_emails = await get_all_employees_emails(stc_db)
@@ -345,7 +942,11 @@ async def get_all_user_statuses():
         logging.error(f"Error fetching all user statuses: {e}")
         raise HTTPException(status_code=500, detail="Failed to fetch user statuses")
 
-@router.post("/users/{user_id}/status", response_model=Dict)
+class StatusCheckCreate(BaseModel):
+    client_name: str
+    status: str
+    
+@api_router.post("/users/{user_id}/status", response_model=Dict)
 async def set_user_status_api(user_id: str, status_update: StatusCheckCreate):
     if status_update.client_name != user_id:
         raise HTTPException(status_code=400, detail="User ID in path and body must match.")
@@ -357,7 +958,57 @@ async def set_user_status_api(user_id: str, status_update: StatusCheckCreate):
     manager.user_status[user_id] = new_status
     await manager.broadcast_status(user_id, new_status)
     return {"user_id": user_id, "status": new_status}
-@router.get("/messages")
+
+class UserPasswordResetRequest(BaseModel):
+    current_password: str
+    new_password: str
+
+@api_router.put("/users/me/reset-password")
+async def user_reset_password(
+    request: UserPasswordResetRequest = Body(...),
+    authorization: str = Header(..., alias="Authorization")
+):
+    """
+    Allows a logged-in user to reset their own password securely.
+    Requires the current password for verification.
+    """
+    try:
+        if not authorization or not authorization.startswith("Bearer "):
+            raise HTTPException(status_code=401, detail="Not authenticated")
+
+        token_str = authorization.split(" ")[1]
+        decoded_token = base64.b64decode(token_str).decode('utf-8')
+        user_data = json.loads(decoded_token)
+        user_email = user_data.get("email")
+
+        if not user_email:
+            raise HTTPException(status_code=400, detail="Invalid token: no email found")
+
+        # Fetch user with password_hash
+        user, collection = await get_user_info_with_collection(stc_db, user_email, include_hash=True)
+        if not user or collection is None:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        stored_hash = user.get("password_hash")
+        if not pwd_context.verify(request.current_password, stored_hash):
+            raise HTTPException(status_code=403, detail="Current password is incorrect")
+
+        # Update new password
+        new_hash = pwd_context.hash(request.new_password)
+        await collection.update_one(
+            {"email": re.compile(f"^{re.escape(user_email)}$", re.IGNORECASE)},
+            {"$set": {"password_hash": new_hash}}
+        )
+
+        return {"message": "Password reset successful"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"Error resetting password: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error during password reset")
+    
+@api_router.get("/messages")
 async def get_messages(channel_id: str = None, recipient_id: str = None, sender_id: str = None, user_id: str = None, limit: int = 50):
     query = {}
     collection = None
@@ -441,7 +1092,7 @@ async def get_messages(channel_id: str = None, recipient_id: str = None, sender_
     messages = serialize_document(messages)
     return messages
 
-@router.get("/channel-messages")
+@api_router.get("/channel-messages")
 async def get_channel_messages(channel_id: str, user_id: str = None, limit: int = 50):
     """Get messages for a specific channel"""
     if user_id:
@@ -488,7 +1139,7 @@ async def get_channel_messages(channel_id: str, user_id: str = None, limit: int 
     messages = serialize_document(messages)
     return messages
 
-@router.get("/direct-messages")
+@api_router.get("/direct-messages")
 async def get_direct_messages(sender_id: str, recipient_id: str, user_id: str = None, limit: int = 50):
     """Get direct messages between two users"""
     if user_id and user_id not in [sender_id, recipient_id]:
@@ -534,7 +1185,7 @@ async def get_direct_messages(sender_id: str, recipient_id: str, user_id: str = 
     messages = serialize_document(messages)
     return messages
 
-@router.delete("/messages")
+@api_router.delete("/messages")
 async def delete_all_messages():
     """Permanently delete all messages from chat history"""
     try:
@@ -554,7 +1205,7 @@ from datetime import datetime
 # CLEAR CHAT (Direct & Channel)
 # ---------------------------
 
-@router.post("/direct-messages/clear-for-user")
+@api_router.post("/direct-messages/clear-for-user")
 async def clear_direct_messages_for_user(
     sender_id: str = Query(...),
     recipient_id: str = Query(...),
@@ -582,7 +1233,7 @@ async def clear_direct_messages_for_user(
         raise HTTPException(status_code=500, detail="Failed to clear direct chat")
 
 
-@router.post("/channel-messages/clear-for-user")
+@api_router.post("/channel-messages/clear-for-user")
 async def clear_channel_messages_for_user(
     channel_id: str = Query(...),
     user_id: str = Query(...)
@@ -608,7 +1259,7 @@ async def clear_channel_messages_for_user(
 # ---------------------------
 
 
-@router.post("/messages/{message_id}/delete")
+@api_router.post("/messages/{message_id}/delete")
 async def mark_message_deleted_for_user(
     message_id: str,
     user_id: str = Query(...)
@@ -638,7 +1289,7 @@ async def mark_message_deleted_for_user(
 # DELETE FOR EVERYONE
 # ---------------------------
 
-@router.delete("/messages/{message_id}")
+@api_router.delete("/messages/{message_id}")
 async def delete_message_permanently(message_id: str, admin_user: dict = Depends(get_current_admin_user)):
     """
     (Admin Only) Permanently delete a specific message by ID from the database.
@@ -656,9 +1307,7 @@ async def delete_message_permanently(message_id: str, admin_user: dict = Depends
         return {"message": "Message permanently deleted successfully"}
     except HTTPException:
         raise
-# In server.py
-
-@router.post("/messages/{message_id}/delete-everyone")
+@api_router.post("/messages/{message_id}/delete-everyone")
 async def delete_message_for_everyone(
     message_id: str,
     user_id: str = Query(...)
@@ -732,9 +1381,815 @@ async def delete_message_for_everyone(
 # TTL INDEXES (Auto-clean)
 # ---------------------------
 
+@app.on_event("startup")
+async def setup_indexes():
+    try:
+        # DeletedMessages auto-expire after 30 days
+        await chat_db.DeletedMessages.create_index(
+            "created_at",
+            expireAfterSeconds=60 * 60 * 24 * 30  # 30 days
+        )
+
+        # Channel & Direct chat: auto-remove globally deleted messages after 90 days
+        await chat_db.Channel_chat.create_index(
+            "deleted_at",
+            expireAfterSeconds=60 * 60 * 24 * 90  # 90 days
+        )
+        await chat_db.Direct_chat.create_index(
+            "deleted_at",
+            expireAfterSeconds=60 * 60 * 24 * 90
+        )
+
+        logging.info("TTL indexes created for DeletedMessages (30d) and deleted messages (90d)")
+    except Exception as e:
+        logging.error(f"Failed to create TTL indexes: {e}")
+
+
+async def check_scheduled_announcements():
+    """
+    A background task that runs continuously to check for and publish scheduled announcements.
+    """
+    while True:
+        try:
+            now_utc = datetime.now(timezone.utc)
+            
+            # Find announcements that are scheduled and due
+            due_announcements = await chat_db.Announcements.find({
+                "status": "scheduled",
+                "scheduled_at": {"$lte": now_utc}
+            }).to_list(length=None)
+
+            for ann in due_announcements:
+                logging.info(f"Publishing scheduled announcement: {ann['title']}")
+                
+                # Update status to 'published'
+                await chat_db.Announcements.update_one(
+                    {"_id": ann["_id"]},
+                    {"$set": {"status": "published", "date": now_utc}}
+                )
+
+                # Update the announcement object in memory before broadcasting
+                # so the frontend receives the correct publication time.
+                ann["date"] = now_utc
+
+                # Broadcast the announcement
+                broadcast_payload = {
+                    "type": "new_announcement",
+                    "data": serialize_document(ann) # serialize_document will convert now_utc to IST
+                }
+                await manager.broadcast(json.dumps(broadcast_payload))
+
+        except Exception as e:
+            logging.error(f"Error in scheduled announcement checker: {e}")
+        
+        await asyncio.sleep(60) # Check every 60 seconds
+
+@api_router.post("/employees", response_model=Employee)
+async def create_employee(employee: Employee):
+    employee_dict = employee.model_dump()
+    # Insert into team-specific collection (auto-creates if missing)
+    team_collection = stc_db[sanitize_team(employee.team)]
+    await team_collection.insert_one(employee_dict)
+    return employee
+
+@api_router.get("/employees")
+async def get_all_employees():
+    try:
+        all_employees = {}
+        # Iterate only through collections corresponding to known teams
+        # This prevents errors from trying to query system or unrelated collections.
+        sanitized_team_names = [sanitize_team(team) for team in TEAMS]
+
+        for name in sanitized_team_names:
+            try:
+                collection = stc_db[name]
+                users = await collection.find(
+                    {},
+                    {"_id": 0, "password_hash": 0}  # Exclude sensitive fields
+                ).to_list(None)
+                for user in users:
+                    # Use email as a unique key to avoid duplicates
+                    if user.get("email"):
+                        all_employees[user["email"]] = user
+            except Exception as e:
+                logging.warning(f"Could not fetch from collection {collection.name}: {e}")
+
+        employees = list(all_employees.values())
+        logging.info(f"Total unique employees fetched from all teams: {len(employees)}")
+        return serialize_document(employees)
+    except Exception as e:
+        logging.error(f"Error fetching employees: {e}")
+        raise HTTPException(status_code=500, detail="Failed to fetch employees")
+
+@api_router.get("/employees/{employee_id}", response_model=Employee)
+async def get_employee(employee_id: str):
+    # Search across all team collections
+    collection_names = await stc_db.list_collection_names()
+    team_collections = [stc_db[name] for name in collection_names]
+    for collection in team_collections:
+        employee = await collection.find_one({"id": employee_id})
+        if employee:
+            return employee
+    raise HTTPException(status_code=404, detail="Employee not found")
+
+@api_router.put("/employees/{employee_id}", response_model=Employee)
+async def update_employee(employee_id: str, employee: Employee):
+    employee_dict = employee.model_dump(exclude_unset=True)
+    # Find and update in the appropriate collection
+    collection_names = await stc_db.list_collection_names()
+    team_collections = [stc_db[name] for name in collection_names]
+    for collection in team_collections:
+        existing = await collection.find_one({"id": employee_id})
+        if existing:
+            await collection.update_one({"id": employee_id}, {"$set": employee_dict})
+            updated_employee = await collection.find_one({"id": employee_id})
+            return updated_employee
+    raise HTTPException(status_code=404, detail="Employee not found")
+
+class ProfilePictureUpdate(BaseModel):
+    profilePicture: Optional[str]
+
+@api_router.put("/employees/{employee_id}/profile-picture", status_code=200)
+async def update_profile_picture(employee_id: str, body: ProfilePictureUpdate):
+    """
+    Updates the profile picture for a given employee.
+    The request body should be JSON: {"profilePicture": "data:image/..."}
+    """
+    try:
+        user, collection = await get_user_info_with_collection(stc_db, employee_id)
+ 
+        if not user or collection is None:
+            raise HTTPException(status_code=404, detail="Employee not found")
+
+        await collection.update_one(
+            {"$or": [{"id": employee_id}, {"email": employee_id}]},
+            {"$set": {"profilePicture": body.profilePicture}}
+        )
+
+        updated_user = await collection.find_one(
+            {"$or": [{"id": employee_id}, {"email": employee_id}]},
+            {"_id": 0, "password_hash": 0}
+        )
+        return serialize_document(updated_user)
+    except Exception as e:
+        logging.error(f"Error updating profile picture for {employee_id}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to update profile picture.")
+
+@api_router.get("/employees/work-details/")
+async def get_employees_work_details(email: Optional[str] = None):
+    """
+    Gets all employees and enriches their data with reviewer info.
+    If an email is provided, it returns the details for only that employee.
+    """
+    try:
+        # Collect all employees from all collections
+        all_employees_dict = {}
+        collection_names = await stc_db.list_collection_names()
+        for name in collection_names:
+            try:
+                collection = stc_db[name]
+                users = await collection.find({}, {"_id": 0, "password_hash": 0}).to_list(None)
+                for user in users:
+                    if user.get("email"):
+                        all_employees_dict[user["email"]] = user
+            except Exception as e:
+                logging.warning(f"Could not fetch employees from {name}: {e}")
+
+        all_employees = list(all_employees_dict.values())
+
+        # Create a map of employee names to their full data for easy lookup
+        employee_by_name = {emp.get("name"): emp for emp in all_employees if emp.get("name")}
+        # Create a map of Zonal Managers to their reviewers
+        zonal_manager_reviewers = {name: data.get("reviewer") for name, data in employee_by_name.items() if data.get("designation", "").lower().strip() == "zonal managers"}
+
+        # Define the specific reviewers for each team's reporting manager
+        reporting_manager_reviewers = {
+            "Research": "Alimpan Banerjee, Anant Tiwari",
+            "Media": "Anant Tiwari",
+            "Data": "Anant Tiwari",
+            "Digital Production": "Anant Tiwari",
+            "Digital Communication": "Anant Tiwari",
+            "Propagation": "Lokesh Mathur",
+            "Neagitive Propagation": "Anant Tiwari",
+            "Digital Marketing/Networking": "Saumitra, Anurag",
+            "HIVE": "Anant Tiwari",
+            "Campaign": "Anant Tiwari, Alimpan Banerjee",
+            "Soul Central": "Alimpan Banerjee",
+            "Field Team AP-1": "Alimpan Banerjee",
+            "Field Team AP-2": "Alimpan Banerjee",
+            "Field Team TG": "Alimpan Banerjee",
+            "PMU": "Alimpan Banerjee",
+            "Directors Team-1": "Anant Tiwari, Alimpan Banerjee",
+            "Directors Team-2": "Anant Tiwari, Alimpan Banerjee",
+            "Directors Team-3": "Anant Tiwari, Alimpan Banerjee",
+            "HR": "Robbin Sharma, Anant Tiwari, Alimpan Banerjee, Khushboo Sharma",
+            "Operations": "Robbin Sharma, Anant Tiwari, Alimpan Banerjee, Khushboo Sharma",
+            "System Admin": "Management"
+        }
+
+        # Create a map of each team to its reporting manager(s).
+        reporting_managers_by_team = {}
+        for emp in all_employees:
+            designation = emp.get("designation", "").lower()
+            team_name = emp.get("team")
+            if designation == "reporting manager" and team_name:
+                if team_name not in reporting_managers_by_team:
+                    reporting_managers_by_team[team_name] = []
+                reporting_managers_by_team[team_name].append(emp.get("name"))
+
+        processed_employees = []
+        for emp in all_employees:
+            enriched_emp = emp.copy()
+            designation = enriched_emp.get("designation", "").lower().strip()
+            team = enriched_emp.get("team")
+            reviewer = enriched_emp.get("reviewer") # Keep existing reviewer if present
+            original_reviewer = reviewer  # For logging
+
+            # Step 1: Handle specific role assignments first.
+            if designation == "reporting manager":
+                # Assign specific reviewers based on the manager's team.
+                enriched_emp["reviewer"] = reporting_manager_reviewers.get(team, "Management")
+            
+            # Step 2: Handle hierarchical assignments for employees and zonal managers.
+            elif designation in ["employee", "zonal manager", "zonal managers"]:
+                # Only assign a reviewer if one isn't already set.
+                if not reviewer:
+                    # If an employee's reviewer is a Zonal Manager, get the ZM's reviewer.
+                    if designation == "employee" and reviewer and reviewer in zonal_manager_reviewers:
+                        enriched_emp["reviewer"] = zonal_manager_reviewers.get(reviewer)
+                        print(f"Re-assigning reviewer for '{enriched_emp.get('name')}': from ZM '{reviewer}' to '{enriched_emp['reviewer']}'")
+                    elif team and team in reporting_managers_by_team:
+                        enriched_emp["reviewer"] = ", ".join(sorted(reporting_managers_by_team[team]))
+            
+            # Step 3: Final fallback for any unassigned reviewers.
+            # This covers directors and any other roles.
+            # It also catches employees/ZMs whose teams have no reporting manager.
+            if not enriched_emp.get("reviewer"):
+                enriched_emp["reviewer"] = "Not Assigned"
+            
+            if enriched_emp.get("reviewer") != original_reviewer:
+                print(f"Reviewer for '{enriched_emp.get('name')}' ({designation}) changed from '{original_reviewer}' to '{enriched_emp.get('reviewer')}'")
+
+            processed_employees.append(enriched_emp)
+
+        # If an email is provided, filter for that user
+        if email:
+            user_details = next((e for e in processed_employees if e.get("email") == email), None)
+            # Always return an array, even if it's a single user or empty
+            if user_details:
+                return serialize_document([user_details])
+            else:
+                return []
+        
+        return serialize_document(processed_employees)
+    except Exception as e:
+        logging.error(f"Error fetching work-details: {e}")
+        raise HTTPException(status_code=500, detail="Failed to fetch employees work details")
+
+@api_router.post("/employees/update-reviewers", status_code=200)
+async def update_all_employee_reviewers():
+    """
+    Calculates and updates the 'reviewer' field for all employees in the database.
+    This is an administrative endpoint to persist the calculated reviewer data.
+    """
+    try:
+        # 1. Collect all employees from all collections
+        all_employees_dict = {}
+        collection_names = await stc_db.list_collection_names()
+        for name in collection_names:
+            collection = stc_db[name]
+            users = await collection.find({}, {"_id": 0, "password_hash": 0}).to_list(None)
+            for user in users:
+                if user.get("email"):
+                    all_employees_dict[user["email"]] = user
+
+        all_employees = list(all_employees_dict.values())
+
+        # 2. Calculate reviewers using the same logic as get_employees_work_details
+        employee_by_name = {emp.get("name"): emp for emp in all_employees if emp.get("name")}
+        zonal_manager_reviewers = {name: data.get("reviewer") for name, data in employee_by_name.items() if data.get("designation", "").lower().strip() == "zonal managers"}
+
+        reporting_manager_reviewers = {
+            "Research": "Alimpan Banerjee, Anant Tiwari", "Media": "Anant Tiwari", "Data": "Anant Tiwari",
+            "Digital Production": "Anant Tiwari", "Digital Communication": "Anant Tiwari", "Propagation": "Lokesh Mathur",
+            "Neagitive Propagation": "Anant Tiwari", "Digital Marketing/Networking": "Saumitra, Anurag", "HIVE": "Anant Tiwari",
+            "Campaign": "Anant Tiwari, Alimpan Banerjee", "Soul Central": "Alimpan Banerjee", "Field Team AP-1": "Alimpan Banerjee",
+            "Field Team AP-2": "Alimpan Banerjee", "Field Team TG": "Alimpan Banerjee", "PMU": "Alimpan Banerjee",
+            "Directors Team-1": "Anant Tiwari, Alimpan Banerjee", "Directors Team-2": "Anant Tiwari, Alimpan Banerjee",
+            "Directors Team-3": "Anant Tiwari, Alimpan Banerjee", "HR": "Robbin Sharma, Anant Tiwari, Alimpan Banerjee, Khushboo Sharma",
+            "Operations": "Robbin Sharma, Anant Tiwari, Alimpan Banerjee, Khushboo Sharma", "System Admin": "Management"
+        }
+
+        reporting_managers_by_team = {}
+        for emp in all_employees:
+            designation = emp.get("designation", "").lower()
+            team_name = emp.get("team")
+            if designation == "reporting manager" and team_name:
+                if team_name not in reporting_managers_by_team:
+                    reporting_managers_by_team[team_name] = []
+                reporting_managers_by_team[team_name].append(emp.get("name"))
+
+        updated_count = 0
+        for emp in all_employees:
+            new_reviewer = emp.get("reviewer") # Start with existing
+            designation = emp.get("designation", "").lower().strip()
+            team = emp.get("team")
+
+            if designation == "reporting manager":
+                new_reviewer = reporting_manager_reviewers.get(team, "Management")
+            elif designation in ["employee", "zonal manager", "zonal managers"]:
+                if not emp.get("reviewer"): # Only if reviewer is not already set
+                    if designation == "employee" and emp.get("reviewer") and emp.get("reviewer") in zonal_manager_reviewers:
+                        new_reviewer = zonal_manager_reviewers.get(emp.get("reviewer"))
+                    elif team and team in reporting_managers_by_team:
+                        new_reviewer = ", ".join(sorted(reporting_managers_by_team[team]))
+
+            if not new_reviewer:
+                new_reviewer = "Not Assigned"
+
+            # 3. Update the employee record in the database if the reviewer has changed
+            if new_reviewer != emp.get("reviewer"):
+                _user, collection = await get_user_info_with_collection(stc_db, emp["email"])
+                if collection:
+                    result = await collection.update_one(
+                        {"email": emp["email"]},
+                        {"$set": {"reviewer": new_reviewer}}
+                    )
+                    if result.modified_count > 0:
+                        updated_count += 1
+                        logging.info(f"Updated reviewer for {emp['name']} to '{new_reviewer}'")
+
+        return {"message": f"Reviewer update process completed. {updated_count} employees updated."}
+    except Exception as e:
+        logging.error(f"Error updating employee reviewers: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to update employee reviewers.")
+
+@api_router.get("/employees/code/{emp_code}")
+async def get_employee_by_code(emp_code: str):
+    try:
+        collection_names = await stc_db.list_collection_names()
+        team_collections = [stc_db[name] for name in collection_names]
+
+        for collection in team_collections:
+            try:
+                # Use a case-insensitive regex for the employee code
+                emp_code_regex = re.compile(f"^{re.escape(emp_code)}$", re.IGNORECASE)
+                employee = await collection.find_one(
+                  {"$or": [
+                    {"empCode": emp_code_regex},
+                    {"Emp code": emp_code_regex} # Keep this for different key names
+                   ]},
+                   {"password_hash": 0, "_id": 0}
+               )
+
+                if employee:
+                    employee = serialize_document(employee)
+                    return employee
+            except Exception as e:
+                logging.warning(f"Skipping collection {collection.name} due to error: {e}")
+                continue
+
+        raise HTTPException(status_code=404, detail="Employee not found")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"Failed to get employee by code {emp_code}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to fetch employee by code")
+
+
+@api_router.get("/employees/email/{email}")
+async def get_employee_by_email(email: str):
+    try:
+        email = email.strip()
+
+        collection_names = await stc_db.list_collection_names()
+        team_collections = [stc_db[name] for name in collection_names]
+
+        for collection in team_collections:
+            try:
+                # Try by id first (exact match)
+                employee = await collection.find_one({"id": email}, {"password_hash": 0, "_id": 0})
+                if employee:
+                    employee = serialize_document(employee)
+                    return employee
+                # Then by email with case-insensitive regex
+                email_regex = re.compile(f"^{re.escape(email)}$", re.IGNORECASE)
+                employee = await collection.find_one({"email": email_regex}, {"password_hash": 0, "_id": 0})
+                if employee:
+                    # Ensure password hash is not in the final output, just in case
+                    employee.pop("password_hash", None)
+                    employee = serialize_document(employee)
+                    return employee
+            except Exception as e:
+                logging.warning(f"Skipping collection {collection.name} due to error: {e}")
+                continue
+
+        raise HTTPException(status_code=404, detail="Employee not found")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"Failed to get employee by email {email}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to fetch employee")
+
+
+def serialize_employee(employee: dict) -> dict:
+    """
+    Custom serializer for a single employee document to handle ObjectId and datetime.
+    """
+    if not employee:
+        return None
+    if '_id' in employee:
+        employee['_id'] = str(employee['_id'])
+    for key, value in employee.items():
+        if isinstance(value, datetime):
+            employee[key] = value.isoformat()
+    return employee
+
+@api_router.delete("/employees/{employee_id}/profile-picture", status_code=200)
+async def remove_profile_picture(employee_id: str):
+    """
+    Removes the profile picture for a given employee by setting it to null.
+    """
+    try:
+        # Find the user and their collection
+        user, collection = await get_user_info_with_collection(stc_db, employee_id)
+
+        if not user or collection is None:
+            raise HTTPException(status_code=404, detail="Employee not found")
+
+        # Set the profile picture to null in the database
+        await collection.update_one(
+            {"$or": [{"id": employee_id}, {"email": employee_id}]},
+            {"$set": {"profilePicture": None}}
+        )
+
+        # Fetch and return the updated user document to confirm the change
+        updated_user = await collection.find_one(
+            {"$or": [{"id": employee_id}, {"email": employee_id}]},
+            {"_id": 0, "password_hash": 0}
+        )
+        return serialize_document(updated_user)
+    except Exception as e:
+        logging.error(f"Error removing profile picture for {employee_id}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to remove profile picture.")
+
+@api_router.put("/employees/{employeeId}/deactivate")
+async def deactivate_employee(employeeId: str, admin_user: dict = Depends(get_current_admin_user) ):
+    try:
+        # Find the user and their collection across all teams
+        decoded_employee_id = urllib.parse.unquote(employeeId)
+        user, collection = await get_user_info_with_collection(stc_db, decoded_employee_id)
+
+        if not user or collection is None:
+            raise HTTPException(status_code=404, detail="Employee not found")
+        
+        # Soft delete: Mark the user as inactive instead of deleting them.
+        result = await collection.update_one(
+            {"email": re.compile(f"^{re.escape(decoded_employee_id)}$", re.IGNORECASE)},
+            {"$set": {"active": False}}
+        )
+
+        if result.modified_count > 0:
+            logging.info(f"Employee {decoded_employee_id} deactivated by admin {admin_user.get('email')}.")
+            return {"message": "Employee account has been deactivated."}
+        
+        raise HTTPException(status_code=404, detail="Employee was found but could not be deactivated.")
+    except HTTPException:
+        raise  # Re-raise HTTPException to preserve status code and detail
+    except Exception as e:
+        logging.error(f"Error deactivating employee {employeeId}: {e}")
+        raise HTTPException(status_code=500, detail="Error deactivating employee")
+
+@api_router.put("/users/me/deactivate")
+@api_router.delete("/users/me")
+async def deactivate_self(
+    authorization: str = Header(..., alias="Authorization"),
+):
+    """
+    Allows a currently authenticated user to deactivate their own account.
+    Allows a currently authenticated user to permanently delete their own account.
+    The user is identified via their Authorization token.
+    """
+    try:
+        # We can reuse the admin dependency logic to get the user from the token,
+        # but we don't need to check for admin privileges here.
+        if not authorization or not authorization.startswith("Bearer "):
+            raise HTTPException(status_code=401, detail="Not authenticated")
+        
+
+        token_str = authorization.split(" ")[1]
+        decoded_token = base64.b64decode(token_str).decode('utf-8')
+        user_data_from_token = json.loads(decoded_token)
+        user_email = user_data_from_token.get("email")
+
+        if not user_email:
+            raise HTTPException(status_code=401, detail="Invalid token: email missing.")
+            raise HTTPException(status_code=401, detail="Invalid token: user email missing.")
+
+        # Use the existing admin-level deactivate function, but pass the user's own email
+        # and a dummy admin_user object to satisfy the dependency.
+        return await deactivate_employee(employeeId=user_email, admin_user={"email": user_email})
+        user, collection = await get_user_info_with_collection(stc_db, user_email)
+
+        if not user or collection is None:
+            raise HTTPException(status_code=404, detail="User to be deleted not found.")
+
+        result = await collection.delete_one({"email": re.compile(f"^{re.escape(user_email)}$", re.IGNORECASE)})
+
+        if result.deleted_count > 0:
+            logging.info(f"User {user_email} has permanently deleted their own account.")
+            return {"message": "Your account has been permanently deleted."}
+        
+        raise HTTPException(status_code=500, detail="Account could not be deleted.")
+    except Exception as e:
+        logging.error(f"Error during self-deactivation for token: {e}")
+        raise HTTPException(status_code=500, detail="An error occurred during account deactivation.")
+
+class PasswordChangeRequest(BaseModel):
+    current_password: str
+    new_password: str
+
+@api_router.put("/users/{user_id}/change-password")
+async def change_password(user_id: str, request: PasswordChangeRequest, admin_user: Optional[dict] = None) -> JSONResponse:
+    """
+    Changes the password for a given user.
+    If is_admin_reset is True, it bypasses the current password check.
+    """
+    if len(request.new_password) > 72:
+        raise HTTPException(status_code=400, detail="Password cannot exceed 72 characters.")
+
+    try:
+        # Find the user and their collection
+        # We need the password hash, so we must set include_hash=True
+        user, collection = await get_user_info_with_collection(stc_db, user_id, include_hash=True)
+
+        if not user or collection is None:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        # Verify the current password, unless it's an admin reset
+        if not admin_user: # This is a regular user changing their own password
+            password_hash = user.get("password_hash")
+            if not password_hash or not pwd_context.verify(request.current_password, password_hash):
+                raise HTTPException(status_code=400, detail="Incorrect current password")
+
+        # Hash the new password
+        new_password_hash = pwd_context.hash(request.new_password)
+
+        # Update the password in the database
+        result = await collection.update_one(
+            {"email": re.compile(f"^{re.escape(user_id)}$", re.IGNORECASE)},
+            {"$set": {"password_hash": new_password_hash}}
+        )
+
+        if result.modified_count > 0:
+            if admin_user:
+                logging.info(f"Admin '{admin_user.get('email')}' reset password for user '{user_id}'.")
+            return JSONResponse(content={"message": "Password updated successfully"})
+        raise HTTPException(status_code=500, detail="Failed to update password")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"Error changing password for {user_id}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to change password.")
+
+@api_router.put("/users/{email}/profile")
+async def update_user_profile(email: str, profile_data: UserProfileUpdate):
+    """
+    Updates a user's profile information (name, phone, etc.).
+    This is the endpoint for users updating their own details.
+    """
+    try:
+        # Find the user and their collection
+        user, collection = await get_user_info_with_collection(stc_db, email)
+
+        if not user or collection is None:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        # Create an update payload with only the fields that were provided
+        # Use exclude_unset=True to only include fields explicitly sent by the client.
+        update_data = profile_data.model_dump(exclude_unset=True)
+
+        # Convert date_of_birth string to datetime object if present
+        if 'date_of_birth' in update_data and isinstance(update_data['date_of_birth'], str):
+            try:
+                # The frontend might send a full ISO string or just 'YYYY-MM-DD'
+                dob_str = update_data['date_of_birth']
+                # Create a datetime object at midnight UTC
+                update_data['date_of_birth'] = datetime.strptime(dob_str.split('T')[0], '%Y-%m-%d').replace(tzinfo=timezone.utc)
+            except (ValueError, TypeError):
+                # If parsing fails, store it as is or handle the error
+                logging.warning(f"Could not parse date_of_birth: {update_data['date_of_birth']}")
+
+        # If email is being changed, ensure the new one isn't already taken
+        new_email = update_data.get("email")
+        if new_email and new_email.lower() != email.lower():
+            existing_user, _ = await get_user_info_with_collection(stc_db, new_email)
+            if existing_user:
+                raise HTTPException(status_code=400, detail="Email already in use by another account.")
+            # If the email is changing, we should also update the 'id' field
+            # since it's being used as a primary identifier based on the email.
+            update_data['id'] = new_email
+
+        if not update_data:
+            raise HTTPException(status_code=400, detail="No update data provided.")
+
+        # Perform the update
+        # Use the user's original email from the path for the query
+        result = await collection.update_one(
+            {"email": re.compile(f"^{re.escape(email)}$", re.IGNORECASE)},
+            {"$set": update_data}
+        )
+
+        # If email was changed, also update the chat_db.employees collection for consistency
+        if new_email and new_email.lower() != email.lower():
+            await chat_db.employees.update_one(
+                {"email": re.compile(f"^{re.escape(email)}$", re.IGNORECASE)},
+                {"$set": {"email": new_email, "id": new_email}}
+            )
+            logging.info(f"Updated email in chat_db.employees for user {email} to {new_email}")
+
+
+        # Fetch the updated user document to return to the client
+        # Use the new email if it was changed, otherwise the original email
+        final_email_to_find = new_email or email
+        updated_user = await collection.find_one(
+            {"email": re.compile(f"^{re.escape(final_email_to_find)}$", re.IGNORECASE)},
+            {"_id": 0, "password_hash": 0} # Exclude sensitive fields
+        )
+
+        return serialize_document(updated_user)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"Error updating profile for {email}: {e}")
+        raise HTTPException(status_code=500, detail="An error occurred while updating the profile.")
+
+@api_router.post("/signup")
+async def signup(request: SignupRequest):
+    if len(request.password) > 72:
+        raise HTTPException(status_code=400, detail="Password cannot exceed 72 characters.")
+
+    # Add validation for email format
+    if not re.match(r"[^@]+@[^@]+\.[^@]+", request.email):
+        raise HTTPException(status_code=400, detail="Password cannot exceed 72 characters.")
+
+    if request.team not in TEAMS:
+        raise HTTPException(status_code=400, detail=f"Invalid team. Must be one of: {', '.join(TEAMS)}")
+
+    # Check existence across all team collections
+    collection_names = await stc_db.list_collection_names()
+    team_collections = [stc_db[name] for name in collection_names]
+    existing = None
+    for collection in team_collections:
+        existing = await collection.find_one({"email": request.email})
+        if existing:
+            break
+
+    if existing:
+        raise HTTPException(status_code=400, detail="User already exists")
+
+    hashed = pwd_context.hash(request.password)
+    
+    # Set department: use provided or fallback to team
+    dept = request.department if request.department else request.team
+    # Set designation: use provided or default
+    desig = request.designation if request.designation else "Employee"
+    
+    # --- Calculate Reviewer ---
+    new_reviewer = "Not Assigned"
+    try:
+        # 1. Define the reviewer hierarchy maps
+        reporting_manager_reviewers_map = {
+            "Research": "Alimpan Banerjee , Anant Tiwari", "Media": "Anant Tiwari", "Data": "Anant Tiwari",
+            "Digital Production": "Anant Tiwari", "Digital Communication": "Anant Tiwari", "Propagation": "Lokesh Mathur",
+            "Neagitive Propagation": "Anant Tiwari", "Digital Marketing/Networking": "Saumitra, Anurag", "HIVE": "Anant Tiwari",
+            "Campaign": "Anant Tiwari, Alimpan Banerjee", "Soul Central": "Alimpan Banerjee", "Field Team AP-1": "Alimpan Banerjee",
+            "Field Team AP-2": "Alimpan Banerjee", "Field Team TG": "Alimpan Banerjee", "PMU": "Alimpan Banerjee",
+            "Directors Team-1": "Anant Tiwari, Alimpan Banerjee", "Directors Team-2": "Anant Tiwari, Alimpan Banerjee",
+            "Directors Team-3": "Anant Tiwari, Alimpan Banerjee", "HR": "Robbin Sharma, Anant Tiwari, Alimpan Banerjee, Khushboo Sharma",
+            "Operations": "Robbin Sharma, Anant Tiwari, Alimpan Banerjee, Khushboo Sharma", "System Admin": "Management"
+        }
+
+        # 2. Find the reporting manager for the new user's team
+        team_reporting_manager = None
+        all_collections = await stc_db.list_collection_names()
+        for name in all_collections:
+            collection = stc_db[name]
+            # Find a user in the same team with the designation of "reporting manager"
+            manager = await collection.find_one({
+                "team": request.team,
+                "designation": {"$regex": "reporting manager", "$options": "i"}
+            })
+            if manager:
+                team_reporting_manager = manager.get("name")
+                break
+        
+        # 3. Assign reviewer based on designation
+        if desig.lower().strip() == "reporting manager":
+            # The new user is a reporting manager, their reviewer is from the map.
+            new_reviewer = reporting_manager_reviewers_map.get(request.team, "Management")
+        elif desig.lower().strip() == "employee":
+            # The new user is an employee, their reviewer is their team's reporting manager.
+            if team_reporting_manager:
+                new_reviewer = team_reporting_manager
+            else:
+                logging.warning(f"No reporting manager found for team '{request.team}' during signup for {request.email}.")
+        
+        if not new_reviewer:
+            new_reviewer = "Not Assigned"
+
+    except Exception as e:
+        logging.error(f"Error calculating reviewer during signup for {request.email}: {e}")
+
+    # Handle date of birth
+    dob = None
+    if request.date_of_birth:
+        try:
+            dob = datetime.strptime(request.date_of_birth, '%Y-%m-%d').replace(tzinfo=timezone.utc)
+        except ValueError:
+            logging.warning(f"Invalid date_of_birth format during signup: {request.date_of_birth}")
+
+    employee_data = EmployeeCreate(
+        id=request.email,
+        name=request.name,
+        email=request.email,
+        designation=desig,
+        department=dept,
+        team=request.team,
+        empCode=request.empCode,
+        phone=request.phone,
+        emergency_contact=request.emergency_contact,
+        date_of_birth=dob,
+        profilePicture=request.profilePicture,
+        password_hash=hashed,
+        reviewer=new_reviewer # Assign the calculated reviewer
+    )
+    
+    # Insert into team-specific collection (auto-creates if missing)
+    team_collection = stc_db[sanitize_team(request.team)]
+    await team_collection.insert_one(employee_data.model_dump())
+
+    return {"message": "User created successfully"}
+
+from bson import ObjectId
+
+def convert_objectid(doc: dict) -> dict:
+    """Recursively converts ObjectId fields to strings"""
+    if not doc:
+        return doc
+    for k, v in doc.items():
+        if isinstance(v, ObjectId):
+            doc[k] = str(v)
+        elif isinstance(v, dict):
+            doc[k] = convert_objectid(v)
+        elif isinstance(v, list):
+            doc[k] = [convert_objectid(i) if isinstance(i, dict) else i for i in v]
+    return doc
+@api_router.post("/login")
+async def login(request: LoginRequest):
+    # Search across all team collections by id or email
+    collection_names = await stc_db.list_collection_names()
+    team_collections = [stc_db[name] for name in collection_names]
+    user = None
+    for collection in team_collections:
+        # Try by id first
+        user = await collection.find_one({"id": request.identifier})
+        if user:
+            break
+        # Then by email
+        user = await collection.find_one({"email": request.identifier})
+        if user:
+            break
+
+    if not user:
+        raise HTTPException(status_code=400, detail="Invalid credentials")
+    password_hash = user.get("password_hash")
+    if not password_hash:
+        raise HTTPException(status_code=400, detail="Invalid credentials")
+    if not pwd_context.verify(request.password, password_hash):
+        raise HTTPException(status_code=400, detail="Invalid credentials")
+
+    # --- ADDED: Check if the user account is active ---
+    # If 'active' is False, deny login. Treat missing 'active' field as active.
+    if user.get("active") is False:
+        raise HTTPException(status_code=403, detail="Account is deactivated. Please contact an administrator.")
+
+    # Set user status to online and broadcast it immediately upon successful login
+    user_id = user.get("email") or user.get("id")
+    await manager.broadcast_status(user_id, "online")
+
+    user_data = {k: v for k, v in user.items() if k != "password_hash"}    
+    user_data = convert_objectid(user_data)
+    
+    # Ensure profilePicture is included, even if it's null
+    if 'profilePicture' not in user_data:
+        user_data['profilePicture'] = None
+    return user_data
+
 
 # File upload endpoint
-@router.post("/files/upload")
+@api_router.post("/files/upload")
 async def upload_file(request: Request, file: UploadFile = File(...)):
     try:
         if not file:
@@ -767,6 +2222,405 @@ async def upload_file(request: Request, file: UploadFile = File(...)):
     except Exception as e:
         logging.error(f"File upload failed: {e}")
         raise HTTPException(status_code=500, detail="File upload failed")
+    
+@api_router.post("/attendance-report")
+async def save_attendance_report(employees: List[EmployeeAttendance] = Body(...)):
+    try:
+        print(f"Received attendance data for {len(employees)} employees.")
+        
+        for employee_data in employees:
+            # Use model_dump to convert Pydantic model to a dictionary
+            employee_dict = employee_data.model_dump()
+            
+            # Find existing employee record by empCode
+            existing_employee = await attendance_db.Attendance.find_one({"empCode": employee_data.empCode})
+            
+            if existing_employee:
+                # If employee exists, push new dailyRecords
+                await attendance_db.Attendance.update_one(
+                    {"empCode": employee_data.empCode},
+                    {"$push": {"dailyRecords": {"$each": employee_dict['dailyRecords']}}}
+                )
+            else:
+                # If employee does not exist, insert a new document
+                await attendance_db.Attendance.insert_one(employee_dict)
+
+        return {"message": "Attendance data saved or updated successfully"}
+    except Exception as e:
+        logging.error(f"Error saving attendance data: {e}")
+        raise HTTPException(status_code=500, detail=f"Error saving data: {e}")
+
+@api_router.get("/attendance-report")
+async def get_attendance_report(
+    view_type: Optional[str] = None,
+    year: Optional[int] = None,
+    month: Optional[int] = None,
+    date: Optional[str] = None
+):
+    try:
+        pipeline = []
+
+        # If filtering parameters are provided, build the projection stage
+        if view_type == 'month' and year and month:
+            pipeline.extend([
+                # Deconstruct the dailyRecords array
+                {"$unwind": "$dailyRecords"},
+                # Filter the records for the selected month and year
+                {"$match": {
+                    "dailyRecords.date": {
+                        "$gte": datetime(year, month, 1, tzinfo=timezone.utc),
+                        "$lt": datetime(year, month + 1, 1, tzinfo=timezone.utc) if month < 12 else datetime(year + 1, 1, 1, tzinfo=timezone.utc)
+                    }
+                }},
+                # Group back by employee to calculate summaries and collect records
+                {"$group": {
+                    "_id": "$empCode",
+                    "empName": {"$first": "$empName"},
+                    "dailyRecords": {"$push": "$dailyRecords"},
+                    "P": {
+                        "$sum": {
+                            "$cond": [{"$eq": ["$dailyRecords.status", "P"]}, 1, 0]
+                        }
+                    },
+                    "A": {
+                        "$sum": {
+                            "$cond": [{"$eq": ["$dailyRecords.status", "A"]}, 1, 0]
+                        }
+                    },
+                    "H": {
+                        "$sum": {
+                            "$cond": [{"$in": ["$dailyRecords.status", ["H", "Holiday"]]}, 1, 0]
+                        }
+                    },
+                    "L": {
+                        "$sum": {
+                            "$cond": [
+                                {"$and": [
+                                    {"$eq": ["$dailyRecords.status", "P"]},
+                                    {"$ne": ["$dailyRecords.lateBy", "00:00"]},
+                                    {"$ne": ["$dailyRecords.lateBy", None]}
+                                ]}, 1, 0]
+                            }
+                        }
+                    
+                }},
+                # Project the final fields
+                {"$project": {
+                    "_id": 0,
+                    "empCode": "$_id",
+                    "empName": "$empName",
+                    "dailyRecords": 1,
+                    "P": 1, "A": 1, "H": 1, "L": 1
+                }}
+            ])
+        elif view_type == 'day' and date:
+            try:
+                target_date = datetime.strptime(date, '%Y-%m-%d')
+                pipeline.append({
+                    "$project": {
+                        "empCode": 1,
+                        "empName": 1,
+                        "dailyRecords": {
+                            "$filter": {
+                                "input": "$dailyRecords",
+                                "as": "record",
+                                "cond": {
+                                    "$and": [
+                                        {"$eq": [{"$year": "$$record.date"}, target_date.year]},
+                                        {"$eq": [{"$month": "$$record.date"}, target_date.month]},
+                                        {"$eq": [{"$dayOfMonth": "$$record.date"}, target_date.day]}
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                })
+            except ValueError:
+                raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD.")
+
+        if pipeline:
+            attendance_records = await attendance_db.Attendance.aggregate(pipeline).to_list(length=None)
+        else:
+            # Fetch all records if no filters are applied
+            attendance_records = await attendance_db.Attendance.find().to_list(length=None)
+        
+        sanitized_records = serialize_document(attendance_records)
+        logging.info(f"Retrieved {len(attendance_records)} attendance records from database")
+        return {"data": sanitized_records, "count": len(sanitized_records)}
+    except Exception as e:
+        logging.error(f"Failed to fetch attendance report: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch attendance data: {e}")
+
+# --- Attendance Report Endpoint ---
+@api_router.get("/attendance-report/user/{employee_code}")
+async def get_attendance_report(
+    employee_code: str,
+    view_type: str,
+    year: int = None,
+    month: int = None,
+    date: str = None
+):
+    try:
+        attendance_collection = attendance_db["Attendance"]
+        # Build the aggregation pipeline to handle the nested dailyRecords
+        pipeline: List[Dict] = [
+            {"$match": {"empCode": employee_code}}
+        ]
+        
+        if view_type == 'month' and year and month:
+            pipeline.append({
+                "$project": {
+                    "empCode": "$empCode",
+                    "empName": "$empName",
+                    "dailyRecords": {
+                        "$filter": {
+                            "input": "$dailyRecords",
+                            "as": "record",
+                            "cond": {
+                                "$and": [
+                                    {"$eq": [{"$year": "$$record.date"}, year]},
+                                    {"$eq": [{"$month": "$$record.date"}, month]}
+                                ]
+                            }
+                        }
+                    }
+                }
+            })
+        elif view_type == 'day' and date:
+            try:
+                target_date = datetime.strptime(date, '%Y-%m-%d')
+                pipeline.append({
+                    "$project": {
+                        "empCode": "$empCode",
+                        "empName": "$empName",
+                        "dailyRecords": {
+                            "$filter": {
+                                "input": "$dailyRecords",
+                                "as": "record",
+                                "cond": {
+                                    "$and": [
+                                        {"$eq": [{"$year": "$$record.date"}, target_date.year]},
+                                        {"$eq": [{"$month": "$$record.date"}, target_date.month]},
+                                        {"$eq": [{"$dayOfMonth": "$$record.date"}, target_date.day]}
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                })
+            except ValueError:
+                raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD.")
+        elif view_type == 'week' and date:
+            try:
+                target_date = datetime.strptime(date, '%Y-%m-%d')
+                start_of_week = target_date - timedelta(days=target_date.weekday()) # Monday
+                end_of_week = start_of_week + timedelta(days=6) # Sunday
+                pipeline.append({
+                    "$project": {
+                        "empCode": "$empCode",
+                        "empName": "$empName",
+                        "dailyRecords": {
+                            "$filter": {
+                                "input": "$$ROOT.dailyRecords",
+                                "as": "record",
+                                "cond": {
+                                    "$and": [
+                                        {"$gte": ["$$record.date", start_of_week]},
+                                        {"$lte": ["$$record.date", end_of_week]}
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                })
+
+            except ValueError:
+                raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD.")
+        else:
+            raise HTTPException(status_code=400, detail="Invalid query parameters. Must provide 'view_type' ('day', 'week', or 'month') and corresponding date parameters.")
+
+        # Execute the aggregation pipeline
+        employee_data = await attendance_collection.aggregate(pipeline).to_list(length=None)
+        
+        if not employee_data:
+            raise HTTPException(status_code=404, detail=f"No attendance data found for employee {employee_code} and the specified period.")
+
+        # Convert ObjectId to string for JSON serialization
+        sanitized_data = serialize_document(employee_data[0])
+        return sanitized_data # Return the single document
+
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        logging.error(f"Failed to fetch attendance report for user: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch attendance data: {e}")
+
+# --- Manager Report Endpoint ---
+async def find_manager_details_by_code(emp_code: str, stc_db):
+    """
+    Finds a manager's details by searching across all team collections.
+    """
+    manager = None
+    collection_names = await stc_db.list_collection_names()
+    team_collections = [stc_db[name] for name in collection_names]
+    emp_code_regex = re.compile(f"^{re.escape(emp_code)}$", re.IGNORECASE)
+
+    for collection in team_collections:
+        # Search by empCode or Emp code for flexibility
+        manager = await collection.find_one({"$or": [{"empCode": emp_code_regex}, {"Emp code": emp_code_regex}]})
+        if manager:
+            break
+
+    if not manager:
+        return {"managerName": None, "managerId": None, "team": []}
+
+    manager_name = manager.get("name") or manager.get("Name", "Unknown Manager")
+    manager_designation = (manager.get("designation") or manager.get("Designation", "")).lower().strip()
+
+    team_list = []
+
+    # A user is considered a manager if their designation includes "manager", "director",
+    # or if they are a reviewer for someone else.
+    is_manager_by_designation = "manager" in manager_designation
+
+    if manager_name:
+        for collection in team_collections:
+            # Find employees whose 'reviewer' field matches the manager's name
+            manager_name_regex = re.compile(f"^{re.escape(manager_name)}$", re.IGNORECASE)
+            team_members = await collection.find(
+                {"reviewer": manager_name_regex},
+                {"_id": 0, "password_hash": 0}
+            ).to_list(length=None)
+
+            for emp in team_members:
+                # Ensure we don't add duplicates if an employee exists in multiple collections
+                emp_email = emp.get("email") or emp.get("Email ID")
+                # Use email for uniqueness check
+                if emp_email and not any(e.get("email") == emp_email for e in team_list):
+                    team_list.append({
+                        "Name": emp.get("name") or emp.get("Name"),
+                        "empCode": emp.get("empCode") or emp.get("Emp code", ""), # Default to empty string if missing
+                        "Designation": emp.get("designation") or emp.get("Designation", ""),
+                        "Reviewer": emp.get("reviewer") or emp.get("Reviewer", ""),
+                        "email": emp_email # Add email for uniqueness check
+                    })
+
+    # If the user is not a manager by designation and has no team members, they are not a manager.
+    # Allow users with "director" in their designation to be considered managers even with no direct reports.
+    if not is_manager_by_designation and not team_list and "director" not in manager_designation:
+        logging.warning(f"User {emp_code} ({manager_name}) is not a manager. Designation: {manager_designation}")
+        return {"managerName": None, "managerId": None, "team": []}
+
+    # Also include the manager in their own team list
+    manager_id = manager.get("empCode") or manager.get("Emp code")
+    if not any(e.get("empCode") == manager_id for e in team_list if e.get("empCode")):
+        team_list.insert(0, { # Add manager to the start of the list
+            "Name": manager_name,
+            "empCode": manager_id or "",
+            "Designation": manager_designation,
+            "Reviewer": manager.get("reviewer") or manager.get("Reviewer", ""),
+            "email": manager.get("email") or manager.get("Email ID")
+        })
+
+    return {"managerName": manager_name, "managerId": manager_id, "team": team_list}
+
+@api_router.get("/manager/{manager_code}/team")
+async def get_manager_team(manager_code: str):
+    try:
+        details = await find_manager_details_by_code(manager_code, stc_db)
+        if not details["managerName"]:
+            raise HTTPException(status_code=404, detail="Manager not found")
+        return details
+    except Exception as e:
+        logging.error(f"Failed to get manager team: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get manager team")
+
+class ManagerReportRequest(BaseModel):
+    manager_code: str
+    team_emp_codes: List[str]
+    reportType: str
+    year: Optional[int] = None
+    month: Optional[int] = None
+    date: Optional[str] = None
+    endDate: Optional[str] = None
+
+@api_router.post("/attendance-report/manager")
+async def get_manager_attendance_report(request: ManagerReportRequest):
+    try:
+        # The frontend now sends the list of employee codes directly.
+        team_employee_codes = request.team_emp_codes
+        if not team_employee_codes:
+            return {"teamRecords": []} # Return empty if no team members
+
+        coll = attendance_db["Attendance"]
+        pipeline = [{"$match": {"empCode": {"$in": team_employee_codes}}}]
+
+        # Day-wise range view
+        if request.reportType == "day" and request.date and request.endDate:
+            start_date = datetime.fromisoformat(request.date.split('T')[0] + 'T00:00:00.000Z')
+            end_date = datetime.fromisoformat(request.endDate.split('T')[0] + 'T23:59:59.999Z')
+            pipeline += [
+                {"$unwind": "$dailyRecords"},
+                {"$match": {
+                    "dailyRecords.date": {"$gte": start_date, "$lte": end_date}
+                }},
+                {
+                    "$group": {
+                        "_id": "$empCode",
+                        "empName": {"$first": "$empName"},
+                        "dailyRecords": {"$push": "$dailyRecords"}
+                    }
+                },
+                {
+                    "$project": {
+                        "_id": 0,
+                        "empCode": "$_id",
+                        "empName": 1,
+                        "dailyRecords": 1
+                    }
+                }
+            ]
+
+        # Month view
+        elif request.reportType == "month" and request.year and request.month:
+            start = datetime(request.year, request.month, 1)
+            end = (start + timedelta(days=32)).replace(day=1) - timedelta(days=1)
+            pipeline += [
+                {"$unwind": "$dailyRecords"},
+                {"$match": {
+                    "dailyRecords.date": {
+                        "$gte": start.replace(tzinfo=timezone.utc),
+                        "$lte": end.replace(tzinfo=timezone.utc)
+                    }
+                }},
+                {
+                    "$group": {
+                        "_id": "$empCode",
+                        "empName": {"$first": "$empName"},
+                        "P": {"$sum": {"$cond": [{"$eq": ["$dailyRecords.status", "P"]}, 1, 0]}},
+                        "A": {"$sum": {"$cond": [{"$eq": ["$dailyRecords.status", "A"]}, 1, 0]}},
+                        "L": {"$sum": {"$cond": {
+                                "if": {"$gt": ["$dailyRecords.lateBy", "00:00"]},
+                                "then": 1,
+                                "else": 0
+                            }}},
+                        "dailyRecords": {"$push": "$dailyRecords"} # Add this line
+                    }
+                },
+                {
+                    "$project": {"_id": 0, "empCode": "$_id", "empName": 1, "P": 1, "A": 1, "L": 1, "dailyRecords": 1}
+                },
+            ]
+        else:
+            raise HTTPException(status_code=400, detail="Invalid query parameters. Use reportType=day (with date & endDate) or reportType=month (with year & month).")
+
+        records = await coll.aggregate(pipeline).to_list(length=None)
+        return {"teamRecords": records}
+
+    except Exception as e:
+        logging.error(f"Manager report failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Manager report failed: {e}")
+
 HARDCODED_CHANNELS = [
     {"name": "general", "type": "public", "department": "All", "description": "General company announcements and discussions"},
     {"name": "dept-research", "type": "department", "department": "Research", "description": "Research department discussions"},
@@ -795,39 +2649,8 @@ HARDCODED_CHANNELS = [
     {"name": "team-system-admin", "type": "team", "department": "Admin", "subDepartment": "System Admin", "description": "System Admin team channel"}
 ]
 
-async def get_user_channels(self, user_id: str, db) -> List[str]:
-        channels = ["general"]
-        user = await get_user_info(db, user_id)
-        if user and user.get("team"):
-            dept = get_department_from_team(user["team"])
-            if dept:
-                channels.append(f"dept-{dept.lower().replace(' ', '-').replace('/', '-')}")
-            channels.append(f"team-{user['team'].lower().replace(' ', '-').replace('/', '-')}")
-        return channels
 
-async def get_channel_members(self, channel_id: str, db) -> List[str]:
-        """
-        Resolves channel membership:
-        - 'general' => all employees
-        - 'dept-...' => employees of that department
-        - 'team-...' => team collection members
-        """
-        if channel_id == 'general':
-            return await get_all_employees_emails(db)
-        elif channel_id.startswith('dept-'):
-            dept_name_raw = channel_id.replace('dept-', '').replace('-', ' ')
-            dept_name_found = next((dept for dept in DEPARTMENT_TEAMS if dept.lower().replace(' ', '-') == dept_name_raw), None)
-            return await get_employees_by_department(db, dept_name_found) if dept_name_found else []
-        elif channel_id.startswith('team-'):
-            team_slug = channel_id.replace('team-', '')
-            team_name = next((team for team in TEAMS if team.lower().replace(' ', '-').replace('/', '-') == team_slug), None)
-            if team_name:
-                collection_name = sanitize_team(team_name)
-                collection = db[collection_name]
-                users = await collection.find({}, {"email": 1, "_id": 0}).to_list(None)
-                return [u['email'] for u in users]
-        return []
-@router.get("/channels")
+@api_router.get("/channels")
 async def get_channels(user_id: Optional[str] = None):
     """
     Get channels. If user_id is provided, it filters channels the user has access to.
@@ -874,7 +2697,7 @@ async def get_channels(user_id: Optional[str] = None):
         logging.info(f"Filtered channels for user {user_id}: {len(user_channels)} channels")
         return user_channels
 
-@router.get("/announcements", response_model=List[Dict])
+@api_router.get("/announcements", response_model=List[Dict])
 async def get_announcements():
     """
     Fetch all published announcements from the database. This is accessible to all users.
@@ -885,6 +2708,141 @@ async def get_announcements():
     except Exception as e:
         logging.error(f"Error fetching announcements: {e}")
         raise HTTPException(status_code=500, detail="Failed to fetch announcements.")
+
+class AnnouncementCreate(BaseModel):
+    title: str
+    content: str
+    priority: str
+    scheduled_at: Optional[datetime] = None
+
+@api_router.post("/announcements", response_model=Announcement)
+async def create_announcement(
+    announcement_data: AnnouncementCreate,
+    admin_user: dict = Depends(get_current_admin_user)
+):
+    """
+    (Admin Only) Create a new announcement.
+    """
+    try:
+        announcement = Announcement(
+            title=announcement_data.title,
+            content=announcement_data.content,
+            priority=announcement_data.priority,
+            author=admin_user.get("name", "Admin"),
+            scheduled_at=announcement_data.scheduled_at
+        )
+
+        # The frontend sends a UTC datetime, so we can use it directly.
+
+        if announcement.scheduled_at and announcement.scheduled_at > datetime.now(timezone.utc):
+            announcement.status = "scheduled"
+            logging.info(f"Admin '{admin_user.get('email')}' scheduled announcement for {announcement.scheduled_at}")
+        else:
+
+            # If not scheduled or scheduled for the past, publish immediately.
+            announcement.status = "published"
+            announcement.scheduled_at = None # Clear scheduled time if published now
+
+        await chat_db.Announcements.insert_one(announcement.model_dump())
+
+        # Only broadcast and create notifications if the announcement is published immediately.
+        if announcement.status == "published":
+            logging.info(f"Admin '{admin_user.get('email')}' published announcement: '{announcement.title}'")
+
+            # --- Create notifications for offline users ---
+            all_employee_emails = await get_all_employees_emails(stc_db)
+            offline_users = [email for email in all_employee_emails if email not in manager.active_connections and email != admin_user.get("email")]
+
+            if offline_users:
+                notifications_to_create = [
+                    Notification(
+                        user_id=user_id,
+                        sender_id=admin_user.get("email", "admin"),
+                        sender_name=announcement.author,
+                        message_id=announcement.id,
+                        message_content=announcement.title,
+                        type="announcement"
+                    ).model_dump() for user_id in offline_users
+                ]
+                await chat_db.Notifications.insert_many(notifications_to_create)
+                logging.info(f"Created {len(notifications_to_create)} offline notifications for new announcement.")
+
+            # Broadcast the new announcement to all connected clients
+            broadcast_payload = {
+                "type": "new_announcement",
+                "data": serialize_document(announcement.model_dump())
+            }
+            await manager.broadcast(json.dumps(broadcast_payload))
+
+        return announcement
+    except Exception as e:
+        logging.error(f"Error creating announcement: {e}")
+        raise HTTPException(status_code=500, detail="Failed to create announcement.")
+
+class AnnouncementUpdate(BaseModel):
+    title: Optional[str] = None
+    content: Optional[str] = None
+    priority: Optional[str] = None
+    scheduled_at: Optional[datetime] = None
+
+@api_router.put("/announcements/{announcement_id}", response_model=Announcement)
+async def update_announcement(
+    announcement_id: str,
+    announcement_data: AnnouncementUpdate,
+    admin_user: dict = Depends(get_current_admin_user)
+):
+    """
+    (Admin Only) Update an existing announcement.
+    """
+    try:
+        update_payload = announcement_data.model_dump(exclude_unset=True)
+
+        # Handle scheduling logic
+        if 'scheduled_at' in update_payload:
+            scheduled_time = update_payload['scheduled_at']
+            if scheduled_time and scheduled_time > datetime.now(timezone.utc):
+                update_payload['status'] = 'scheduled'
+            else:
+                update_payload['status'] = 'published'
+                update_payload['date'] = datetime.now(timezone.utc) # Set publish date to now
+                update_payload['scheduled_at'] = None # Clear schedule time
+
+        if not update_payload:
+            raise HTTPException(status_code=400, detail="No update data provided.")
+
+        result = await chat_db.Announcements.update_one(
+            {"id": announcement_id},
+            {"$set": update_payload}
+        )
+
+        if result.modified_count == 0:
+            if not await chat_db.Announcements.find_one({"id": announcement_id}):
+                 raise HTTPException(status_code=404, detail="Announcement not found.")
+
+        updated_announcement = await chat_db.Announcements.find_one({"id": announcement_id})
+        return updated_announcement
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"Error updating announcement {announcement_id}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to update announcement.")
+
+@api_router.delete("/announcements/{announcement_id}", status_code=204)
+async def delete_announcement(announcement_id: str, admin_user: dict = Depends(get_current_admin_user)):
+    """
+    (Admin Only) Delete an announcement by its _id.
+    """
+    try:
+        # The frontend sends the UUID 'id' field, not the BSON '_id'
+        result = await chat_db.Announcements.delete_one({"id": announcement_id})
+    except Exception as e:
+        logging.error(f"Error deleting announcement {announcement_id}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to delete announcement.")
+
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Announcement not found.")
+
+    logging.info(f"Admin '{admin_user.get('email')}' deleted announcement with _id: {announcement_id}")
 
 
 async def handle_reaction_update(message_data, client_id):
@@ -952,7 +2910,7 @@ async def handle_reaction_update(message_data, client_id):
         logging.error(f"Failed to handle reaction update: {e}")
 
 # WebSocket endpoint
-@router.websocket("/ws/{client_id}")
+@api_router.websocket("/ws/{client_id}")
 async def websocket_endpoint(websocket: WebSocket, client_id: str):
     await manager.connect(websocket, client_id)
     try:
@@ -1101,3 +3059,39 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
     finally:
         await manager.disconnect(websocket, client_id)
         logging.info(f"User {client_id} connection handler finished.")
+
+# Corrected CORS middleware configuration
+@app.get("/")
+async def app_root():
+    """A simple endpoint for the root URL to confirm the server is running."""
+    return {"message": "Welcome to the STC Portal API. Visit /docs for documentation."}
+
+# Include the download file router and provide the GridFS dependency
+api_router.include_router(
+    download_router, dependencies=[Depends(get_grid_fs)]
+)
+app.include_router(api_router) # Include the main api_router in the app
+
+# Mount static files for uploads
+# from fastapi.staticfiles import StaticFiles
+# app.mount("/uploads", StaticFiles(directory=str(ROOT_DIR / "uploads")), name="uploads") # This is no longer needed
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+@app.on_event("startup")
+async def startup_event():
+    try:
+        await main_client.admin.command('ping')
+        await attendance_client.admin.command('ping')
+        logger.info("MongoDB connections successful.")
+        # Start the background task for checking scheduled announcements
+        asyncio.create_task(check_scheduled_announcements())
+    except Exception as e:
+        logger.error(f"MongoDB connection failed: {e}")
+        logger.info("Continuing without MongoDB - WebSocket functionality will work without database persistence")
+        
+app.include_router(api_router)

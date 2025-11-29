@@ -104,6 +104,32 @@ async def get_current_admin_user(authorization: Optional[str] = Header(None, ali
 
     raise HTTPException(status_code=403, detail="User is not an administrator")
 
+async def get_current_user(authorization: Optional[str] = Header(None, alias="Authorization")):
+    """
+    Dependency to get and validate the current authenticated user from a token.
+    This is for endpoints accessible by any logged-in user.
+    """
+    if not authorization:
+        raise HTTPException(status_code=401, detail="Authorization header missing")
+
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    token_str = authorization.split(" ")[1]
+    try:
+        decoded_token = base64.b64decode(token_str).decode('utf-8')
+        user_data_from_token = json.loads(decoded_token)
+        user_email_from_token = user_data_from_token.get("email")
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid token format.")
+
+    if not user_email_from_token:
+        raise HTTPException(status_code=401, detail="Invalid token: email missing.")
+
+    user, _ = await get_user_info_with_collection(stc_db, user_email_from_token)
+    if not user:
+        raise HTTPException(status_code=401, detail="User not found or token is invalid")
+    return user
 # --- Pydantic Models ---
 
 class Message(BaseModel):
@@ -225,6 +251,24 @@ class SignupRequest(BaseModel):
 class PasswordChangeRequest(BaseModel):
     current_password: str
     new_password: str
+
+class EmployeeCreate(BaseModel):
+    """Model for creating a new employee, without database-generated fields."""
+    id: str
+    name: str
+    email: str
+    designation: str
+    department: str
+    team: str
+    empCode: str
+    password_hash: str
+    reviewer: Optional[str] = None
+    phone: Optional[str] = None
+    emergency_contact: Optional[str] = None
+    date_of_birth: Optional[datetime] = None
+    profilePicture: Optional[str] = None
+    scheduled_at: Optional[datetime] = None
+
 
 class MarkReadRequest(BaseModel):
     message_ids: List[str]

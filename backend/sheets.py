@@ -4,6 +4,13 @@ import pandas as pd
 import re
 import os
 import json
+import logging
+from typing import Optional, Union
+
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
+
+router = APIRouter()
 
 def _get_gid_from_url(url):
     """Extracts the gid from a Google Sheets URL."""
@@ -45,3 +52,20 @@ def get_data_from_sheet(spreadsheet_url, sheet_name=None):
     data = worksheet.get_all_records()
     df = pd.DataFrame(data)
     return df.to_dict(orient='records')
+
+class SheetRequest(BaseModel):
+    url: str
+    sheet_name: Optional[Union[str, int]] = None
+
+@router.post("/data")
+async def get_sheet_data(request: SheetRequest):
+    """
+    Fetches data from a Google Sheet.
+    The service account key should be set as GOOGLE_SHEETS_CREDENTIALS environment variable.
+    """
+    try:
+        data = get_data_from_sheet(request.url, request.sheet_name)
+        return data
+    except Exception as e:
+        logging.error(f"Failed to fetch sheet data: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to fetch sheet data: {e}")

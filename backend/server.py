@@ -18,7 +18,8 @@ from profile import router as profile_router
 from admin import router as admin_router
 from announcements import router as announcements_router
 from meetings import router as meetings_router
-from populate_chat_employees import populate_chat_employees # Import the function
+from populate_chat_employees import populate_chat_employees
+import sheets # Import the sheets module
 
 # --- Allowed Origins for CORS ---
 ALLOWED_ORIGINS = [
@@ -105,6 +106,7 @@ api_router.include_router(profile_router, tags=["Users & Profiles"])
 api_router.include_router(admin_router, tags=["Admin"])
 api_router.include_router(announcements_router, tags=["Announcements"])
 api_router.include_router(meetings_router, prefix="/meetings", tags=["Meetings"])
+api_router.include_router(sheets.router, prefix="/sheets", tags=["Sheets"])
 # The WebSocket endpoint is now part of the chat_router
 
 app.include_router(api_router)

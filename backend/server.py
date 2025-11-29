@@ -2223,7 +2223,7 @@ async def upload_ap_mapping(file: UploadFile = File(...)):
         return {"message": "AP mapping data uploaded successfully"}
     except Exception as e:
         logging.error(f"AP mapping file upload failed: {e}")
-        raise HTTPException(status_code=500, detail=f"AP mapping file upload failed: {e}")
+        raise HTTPException(status_code=500, detail="An unexpected error occurred while processing the file.")
 
 @api_router.get("/ap-mapping-data")
 async def get_ap_mapping_data(
@@ -2247,7 +2247,7 @@ async def get_ap_mapping_data(
         return serialize_document(data)
     except Exception as e:
         logging.error(f"Failed to fetch AP mapping data: {e}")
-        raise HTTPException(status_code=500, detail="Failed to fetch AP mapping data")
+        raise HTTPException(status_code=500, detail="Failed to fetch AP mapping data.")
     
 @api_router.post("/attendance-report")
 async def save_attendance_report(employees: List[EmployeeAttendance] = Body(...)):

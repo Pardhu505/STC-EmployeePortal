@@ -23,13 +23,12 @@ from passlib.context import CryptContext
 from fastapi import Depends, Header
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-from .database import (
+from database import (
     main_db, attendance_db, chat_db, stc_db, grid_fs, get_grid_fs,
     main_client, attendance_client
 )
-from .download_file import router as download_router
-
-from .sheets import get_data_from_sheet
+from download_file import router as download_router
+from sheets import get_data_from_sheet
 import pandas as pd
 import io
 

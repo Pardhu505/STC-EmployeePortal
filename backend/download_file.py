@@ -4,7 +4,7 @@ from motor.motor_asyncio import AsyncIOMotorGridFSBucket
 from bson import ObjectId
 
 # Import the dependency from the new central database module
-from database import get_grid_fs
+from .database import get_grid_fs
 
 router = APIRouter()
 

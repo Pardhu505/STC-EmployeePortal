@@ -1844,22 +1844,16 @@ async def deactivate_employee(employeeId: str, admin_user: dict = Depends(get_cu
         raise HTTPException(status_code=500, detail="Error deactivating employee")
 
 @api_router.put("/users/me/deactivate")
-@api_router.delete("/users/me")
-async def deactivate_self(
+async def deactivate_self_account(
     authorization: str = Header(..., alias="Authorization"),
 ):
     """
     Allows a currently authenticated user to deactivate their own account.
-    Allows a currently authenticated user to permanently delete their own account.
-    The user is identified via their Authorization token.
     """
     try:
-        # We can reuse the admin dependency logic to get the user from the token,
-        # but we don't need to check for admin privileges here.
         if not authorization or not authorization.startswith("Bearer "):
             raise HTTPException(status_code=401, detail="Not authenticated")
         
-
         token_str = authorization.split(" ")[1]
         decoded_token = base64.b64decode(token_str).decode('utf-8')
         user_data_from_token = json.loads(decoded_token)
@@ -1867,17 +1861,43 @@ async def deactivate_self(
 
         if not user_email:
             raise HTTPException(status_code=401, detail="Invalid token: email missing.")
+
+        # Use the existing deactivate function
+        return await deactivate_employee(
+            employeeId=user_email,
+            admin_user={"email": user_email} # Pass dummy admin user
+        )
+    except Exception as e:
+        logging.error(f"Error during self-deactivation: {e}")
+        raise HTTPException(status_code=500, detail="An error occurred during account deactivation.")
+
+@api_router.delete("/users/me")
+async def delete_self_account(
+    authorization: str = Header(..., alias="Authorization"),
+):
+    """
+    Allows a currently authenticated user to permanently delete their own account.
+    """
+    try:
+        if not authorization or not authorization.startswith("Bearer "):
+            raise HTTPException(status_code=401, detail="Not authenticated")
+
+        token_str = authorization.split(" ")[1]
+        decoded_token = base64.b64decode(token_str).decode('utf-8')
+        user_data_from_token = json.loads(decoded_token)
+        user_email = user_data_from_token.get("email")
+
+        if not user_email:
             raise HTTPException(status_code=401, detail="Invalid token: user email missing.")
 
-        # Use the existing admin-level deactivate function, but pass the user's own email
-        # and a dummy admin_user object to satisfy the dependency.
-        return await deactivate_employee(employeeId=user_email, admin_user={"email": user_email})
         user, collection = await get_user_info_with_collection(stc_db, user_email)
 
         if not user or collection is None:
             raise HTTPException(status_code=404, detail="User to be deleted not found.")
 
-        result = await collection.delete_one({"email": re.compile(f"^{re.escape(user_email)}$", re.IGNORECASE)})
+        result = await collection.delete_one(
+            {"email": re.compile(f"^{re.escape(user_email)}$", re.IGNORECASE)}
+        )
 
         if result.deleted_count > 0:
             logging.info(f"User {user_email} has permanently deleted their own account.")
@@ -1885,8 +1905,8 @@ async def deactivate_self(
         
         raise HTTPException(status_code=500, detail="Account could not be deleted.")
     except Exception as e:
-        logging.error(f"Error during self-deactivation for token: {e}")
-        raise HTTPException(status_code=500, detail="An error occurred during account deactivation.")
+        logging.error(f"Error during self-deletion: {e}")
+        raise HTTPException(status_code=500, detail="An error occurred during account deletion.")
 
 class PasswordChangeRequest(BaseModel):
     current_password: str

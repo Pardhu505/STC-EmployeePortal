@@ -19,17 +19,15 @@ from typing import Optional, Any
 import urllib.parse
 import gsheets
 from pydantic import field_validator
-from download_file import router as download_router
 from passlib.context import CryptContext
 from fastapi import Depends, Header
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-# Import all database objects and dependencies from the central database module
 from database import (
     main_db, attendance_db, chat_db, stc_db, grid_fs, get_grid_fs,
     main_client, attendance_client
 )
-
+from download_file import router as download_router
 from sheets import get_data_from_sheet
 import pandas as pd
 import io
@@ -2222,7 +2220,7 @@ async def upload_ap_mapping(file: UploadFile = File(...)):
 
         return {"message": "AP mapping data uploaded successfully"}
     except Exception as e:
-        logging.error(f"AP mapping file upload failed: {e}")
+        logging.error(f"AP mapping file upload failed: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="An unexpected error occurred while processing the file.")
 
 @api_router.get("/ap-mapping-data")

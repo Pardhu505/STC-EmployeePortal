@@ -2220,7 +2220,7 @@ async def upload_ap_mapping(file: UploadFile = File(...)):
 
         return {"message": "AP mapping data uploaded successfully"}
     except Exception as e:
-        logging.error(f"AP mapping file upload failed: {e}")
+        logging.error(f"AP mapping file upload failed: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="An unexpected error occurred while processing the file.")
 
 @api_router.get("/ap-mapping-data")

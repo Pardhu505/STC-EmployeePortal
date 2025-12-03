@@ -1,4 +1,12 @@
-import { API_BASE_URL } from "../config/api";
+// This file centralizes API calls for the application.
+
+
+const API_BASE_URL = 'https://stc-employeeportal.onrender.com'
+
+
+
+// const API_BASE_URL = 'http://localhost:8000'
+
 
 
 /**

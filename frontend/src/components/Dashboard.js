@@ -9,25 +9,26 @@ import Projects from '@/components/Projects';
 import InternalCommunication from './InternalCommunication';
 import AdminPanel from './AdminPanel';
 import AdminRoute from './AdminRoute'; // Import the AdminRoute component
+
 import Meetings from './Meetings'; // Import the new Meetings component
+
 // import PayslipManagement from './PayslipManagement';
 
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
-import { Calendar, Users, BarChart3, Bell, MessageSquare, Gift, Shield, FileText, CalendarCheck ,MapIcon, Video} from 'lucide-react';
+
+import { Calendar, Users, BarChart3, Bell, MessageSquare, Gift, Shield, FileText, CalendarCheck, Map as MapIcon, Video } from 'lucide-react';
+
 import EAttendance from './EMPAttedence';
 import ManagerReport from './Manger Attendence';
 import AttendanceReport from './AdminAttedenceReport';
 import HRAttendance from './HRAttendance';
 import { employeeAPI } from '../Services/api';
+
 import { fetchEmployeesWorkDetails } from '../api'; // Import the centralized fetch function
 
 const DateTimeWidget = () => {
   const [time, setTime] = useState(new Date());
-  const today = new Date();
-  const year = today.getFullYear();
-  const month = today.getMonth();
-  const currentDate = today.getDate();
 
   useEffect(() => {
     const timerId = setInterval(() => setTime(new Date()), 1000);
@@ -41,6 +42,22 @@ const DateTimeWidget = () => {
       second: '2-digit',
     });
   };
+
+  return (
+    <div className="text-center font-mono text-lg font-semibold text-white mb-2" suppressHydrationWarning>
+      <span className="bg-black/10 px-2 py-1 rounded-md">{formatTime(time)}</span>
+    </div>
+  );
+};
+
+
+const CalendarWidget = () => {
+
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = today.getMonth();
+  const currentDate = today.getDate();
+
   const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
   const dayNames = ["S", "M", "T", "W", "T", "F", "S"];
 
@@ -56,6 +73,7 @@ const DateTimeWidget = () => {
   // Cells for each day of the month
   for (let day = 1; day <= daysInMonth; day++) {
     const isToday = day === currentDate;
+
     calendarDays.push(
       <div key={day} className={`w-3 h-3 flex items-center justify-center relative rounded-full ${isToday ? 'bg-[#225F8B]' : ''}`}>
         <span className={`text-xs ${isToday ? 'font-bold text-transparent' : 'text-gray-700'}`}>
@@ -69,15 +87,13 @@ const DateTimeWidget = () => {
   }
 
   return (
-    <div className="p-3 bg-white/90 backdrop-blur-sm rounded-lg shadow-md w-50 !h-30" suppressHydrationWarning>
-      <div className="text-center text-xs font-semibold text-gray-800 mb-1">
-        <span>{formatTime(time)}</span>
-      </div>
+  <div className="p-3 bg-white/90 backdrop-blur-sm rounded-lg shadow-md w-48" suppressHydrationWarning>
       <div className="text-center text-xs font-semibold text-gray-800 mb-2">
         <span>{monthNames[month]} {year}</span>
       </div>
       <div className="grid grid-cols-7 gap-1 text-center text-xs text-gray-500 mb-1">
         {dayNames.map((day, i) => <div key={`${day}-${i}`} className="w-3 h-3 flex items-center justify-center">{day}</div>)}
+
       </div>
       <div className="grid grid-cols-7 gap-1">{calendarDays}</div>
     </div>
@@ -85,10 +101,13 @@ const DateTimeWidget = () => {
 };
 
 const Dashboard = () => {
-  const { user, isAdmin, loading: authLoading, navigationTarget, allEmployees, setAllEmployees } = useAuth();
+
+  const { user, isAdmin, loading: authLoading, navigationTarget } = useAuth();
   const [activeSection, setActiveSection] = useState('portals');
   const [readAnnouncementIds, setReadAnnouncementIds] = useState(new Set());
   const [announcements, setAnnouncements] = useState([]);
+  const [allEmployees, setAllEmployees] = useState([]);
+
 
   // Helper to check for birthdays
   const checkBirthdays = (employees) => {
@@ -143,15 +162,14 @@ const Dashboard = () => {
       if (!response.ok) throw new Error('Failed to fetch announcements');
       const data = await response.json();
       
-      // Fetch all employees' work details to check for birthdays. This endpoint is accessible to all users.
-      // The employee list is now managed by AuthContext, so we just use it.
-
       // Generate birthday announcements
-      const birthdayEmployees = checkBirthdays(allEmployees, user);
+      // Check for birthdays using the 'allEmployees' state
+      const birthdayEmployees = checkBirthdays(allEmployees);
       const birthdayAnns = generateBirthdayAnnouncements(birthdayEmployees, user);
 
       // Combine fetched announcements with birthday announcements
-      setAnnouncements([...data, ...birthdayAnns]);
+      // Use a function for state update to avoid stale state issues
+      setAnnouncements(prev => [...data, ...birthdayAnns]);
 
     } catch (error) {
       console.error("Dashboard: Failed to fetch announcements", error);
@@ -159,8 +177,22 @@ const Dashboard = () => {
   };
 
   useEffect(() => {
+    // Fetch employees only once when the user is available
+    const fetchAllEmployees = async () => {
+      if (!user) return;
+      try {
+        const employees = await fetchEmployeesWorkDetails();
+        setAllEmployees(employees);
+      } catch (error) {
+        console.error("Dashboard: Failed to fetch employees", error);
+      }
+    };
+    fetchAllEmployees();
+  }, [user]); // Only depends on the user
+
+  useEffect(() => {
     fetchAnnouncements();
-    // The global employee list is fetched in AuthContext, so no need to fetch it here.
+  
 
     const handleNewAnnouncement = (event) => {
       const message = event.detail;
@@ -176,14 +208,15 @@ const Dashboard = () => {
     };
     
     window.addEventListener('websocket-message', handleNewAnnouncement);
-    return () => window.removeEventListener('websocket-message', handleNewAnnouncement);
-  }, [user, allEmployees]); // Depend on allEmployees so birthday announcements update if the list changes.
+    return () => window.removeEventListener('websocket-message', handleNewAnnouncement);  }, [user, allEmployees]); // Now this is safe because allEmployees is set elsewhere
+
+
 
   // Periodically re-fetch announcements to catch newly active scheduled ones
   useEffect(() => {
     const intervalId = setInterval(() => {
       fetchAnnouncements();
-    }, 60000); // Re-fetch every 60 seconds
+    }, 120000); // Re-fetch every 2 minutes to reduce load
     return () => clearInterval(intervalId); // Cleanup on component unmount
   }, []); // Empty dependency array ensures this runs only once
 
@@ -195,7 +228,7 @@ const Dashboard = () => {
         setActiveSection(navigationTarget.section);
       }
     }
-  }, [navigationTarget]);
+  }, [navigationTarget, activeSection]);
 
   // Load and manage user-specific read announcement IDs
   useEffect(() => {
@@ -224,7 +257,9 @@ const Dashboard = () => {
       case 'projects': return <Projects />;
       case 'profile': return <UserProfile />;
       case 'communication': return <InternalCommunication />;
+
       case 'meetings': return <Meetings />;
+
       case 'admin': 
         // Use the new isAdmin check from AuthContext
         return isAdmin ? <AdminPanel /> : <PortalCards />;
@@ -248,7 +283,9 @@ const Dashboard = () => {
     { id: 'announcements', label: 'Announcements', icon: Bell },
     { id: 'projects', label: 'Projects', icon: MapIcon },
     { id: 'communication', label: 'Communication', icon: MessageSquare },
+
     { id: 'meetings', label: 'Meetings', icon: Video },
+
     { id: 'attendance', label: user?.isAdmin ? 'Attendance Report' : 'Attendance', icon: CalendarCheck },
     // { id: 'payslips', label: 'Payslips', icon: FileText },
     // Use the new isAdmin check from AuthContext to show/hide the Admin Panel button
@@ -295,7 +332,11 @@ const Dashboard = () => {
                 </div>
                 <div className="hidden md:block">
                   <div className="flex flex-col items-center" suppressHydrationWarning>
+
                     <DateTimeWidget />
+
+                    <CalendarWidget />
+
                   </div>
                 </div>
               </div>

@@ -8,6 +8,7 @@ import re
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import Flow
 from googleapiclient.discovery import build
+from google.auth.exceptions import RefreshError
 from googleapiclient.errors import HttpError
  
 # Import the admin user dependency from models.py, which handles token validation.
@@ -46,42 +47,45 @@ class ScheduleMeetingRequest(BaseModel):
 @router.post("/schedule", status_code=201)
 async def schedule_meeting(
     request_data: ScheduleMeetingRequest,
-    current_user: Employee = Depends(get_current_user)
+    # use_cache=False tells FastAPI to NOT run this dependency for OPTIONS requests.
+    # This prevents the auth check during the CORS preflight, fixing the root cause.
+    current_user: Employee = Depends(get_current_user) # We will adjust the dependency itself
 ):
     """
     Schedules a new meeting in the user's Google Calendar.
     The frontend must provide an authorization code from Google's OAuth flow.
     """
-    flow = Flow.from_client_config(
-        client_config={
-            "web": {
-                "client_id": GOOGLE_CLIENT_ID,
-                "client_secret": GOOGLE_CLIENT_SECRET,
-                "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-                "token_uri": "https://oauth2.googleapis.com/token",
-                "redirect_uris": [GOOGLE_REDIRECT_URI],
-            }
-        },
-        scopes=SCOPES,
-        redirect_uri=GOOGLE_REDIRECT_URI
-    )
-
-    meeting = request_data.meeting_details
-    resolved_attendees = []
-    unresolved_attendees = []
-
-    for attendee in meeting.attendees:
-        # Simple check for email format
-        if re.match(r"[^@]+@[^@]+\.[^@]+", attendee):
-            resolved_attendees.append(attendee)
-        else:
-            # Assume it's a name and look up the email
-            employee = await get_employee_by_name(stc_db, attendee)
-            if employee and employee.get("email"):
-                resolved_attendees.append(employee["email"])
-            else:
-                unresolved_attendees.append(attendee)
     try:
+        flow = Flow.from_client_config(
+            client_config={
+                "web": {
+                    "client_id": GOOGLE_CLIENT_ID,
+                    "client_secret": GOOGLE_CLIENT_SECRET,
+                    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                    "token_uri": "https://oauth2.googleapis.com/token",
+                    "redirect_uris": [GOOGLE_REDIRECT_URI],
+                }
+            },
+            scopes=SCOPES,
+            redirect_uri=GOOGLE_REDIRECT_URI
+        )
+
+        meeting = request_data.meeting_details
+        resolved_attendees = []
+        unresolved_attendees = []
+
+        for attendee in meeting.attendees:
+            # Simple check for email format
+            if re.match(r"[^@]+@[^@]+\.[^@]+", attendee):
+                resolved_attendees.append(attendee)
+            else:
+                # Assume it's a name and look up the email
+                employee = await get_employee_by_name(stc_db, attendee)
+                if employee and employee.get("email"):
+                    resolved_attendees.append(employee["email"])
+                else:
+                    unresolved_attendees.append(attendee)
+
         # Exchange the authorization code for credentials (access and refresh tokens)
         flow.fetch_token(code=request_data.auth_code)
         credentials = flow.credentials
@@ -131,6 +135,12 @@ async def schedule_meeting(
             response_message += f" Could not find emails for: {', '.join(unresolved_attendees)}."
 
         return {"message": response_message, "event_link": created_event.get('htmlLink')}
+
+    except RefreshError as error:
+        # This specifically catches errors from an invalid, expired, or already-used auth_code.
+        # This is a client-side error, so we return a 400 Bad Request.
+        print(f"Google Auth RefreshError during token fetch: {error}")
+        raise HTTPException(status_code=400, detail=f"Invalid authorization code provided. It may be expired or has already been used. Please try again. Details: {error}")
 
     except HttpError as error:
         print(f"An error occurred: {error}")

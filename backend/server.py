@@ -1,11 +1,16 @@
 from fastapi import FastAPI, APIRouter, HTTPException, Request, Depends
+from fastapi.responses import JSONResponse
 from starlette.middleware.cors import CORSMiddleware
 import logging
 import asyncio
 from datetime import timezone
 
-from download_file import router as download_router
-from fastapi.responses import JSONResponse
+# Initialize logging early so startup events can use `logger`
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 # Import all database objects and dependencies from the central database module
 from database import get_grid_fs, main_client, attendance_client, chat_db
@@ -17,9 +22,10 @@ from attendance import router as attendance_router
 from profile import router as profile_router
 from admin import router as admin_router
 from announcements import router as announcements_router
-from meetings import router as meetings_router
-from populate_chat_employees import populate_chat_employees
-import sheets # Import the sheets module
+from meetings import router as meetings_router 
+from sheets import router as sheets_router
+from populate_chat_employees import populate_chat_employees # Import the function
+from download_file import router as download_router
 
 # --- Allowed Origins for CORS ---
 ALLOWED_ORIGINS = [
@@ -40,11 +46,20 @@ async def http_exception_handler(request: Request, exc: HTTPException):
     """
     origin = request.headers.get('origin')
     headers = getattr(exc, "headers", None) or {}
-    if origin in ALLOWED_ORIGINS:
+    # Mirror the Origin if present and allowed, otherwise allow all for local/dev
+    if origin and origin in ALLOWED_ORIGINS:
         headers["Access-Control-Allow-Origin"] = origin
-        headers["Access-Control-Allow-Credentials"] = "true"
+    elif origin:
+        headers["Access-Control-Allow-Origin"] = origin
+    else:
+        headers["Access-Control-Allow-Origin"] = "*"
+
+    headers.setdefault("Access-Control-Allow-Credentials", "true")
+    headers.setdefault("Access-Control-Allow-Methods", "*")
+    headers.setdefault("Access-Control-Allow-Headers", "*")
 
     return JSONResponse(
+        
         status_code=exc.status_code,
         content={"detail": exc.detail},
         headers=headers,
@@ -58,9 +73,16 @@ async def generic_exception_handler(request: Request, exc: Exception):
     logging.error(f"Unhandled exception: {exc}", exc_info=True)
     origin = request.headers.get('origin')
     headers = {}
-    if origin in ALLOWED_ORIGINS:
+    if origin and origin in ALLOWED_ORIGINS:
         headers["Access-Control-Allow-Origin"] = origin
-        headers["Access-Control-Allow-Credentials"] = "true"
+    elif origin:
+        headers["Access-Control-Allow-Origin"] = origin
+    else:
+        headers["Access-Control-Allow-Origin"] = "*"
+
+    headers.setdefault("Access-Control-Allow-Credentials", "true")
+    headers.setdefault("Access-Control-Allow-Methods", "*")
+    headers.setdefault("Access-Control-Allow-Headers", "*")
 
     return JSONResponse(status_code=500, content={"detail": "An internal server error occurred."}, headers=headers)
 
@@ -106,7 +128,7 @@ api_router.include_router(profile_router, tags=["Users & Profiles"])
 api_router.include_router(admin_router, tags=["Admin"])
 api_router.include_router(announcements_router, tags=["Announcements"])
 api_router.include_router(meetings_router, prefix="/meetings", tags=["Meetings"])
-api_router.include_router(sheets.router, prefix="/sheets", tags=["Sheets"])
+api_router.include_router(sheets_router, tags=["Google Sheets"])
 # The WebSocket endpoint is now part of the chat_router
 
 app.include_router(api_router)
@@ -149,8 +171,4 @@ async def startup_event():
         logger.error(f"MongoDB connection failed: {e}")
         logger.info("Continuing without MongoDB - WebSocket functionality will work without database persistence")
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
+# logger already initialized above

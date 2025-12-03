@@ -161,19 +161,20 @@ const UserProfile = () => {
   }
 
   try {
-    const token = btoa(JSON.stringify(user)); // same encoding as login
+  const token = btoa(JSON.stringify({ email: user.email }));
 
-    const response = await fetch("http://localhost:8000/api/users/me/reset-password", {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${token}`
-      },
-      body: JSON.stringify({
-        current_password: passwordData.currentPassword,
-        new_password: passwordData.newPassword.slice(0, 72)
-      })
-    });
+const response = await fetch("http://localhost:8000/api/users/me/reset-password", {
+  method: "PUT",
+  headers: {
+    "Content-Type": "application/json",
+    "Authorization": `Bearer ${token}`
+  },
+  body: JSON.stringify({
+    current_password: passwordData.currentPassword,
+    new_password: passwordData.newPassword.slice(0, 72)
+  })
+});
+
 
     const data = await response.json();
 
@@ -518,7 +519,9 @@ const UserProfile = () => {
                     value={passwordData.newPassword}
                     onChange={(e) => handlePasswordChange('newPassword', e.target.value)}
                     className="pr-10"
+
                     maxLength="72"
+
                     placeholder="Enter new password"
                   />
                   <button
@@ -542,7 +545,9 @@ const UserProfile = () => {
                     value={passwordData.confirmPassword}
                     onChange={(e) => handlePasswordChange('confirmPassword', e.target.value)}
                     className="pr-10"
+
                     maxLength="72"
+
                     placeholder="Confirm new password"
                   />
                   <button

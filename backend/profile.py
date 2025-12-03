@@ -332,7 +332,7 @@ async def remove_profile_picture(employee_id: str):
     )
     return serialize_document(updated_user)
 
-@router.get("/employees/work-details")
+@router.get("/employees/work-details/")
 async def get_employees_work_details(email: Optional[str] = None):
     """
     Gets all employees and enriches their data with reviewer info.

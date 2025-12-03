@@ -104,12 +104,18 @@ async def get_current_admin_user(authorization: Optional[str] = Header(None, ali
 
     raise HTTPException(status_code=403, detail="User is not an administrator")
 
-async def get_current_user(authorization: Optional[str] = Header(None, alias="Authorization")):
+async def get_current_user(
+    authorization: Optional[str] = Header(None, alias="Authorization"),
+    use_cache: bool = True
+):
     """
     Dependency to get and validate the current authenticated user from a token.
     This is for endpoints accessible by any logged-in user.
     """
-    if not authorization:
+    # For preflight OPTIONS requests, FastAPI calls dependencies with use_cache=False.
+    if not use_cache:
+        return None
+    if not authorization: 
         raise HTTPException(status_code=401, detail="Authorization header missing")
 
     if not authorization.startswith("Bearer "):

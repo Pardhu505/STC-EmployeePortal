@@ -145,7 +145,7 @@ export const employeeAPI = {
   // Get all employees with enriched work details
   getEmployeesWorkDetails: async () => {
     try {
-      const response = await api.get('/employees/work-details');
+      const response = await api.get('/employees/work-details/');
       return response.data;
     } catch (error) {
       console.error('Error fetching employee work details:', error);
@@ -156,7 +156,7 @@ export const employeeAPI = {
   // Get a single employee's enriched work details
   getSingleEmployeeWorkDetails: async (email) => {
     try {
-      const response = await api.get(`/employees/email/${email}`);
+      const response = await api.get(`/employees/email/${email}/`);
       return response.data;
     } catch (error) {
       console.error('Error fetching single employee work details:', error);

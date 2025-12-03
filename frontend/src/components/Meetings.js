@@ -60,14 +60,15 @@ const MeetingsContent = () => {
         attendees: attendeeEmails,
       }
     };
-
+    const token = btoa(JSON.stringify({ email: user.email }));
     try {
       const response = await fetch(`${API_BASE_URL}/api/meetings/schedule`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           // Assuming your backend needs the portal's auth token
-          'Authorization': `Bearer ${btoa(JSON.stringify(user))}`
+           "Authorization": `Bearer ${token}`
+
         },
         body: JSON.stringify(payload)
       });
@@ -286,7 +287,19 @@ const MeetingsContent = () => {
 
 const Meetings = () => {
   if (!CLIENT_ID) {
-    return <div className="text-red-500 text-center p-4">Google Client ID is not configured. Please set REACT_APP_GOOGLE_CLIENT_ID in your .env file.</div>;
+    return (
+      <div className="p-4">
+        <Card className="border-red-500 bg-red-50">
+          <CardHeader>
+            <CardTitle className="text-red-700">Configuration Error</CardTitle>
+          </CardHeader>
+          <CardContent className="text-red-600 space-y-2">
+            <p>The Google Client ID is missing. The meeting scheduling feature cannot be initialized.</p>
+            <p className="text-sm">Please ensure you have a <code>.env</code> file in the frontend's root directory with the <code>REACT_APP_GOOGLE_CLIENT_ID</code> variable set, and then restart your development server.</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
   return (
     <GoogleOAuthProvider clientId={CLIENT_ID}>

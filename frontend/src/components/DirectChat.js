@@ -48,7 +48,7 @@ const MessageStatus = ({ status }) => {
 };
 
 const DirectChat = ({ selectedEmployee, onBack }) => {
-  const { user, sendWebSocketMessage, userStatuses, setCurrentChatUser, showNotification, newMessages, setNewMessages, allEmployees, clearChatNotifications } = useAuth();
+  const { user, sendWebSocketMessage, userStatuses, setCurrentChatUser, allEmployees, clearChatNotifications } = useAuth();
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
   const [selectedFile, setSelectedFile] = useState(null);
@@ -248,7 +248,7 @@ const DirectChat = ({ selectedEmployee, onBack }) => {
         window.removeEventListener('websocket-message', handleWebSocketMessage);
       };
     }
-  }, [user, recipientId, user?.email]);
+  }, [user, recipientId, sendWebSocketMessage]);
 
   // Mark messages as read when chat is opened or new messages arrive
   useEffect(() => {
@@ -554,71 +554,6 @@ const handleClearChat = async () => {
   }, []);
 
   const employeeStatus = recipientId ? (userStatuses[recipientId] || MOCK_USER_STATUS.OFFLINE) : MOCK_USER_STATUS.OFFLINE;
-
-  const downloadFile = async (fileUrl, fileName) => {
-    try {
-      const response = await fetch(fileUrl);
-      if (!response.ok) {
-        throw new Error('Network response was not ok');
-      }
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = fileName;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-    } catch (error) {
-      console.error('Error downloading file:', error);
-      alert('Failed to download file. Please try again.');
-    }
-  };
-
-  const handleFileUpload = async (file) => {
-    if (!file || !user || !recipientId) return;
-
-    try {
-      const formData = new FormData();
-      formData.append('file', file);
-
-      const response = await fetch(`${API_BASE_URL}/api/files/upload`, {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (response.ok) {
-        const fileData = await response.json();
-        console.log('File uploaded successfully:', fileData);
-
-        // Send message with file information
-        const messagePayload = {
-          type: 'personal_message',
-          recipient_id: recipientId,
-          sender_id: user.email,
-          sender_name: user.name,
-          content: `${fileData.file_name} (${(fileData.file_size / 1024).toFixed(1)} KB)`,
-          file_url: fileData.file_url,
-          file_name: fileData.file_name,
-          file_type: fileData.file_type,
-          file_size: fileData.file_size,
-        };
-        sendWebSocketMessage(messagePayload);
-      } else {
-        console.error('File upload failed:', response.statusText);
-        alert('File upload failed. Please try again.');
-      }
-    } catch (error) {
-      console.error('Error uploading file:', error);
-      alert('Error uploading file. Please try again.');
-    } finally {
-      setSelectedFile(null);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
-    }
-  };
 
   if (!selectedEmployee) {
     return <div className="p-4">No employee selected for direct chat.</div>;

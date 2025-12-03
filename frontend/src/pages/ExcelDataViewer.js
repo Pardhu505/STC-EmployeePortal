@@ -104,7 +104,8 @@ const ExcelDataViewer = () => {
       'Assembly Constituency': '',
     };
     setFilters(clearedFilters);
-    fetchData(clearedFilters); // Fetch data with filters cleared
+    // Reset to the full dataset without a new API call
+    setData(allData);
   };
 
   return (
@@ -137,8 +138,8 @@ const ExcelDataViewer = () => {
               <SelectValue placeholder={`All ${key}`} />
             </SelectTrigger>
             <SelectContent>
-              {dropdownOptions[key].map(option => (
-                <SelectItem key={option} value={String(option)}>{option}</SelectItem>
+              {dropdownOptions[key].map((option, index) => (
+                <SelectItem key={`${option}-${index}`} value={String(option)}>{option}</SelectItem>
               ))}
             </SelectContent>
           </Select>

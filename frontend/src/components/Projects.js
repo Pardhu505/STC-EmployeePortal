@@ -22,7 +22,7 @@ const PROJECTS_DATA = [
     icon: <Map className="w-8 h-8 text-white" />,
     gradient: 'from-green-500 to-green-700',
     category: 'Analytics',
-    url: '#', // Not yet implemented
+    url: 'https://campaigndashboard-delta.vercel.app',
   },
   {
     id: 'ap-zone-booth-mapping',
@@ -40,7 +40,11 @@ const Projects = () => {
 
   const handleProjectClick = (url) => {
     if (url && url !== '#') {
-      navigate(url);
+      if (url.startsWith('http')) {
+        window.open(url, '_blank', 'noopener,noreferrer');
+      } else {
+        navigate(url);
+      }
     }
   };
 

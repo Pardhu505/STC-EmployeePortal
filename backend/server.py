@@ -13,7 +13,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Import all database objects and dependencies from the central database module
-from database import get_grid_fs, main_client, attendance_client, chat_db
+from database import get_grid_fs, main_client, attendance_client, chat_db, stc_db
 from announcements import check_scheduled_announcements
 
 # Import new routers
@@ -157,14 +157,43 @@ async def setup_chat_indexes():
     except Exception as e:
         logging.error(f"Failed to create TTL indexes: {e}")
 
+async def setup_ap_mapping_indexes():
+    """Creates indexes on the ap_mapping collection to speed up queries."""
+    try:
+        collection = stc_db["ap_mapping"]
+        # Create individual indexes on the fields used for filtering
+        await collection.create_index("Zone")
+        await collection.create_index("District")
+        await collection.create_index("Parliament Constituency")
+        await collection.create_index("Assembly Constituency")
+        logging.info("Indexes created for ap_mapping collection.")
+    except Exception as e:
+        logging.error(f"Failed to create ap_mapping indexes: {e}")
+
+async def setup_ap_mapping_indexes():
+    """Creates indexes on the ap_mapping collection to speed up queries."""
+    try:
+        collection = stc_db["ap_mapping"]
+        # Create individual indexes on the fields used for filtering
+        await collection.create_index("Zone")
+        await collection.create_index("District")
+        await collection.create_index("Parliament Constituency")
+        await collection.create_index("Assembly Constituency")
+        logging.info("Indexes created for ap_mapping collection.")
+    except Exception as e:
+        logging.error(f"Failed to create ap_mapping indexes: {e}")
+
 @app.on_event("startup")
 async def startup_event():
     try:
         await main_client.admin.command('ping')
         await attendance_client.admin.command('ping')
         logger.info("MongoDB connections successful.")
+
         # Setup background tasks and indexes
         await setup_chat_indexes()
+        await setup_ap_mapping_indexes()
+
         asyncio.create_task(check_scheduled_announcements())
         await populate_chat_employees() # Run the script on startup
     except Exception as e:

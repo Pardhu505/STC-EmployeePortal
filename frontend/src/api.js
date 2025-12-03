@@ -36,7 +36,7 @@ export const uploadAPMapping = async (file) => {
   const formData = new FormData();
   formData.append('file', file);
 
-  const response = await fetch(`${API_BASE_URL}/upload-ap-mapping`, {
+  const response = await fetch(`${API_BASE_URL}/api/upload-ap-mapping`, {
     method: 'POST',
     body: formData,
   });
@@ -51,7 +51,7 @@ export const uploadAPMapping = async (file) => {
 
 export const fetchAPMappingData = async (filters) => {
   const query = new URLSearchParams(filters).toString();
-  const response = await fetch(`${API_BASE_URL}/ap-mapping-data?${query}`);
+  const response = await fetch(`${API_BASE_URL}/api/ap-mapping-data?${query}`);
 
   if (!response.ok) {
     const errorData = await response.json();

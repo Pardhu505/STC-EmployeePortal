@@ -48,7 +48,7 @@ const ImageCarousel = () => {
           key={index}
           src={src}
           alt={`carousel-${index}`}
-          className={`absolute w-full h-full object-contain transition-opacity duration-1000 ease-in-out ${index === currentIndex ? 'opacity-100' : 'opacity-0'}`}
+          className={`absolute w-full h-full object-cover transition-opacity duration-1000 ease-in-out ${index === currentIndex ? 'opacity-100' : 'opacity-0'}`}
         />
       ))}
     </div>

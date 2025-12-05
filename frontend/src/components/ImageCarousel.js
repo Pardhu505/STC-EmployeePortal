@@ -1,17 +1,19 @@
 import React from 'react';
 import './ImageCarousel.css';
 
-import image1 from '../assets/carousel/carousel-1.jpg';
-import image2 from '../assets/carousel/carousel-2.jpg';
-import image3 from '../assets/carousel/carousel-3.jpg';
-import image4 from '../assets/carousel/carousel-4.jpg';
-import image5 from '../assets/carousel/carousel-5.jpg';
-import image6 from '../assets/carousel/carousel-6.jpg';
-import image7 from '../assets/carousel/carousel-7.jpg';
-import image8 from '../assets/carousel/carousel-8.jpg';
-import image9 from '../assets/carousel/carousel-9.jpg';
-import image10 from '../assets/carousel/carousel-10.jpg';
-import image11 from '../assets/carousel/carousel-11.jpg';
+import image1 from '../assets/carousel/1760922234178.jpg';
+import image2 from '../assets/carousel/1760922234926.jpg';
+import image3 from '../assets/carousel/1760922234968.jpg';
+import image4 from '../assets/carousel/1760922235049.jpg';
+import image5 from '../assets/carousel/1760922235281.jpg';
+import image6 from '../assets/carousel/1760922235358.jpg';
+import image7 from '../assets/carousel/1760922235406.jpg';
+import image8 from '../assets/carousel/1760922235497.jpg';
+import image9 from '../assets/carousel/1760922235534.jpg';
+import image10 from '../assets/carousel/1760922235603.jpg';
+import image11 from '../assets/carousel/1760922235760.jpg';
+import image12 from '../assets/carousel/1760922235776.jpg';
+import image13 from '../assets/carousel/1760922236111.jpg';
 
 const images = [
   image1,
@@ -24,7 +26,9 @@ const images = [
   image8,
   image9,
   image10,
-  image11
+  image11,
+  image12,
+  image13
 ];
 
 const ImageCarousel = () => {

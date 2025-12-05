@@ -45,11 +45,11 @@ const Login = () => {
         />
       </div>
       <div className="flex w-full max-w-6xl">
-        <div className="w-1/2">
+        <div className="w-1/2 flex items-center justify-center">
           <ImageCarousel />
         </div>
-        <div className="w-1/2">
-          <Card className="w-full relative backdrop-blur-sm bg-white/90 shadow-2xl border-0 z-10">
+        <div className="w-1/2 flex items-center">
+          <Card className="w-full relative backdrop-blur-sm bg-white/90 shadow-2xl border-0 z-10 max-w-md mx-auto">
             <CardHeader className="text-center pb-8">
               <div className="flex justify-center mb-6">
                 <div className="relative">

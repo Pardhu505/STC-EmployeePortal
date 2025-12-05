@@ -1,153 +1,107 @@
-import React, { useState } from 'react';
-import { useAuth } from '../contexts/AuthContext';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
-import { Button } from './ui/button';
-import { Input } from './ui/input';
-import { Label } from './ui/label';
-import { Alert, AlertDescription } from './ui/alert';
-import { Eye, EyeOff, Building2, Mail, Lock } from 'lucide-react';
-import ImageCarousel from './ImageCarousel';
+import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../hooks/use-toast';
+
+const images = [
+  'assets/carousel/1760922234178.jpg',
+  'assets/carousel/1760922234926.jpg',
+  'assets/carousel/1760922234968.jpg',
+  'assets/carousel/1760922235049.jpg',
+  'assets/carousel/1760922235281.jpg',
+  'assets/carousel/1760922235358.jpg',
+  'assets/carousel/1760922235406.jpg',
+  'assets/carousel/1760922235497.jpg',
+  'assets/carousel/1760922235534.jpg',
+  'assets/carousel/1760922235603.jpg',
+  'assets/carousel/1760922235760.jpg',
+  'assets/carousel/1760922235776.jpg',
+  'assets/carousel/1760922236111.jpg',
+];
 
 const Login = () => {
-  const [identifier, setIdentifier] = useState('');
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
   const { login } = useAuth();
   const navigate = useNavigate();
+  const { addToast } = useToast();
 
-  const handleSubmit = async (e) => {
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentImageIndex((prevIndex) => (prevIndex + 1) % images.length);
+    }, 3000); // Change image every 3 seconds
+    return () => clearInterval(timer);
+  }, []);
+
+  const handleLogin = async (e) => {
     e.preventDefault();
-    setLoading(true);
-    setError('');
     try {
-      const loggedInUser = await login(identifier, password.slice(0, 72));
-      // Store the login time in localStorage
-      localStorage.setItem('loginTime', new Date().toISOString());
+      await login(email, password);
+      addToast('Login successful!', { appearance: 'success' });
       navigate('/dashboard');
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
+    } catch (error) {
+      const errorMessage = error.message || 'An unexpected error occurred.';
+      addToast(errorMessage, { appearance: 'error' });
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 flex items-center justify-center p-4 relative overflow-hidden">
-      <div className="absolute inset-0 bg-gradient-to-br from-[#225F8B]/5 via-[#225F8B]/5 to-[#225F8B]/10"></div>
-      <div className="shape2 rotate-me">
-        <img 
-          src="https://showtimeconsulting.in/web/images/thm-shape1.png" 
-          alt="About us" 
-          className="w-16 h-16 opacity-30"
+    <div className="relative h-screen w-screen overflow-hidden">
+      {images.map((src, index) => (
+        <img
+          key={src}
+          src={src}
+          alt={`Carousel background ${index + 1}`}
+          className={`absolute top-0 left-0 w-full h-full object-cover transition-opacity duration-1000 ${
+            index === currentImageIndex ? 'opacity-100' : 'opacity-0'
+          }`}
         />
-      </div>
-      <div className="flex w-full max-w-6xl">
-        <div className="w-1/2 flex items-center justify-center">
-          <ImageCarousel />
-        </div>
-        <div className="w-1/2 flex items-center">
-          <Card className="w-full relative backdrop-blur-sm bg-white/90 shadow-2xl border-0 z-10 max-w-md mx-auto">
-            <CardHeader className="text-center pb-8">
-              <div className="flex justify-center mb-6">
-                <div className="relative">
-                  <img
-                    src="https://showtimeconsulting.in/images/settings/2fd13f50.png"
-                    alt="Showtime Consulting"
-                    className="h-20 w-auto object-contain"
-                  />
-                  <div className="absolute -inset-1 bg-gradient-to-r from-[#225F8B] to-[#225F8B]/80 rounded-full blur opacity-20"></div>
-                </div>
+      ))}
+      <div className="absolute top-0 left-0 w-full h-full bg-black bg-opacity-50 flex items-center justify-center">
+        <div className="w-full max-w-md p-8 space-y-8 bg-white bg-opacity-10 backdrop-blur-lg rounded-xl shadow-2xl">
+          <div className="text-center">
+            <h2 className="text-4xl font-extrabold text-white">Login</h2>
+            <p className="mt-2 text-sm text-gray-200">Welcome to the Employee Portal</p>
+          </div>
+          <form className="mt-8 space-y-6" onSubmit={handleLogin}>
+            <div className="rounded-md shadow-sm -space-y-px">
+              <div>
+                <input
+                  id="email-address"
+                  name="email"
+                  type="email"
+                  autoComplete="email"
+                  required
+                  className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
+                  placeholder="Email address"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                />
               </div>
-              <CardTitle className="text-2xl font-bold bg-sky-700 bg-clip-text text-transparent">
-                ShowTime Consulting
-              </CardTitle>
-              <p className="text-gray-600 text-sm mt-2">
-                Employee Portal
-              </p>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleSubmit} className="space-y-6">
-                <div className="space-y-2">
-                  <Label htmlFor="identifier" className="text-sm font-medium text-gray-700">
-                    Email or Employee ID
-                  </Label>
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                    <Input
-                      id="identifier"
-                      type="text"
-                      placeholder="Enter your email or employee ID"
-                      value={identifier}
-                      onChange={(e) => setIdentifier(e.target.value)}
-                      className="pl-10 h-12 border-gray-200 focus:border-[#225F8B] focus:ring-[#225F8B]"
-                      required
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="password" className="text-sm font-medium text-gray-700">
-                    Password
-                  </Label>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                    <Input
-                      id="password"
-                      type={showPassword ? "text" : "password"}
-                      placeholder="Enter your password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      className="pl-10 pr-10 h-12 border-gray-200 focus:border-[#225F8B] focus:ring-[#225F8B]"
-                      maxLength="72"
-                      required
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-3 h-4 w-4 text-gray-400 hover:text-gray-600"
-                    >
-                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </button>
-                  </div>
-                </div>
-                {error && (
-                  <Alert className="border-red-200 bg-red-50">
-                    <AlertDescription className="text-red-700">
-                      {error}
-                    </AlertDescription>
-                  </Alert>
-                )}
-                <Button
-                  type="submit"
-                  className="w-full h-12 bg-sky-700 hover:bg-sky-800 text-white font-medium shadow-lg hover:shadow-xl transition-all duration-200"
-                  disabled={loading}
-                >
-                  {loading ? (
-                    <div className="flex items-center justify-center">
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                      {"Signing in..."}
-                    </div>
-                  ) : (
-                    <div className="flex items-center justify-center">
-                      <Building2 className="h-4 w-4 mr-2" />
-                      {"Sign In"}
-                    </div>
-                  )}
-                </Button>
-                <div className="text-center mt-2">
-                  <button
-                    type="button"
-                    className="text-black hover:underline text-sm"
-                    onClick={() => navigate('/signup')}
-                  >
-                    {"Don't have an account? Sign Up"}
-                  </button>
-                </div>
-              </form>
-            </CardContent>
-          </Card>
+              <div>
+                <input
+                  id="password"
+                  name="password"
+                  type="password"
+                  autoComplete="current-password"
+                  required
+                  className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
+                  placeholder="Password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
+              </div>
+            </div>
+            <div>
+              <button
+                type="submit"
+                className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+              >
+                Sign in
+              </button>
+            </div>
+          </form>
         </div>
       </div>
     </div>

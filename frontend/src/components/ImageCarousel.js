@@ -42,15 +42,17 @@ const ImageCarousel = () => {
   }, []);
 
   return (
-    <div className="w-1/2 h-screen overflow-hidden relative">
-      {images.map((src, index) => (
-        <img
-          key={index}
-          src={src}
-          alt={`carousel-${index}`}
-          className={`absolute w-full h-full object-cover transition-opacity duration-1000 ease-in-out ${index === currentIndex ? 'opacity-100' : 'opacity-0'}`}
-        />
-      ))}
+    <div className="w-full max-w-2xl aspect-video overflow-hidden rounded-2xl shadow-lg">
+      <div className="w-full h-full relative">
+        {images.map((src, index) => (
+          <img
+            key={index}
+            src={src}
+            alt={`carousel-${index}`}
+            className={`absolute w-full h-full object-cover transition-opacity duration-1000 ease-in-out ${index === currentIndex ? 'opacity-100' : 'opacity-0'}`}
+          />
+        ))}
+      </div>
     </div>
   );
 };

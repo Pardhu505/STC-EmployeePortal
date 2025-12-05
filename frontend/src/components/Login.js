@@ -45,7 +45,7 @@ const Login = () => {
         />
       </div>
       <div className="flex w-full max-w-6xl">
-        <div className="w-1/2">
+        <div className="w-1/2 flex items-center justify-center">
           <ImageCarousel />
         </div>
         <div className="w-1/2 flex items-center">

@@ -5,6 +5,7 @@ import Header from './Header';
 import PortalCards from './PortalCards';
 import Announcements from './Announcements';
 import UserProfile from './UserProfile';
+import Footer from './Footer'; // Import the new Footer component
 import Projects from '@/components/Projects';
 import InternalCommunication from './InternalCommunication';
 import AdminPanel from './AdminPanel';
@@ -370,6 +371,7 @@ const Dashboard = () => {
             {renderContent()}
           </div>
         </div>
+             <Footer />
       </div>
     </div>
   );

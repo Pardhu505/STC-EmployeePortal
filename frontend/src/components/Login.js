@@ -62,7 +62,7 @@ const Login = () => {
         <div className="w-full max-w-md p-8 space-y-8 bg-white bg-opacity-10 backdrop-blur-lg rounded-xl shadow-2xl">
           <div className="text-center">
             <img className="mx-auto h-24 w-auto" src="assets/logo.png" alt="Logo" />
-            <h2 className="text-4xl font-extrabold text-white">Login</h2>
+            <h2 className="text-4xl font-extrabold text-white">ShowTime Consulting</h2>
             <p className="mt-2 text-sm text-gray-200">Welcome to the Employee Portal</p>
           </div>
           <form className="mt-8 space-y-6" onSubmit={handleLogin}>

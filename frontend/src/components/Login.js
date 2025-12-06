@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../hooks/use-toast';
 
@@ -61,6 +61,7 @@ const Login = () => {
       <div className="absolute top-0 left-0 w-full h-full bg-black bg-opacity-50 flex items-center justify-center">
         <div className="w-full max-w-md p-8 space-y-8 bg-white bg-opacity-10 backdrop-blur-lg rounded-xl shadow-2xl">
           <div className="text-center">
+            <img className="mx-auto h-24 w-auto" src="assets/logo.png" alt="Logo" />
             <h2 className="text-4xl font-extrabold text-white">Login</h2>
             <p className="mt-2 text-sm text-gray-200">Welcome to the Employee Portal</p>
           </div>
@@ -100,6 +101,11 @@ const Login = () => {
               >
                 Sign in
               </button>
+            </div>
+            <div className="text-sm text-center">
+              <Link to="/signup" className="font-medium text-indigo-200 hover:text-indigo-100">
+                Don't have an account? Sign up
+              </Link>
             </div>
           </form>
         </div>

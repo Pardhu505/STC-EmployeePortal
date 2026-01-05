@@ -13,6 +13,7 @@ import TermsAndConditions from "./components/TermsAndConditions";
 
 import APMapping from "@/components/APMapping";
 import ExcelDataViewer from "@/pages/ExcelDataViewer";
+import InhouseTracking from "@/components/InhouseTracking";
 
 
 const ProtectedRoute = ({ children }) => {
@@ -71,6 +72,11 @@ function App() {
               <Route path="/excel-data" element={
                 <ProtectedRoute>
                   <ExcelDataViewer />
+                </ProtectedRoute>
+              } />
+              <Route path="/InhouseTracking" element={
+                <ProtectedRoute>
+                  <InhouseTracking />
                 </ProtectedRoute>
               } />
               <Route path="/" element={<Navigate to="/dashboard" />} />

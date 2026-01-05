@@ -282,31 +282,31 @@ export const FileMessage = ({ message }) => {
   const isImage = message.file_type && message.file_type.startsWith('image/');
 
   return (
-    <div className="max-w-sm">
-      <Card className="border border-gray-200 hover:border-gray-300 transition-colors">
+    <div className="w-full">
+      <Card className="border border-blue-200 hover:border-gray-300 transition-colors">
         <CardContent className="p-3">
           {isImage ? (
-            <div className="space-y-2">
-              <div className="aspect-video bg-gray-100 rounded-lg overflow-hidden">
+            <div className="flex items-center space-x-3 p-2 rounded-lg bg-blue-50">
+              <div className="flex-shrink-0">
                 <img
                   src={message.file_url}
                   alt={message.file_name}
-                  className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                  className="w-12 h-12 object-cover rounded-md cursor-pointer hover:opacity-90 transition-opacity"
                   onClick={handleDownload}
                 />
               </div>
-              <div className="space-y-1">
+              <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-gray-700 truncate">{message.file_name}</p>
                 <p className="text-xs text-gray-500">{formatFileSize(message.file_size)}</p>
               </div>
-              <div className="flex justify-center">
+              <div className="flex-shrink-0">
                 <Button variant="outline" size="sm" onClick={handleDownload}>
                   Download
                 </Button>
               </div>
             </div>
           ) : (
-            <div className="flex items-center space-x-3 p-2 rounded-lg">
+            <div className="flex items-center space-x-3 p-2 rounded-lg bg-blue-50">
               <div className="flex-shrink-0">
                 {getFileIcon(message.file_type)}
               </div>

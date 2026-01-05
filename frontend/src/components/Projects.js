@@ -2,7 +2,7 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
-import { ArrowRight, Map } from 'lucide-react';
+import { ArrowRight, Map, BarChart } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 const PROJECTS_DATA = [
@@ -32,6 +32,15 @@ const PROJECTS_DATA = [
     gradient: 'from-purple-500 to-purple-700',
     category: 'Data Management',
     url: '/excel-data',
+  },
+  {
+    id: 'inhouse-tracking-tool',
+    title: 'Inhouse Tracking Tool',
+    description: 'Analyze and track party Inhouse channels effectively with our inhouse tracking tool.',
+    icon: <BarChart className="w-8 h-8 text-white" />,
+    gradient: 'from-purple-500 to-purple-700',
+    category: 'Analytics',
+    url: '/InhouseTracking',
   },
 ];
 

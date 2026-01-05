@@ -25,6 +25,7 @@ import {
   // Circle // Not using Circle for status indicator here directly, relies on color
 } from 'lucide-react';
 import { USER_STATUS as MOCK_USER_STATUS } from '../data/mock'; // Renamed for clarity
+import { FileMessage } from './FileUpload'; // Import the FileMessage component
 
 const MessageStatus = ({ status }) => {
   // Always show at least one tick if the status is 'sent', 'delivered', or 'read'
@@ -745,29 +746,9 @@ const handleClearChat = async () => {
                                 )}
                                 <div className={`text-sm ${(message.deleted || message.deleted_for_me) ? 'text-gray-400 italic' : ''}`}>
                                   {displayContent && <p>{(message.deleted || message.deleted_for_me) ? 'This message was deleted' : displayContent}</p>}
-                                  {!(message.deleted || message.deleted_for_me) && (message.file || message.file_url) && (
-                                    <div className="mt-2 p-2 bg-gray-100 rounded border">
-                                      {/* <div className="flex items-center space-x-2">
-                                        <Paperclip className="h-4 w-4 text-gray-500" />
-                                        <span className="text-sm font-medium">
-                                          {message.file?.name || message.file_name}
-                                        </span>
-                                        <span className="text-xs text-gray-500">
-                                          ({((message.file?.size || message.file_size) / 1024).toFixed(1)} KB)
-                                        </span>
-                                      </div>
-                                      <p className="text-xs text-gray-600 mt-1">
-                                        {message.file?.type || message.file_type}
-                                      </p> */}
-                                      {message.file_url && (
-                                        <a
-                                          href={message.file_url}
-                                          download={message.file_name}
-                                          className="text-xs text-blue-600 hover:text-blue-800 mt-1 inline-block"
-                                        >
-                                          Download File
-                                        </a>
-                                      )}
+                                  {!(message.deleted || message.deleted_for_me) && message.file_url && (
+                                    <div className="mt-2">
+                                      <FileMessage message={message} />
                                     </div>
                                   )}
                                 </div>
@@ -802,7 +783,7 @@ const handleClearChat = async () => {
                             </div>
                           ) : (
                             <div className="flex flex-col items-start">
-                              <div className="order-2 p-3 rounded-lg bg-gray-200 text-gray-900 inline-block max-w-max max-h-max">
+                              <div className="order-2 p-3 rounded-lg bg-white text-gray-900 inline-block max-w-max max-h-max shadow-sm border border-gray-100">
                                 <div className="flex items-center justify-between mb-1">
                                   <div className="flex items-center space-x-2">
                                     <span className="font-medium text-sm">{message.sender_name}</span>
@@ -874,29 +855,9 @@ const handleClearChat = async () => {
                                 <div className={`text-sm ${(message.deleted || message.deleted_for_me) ? 'text-gray-400 italic' : ''}`}>
 
                                   {displayContent && <p>{(message.deleted || message.deleted_for_me) ? 'This message was deleted' : displayContent}</p>}
-                                  {!(message.deleted || message.deleted_for_me) && (message.file || message.file_url) && (
-                                    <div className="mt-2 p-2 bg-gray-100 rounded border">
-                                      <div className="flex items-center space-x-2">
-                                        <Paperclip className="h-4 w-4 text-gray-500" />
-                                        <span className="text-sm font-medium">
-                                          {message.file?.name || message.file_name}
-                                        </span>
-                                        <span className="text-xs text-gray-500">
-                                          ({((message.file?.size || message.file_size) / 1024).toFixed(1)} KB)
-                                        </span>
-                                      </div>
-                                      <p className="text-xs text-gray-600 mt-1">
-                                        {message.file?.type || message.file_type}
-                                      </p>
-                                      {message.file_url && (
-                                        <a
-                                          href={message.file_url}
-                                          download={message.file_name}
-                                          className="text-xs text-blue-600 hover:text-blue-800 mt-1 inline-block"
-                                        >
-                                          Download File
-                                        </a>
-                                      )}
+                                  {!(message.deleted || message.deleted_for_me) && message.file_url && (
+                                    <div className="mt-2">
+                                      <FileMessage message={message} />
                                     </div>
                                   )}
                                 </div>

@@ -26,6 +26,8 @@ from meetings import router as meetings_router
 from sheets import router as sheets_router
 from populate_chat_employees import populate_chat_employees # Import the function
 from download_file import router as download_router
+from youtube import router as youtube_api_router
+from facebook import router as facebook_router
 
 # --- Allowed Origins for CORS ---
 ALLOWED_ORIGINS = [
@@ -33,7 +35,8 @@ ALLOWED_ORIGINS = [
     "http://localhost:3001",
     "https://showtime-consulting-employee-portal.onrender.com",
     "https://showtime-employeeportal.vercel.app",
-    "https://stc-employeeportal.vercel.app"
+    "https://stc-employeeportal.vercel.app",
+    "https://stc-employeeportal.onrender.com"
 ]
 
 # --- Custom Exception Handlers to ensure CORS headers on errors ---
@@ -129,6 +132,8 @@ api_router.include_router(admin_router, tags=["Admin"])
 api_router.include_router(announcements_router, tags=["Announcements"])
 api_router.include_router(meetings_router, prefix="/meetings", tags=["Meetings"])
 api_router.include_router(sheets_router, tags=["Google Sheets"])
+api_router.include_router(youtube_api_router, prefix="/youtube", tags=["YouTube"])
+api_router.include_router(facebook_router, prefix="/facebook", tags=["Facebook"])
 # The WebSocket endpoint is now part of the chat_router
 
 app.include_router(api_router)

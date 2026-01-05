@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { useLocation } from 'react-router-dom';
 import { API_BASE_URL } from '../config/api';
 import Header from './Header';
+import Footer from './Footer'; // Import the new Footer component
 import PortalCards from './PortalCards';
 import Announcements from './Announcements';
 import UserProfile from './UserProfile';
-import Footer from './Footer'; // Import the new Footer component
+
 import Projects from '@/components/Projects';
 import InternalCommunication from './InternalCommunication';
 import AdminPanel from './AdminPanel';
@@ -103,11 +105,21 @@ const CalendarWidget = () => {
 
 const Dashboard = () => {
 
+  const location = useLocation();
   const { user, isAdmin, loading: authLoading, navigationTarget } = useAuth();
   const [activeSection, setActiveSection] = useState('portals');
   const [readAnnouncementIds, setReadAnnouncementIds] = useState(new Set());
   const [announcements, setAnnouncements] = useState([]);
   const [allEmployees, setAllEmployees] = useState([]);
+
+  // Handle navigation from other components that pass state
+  useEffect(() => {
+    if (location.state?.section) {
+      setActiveSection(location.state.section);
+      // Clear the state to prevent it from persisting on re-navigation or refresh
+      window.history.replaceState({}, document.title)
+    }
+  }, [location.state]);
 
 
   // Helper to check for birthdays
@@ -371,7 +383,8 @@ const Dashboard = () => {
             {renderContent()}
           </div>
         </div>
-             <Footer />
+        <Footer />
+
       </div>
     </div>
   );

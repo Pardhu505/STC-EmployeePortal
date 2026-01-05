@@ -85,4 +85,5 @@ agenthub/agents/youtube/db
 # Build caches
 .cache/
 
-# Mobile development
+# Chrome automation profile (DO NOT COMMIT)
+backend/chrome_profile/

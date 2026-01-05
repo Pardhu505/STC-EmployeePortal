@@ -45,6 +45,7 @@ import { employeeAPI } from '../Services/api';
 import DirectChat from './DirectChat'; // This component will handle the 1-on-1 chat
 import chatImage from '../data/chat.jpg'; // Import the placeholder image
 import ChatInput from './ChatInput'; // Extracted input logic for reusability
+import { FileMessage } from './FileUpload'; // Import the FileMessage component
 
 const MessageStatus = ({ status }) => {
   // In channel chat, we only show the 'sent' status (single tick).
@@ -1015,7 +1016,7 @@ const handleReactionClick = (message, emoji) => {
                   )}
                   <div className={`flex mb-2 ${isSender ? 'justify-end' : 'justify-start'}`}>
                     <div className={`max-w-[70%] ${isSender ? 'order-2' : 'order-1'}`}>
-                      <div className={`p-3 rounded-lg ${isSender ? 'bg-[#B3D4F2] text-black' : 'bg-gray-200 text-gray-900'}`}>
+                      <div className={`p-3 rounded-lg ${isSender ? 'bg-[#B3D4F2] text-black' : 'bg-white text-gray-900 shadow-sm border border-gray-100'}`}>
                         <div className="flex items-center justify-between mb-1">
                           <div className="flex items-center space-x-2">
                             <span className="font-medium text-sm">{message.sender_name}</span>
@@ -1100,16 +1101,9 @@ const handleReactionClick = (message, emoji) => {
                         )}
                         <div className={`text-sm ${message.deleted ? 'text-gray-500 italic' : ''}`}>
                           {message.content && <p>{message.content}</p>}
-                          {!(message.deleted || message.deleted_for_me) && (message.file || message.file_url) && (
-                            <div className="mt-2 p-2 bg-gray-100 rounded border ">
-                              {message.file_url && (
-                                <a
-                                  href={message.file_url}
-                                  className="text-xs text-blue-600 hover:text-blue-800 mt-1 inline-block"
-                                >
-                                  Download File
-                                </a>
-                              )}
+                          {!(message.deleted || message.deleted_for_me) && message.file_url && (
+                            <div className="mt-2">
+                              <FileMessage message={message} />
                             </div>
                           )}
                         </div>

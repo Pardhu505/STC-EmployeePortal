@@ -154,4 +154,6 @@ async def get_ap_mapping_data(
     # Fetch data from MongoDB, excluding the internal '_id' field
     cursor = collection.find(query, {'_id': 0})
     results = await cursor.to_list(length=None)
+
     return results
+

@@ -29,12 +29,8 @@ import {
   LogOut,
   User,
   Users,
-  Search,
-  Instagram,
-  Facebook,
-  Globe,
   UserX,
-  AlertTriangle
+  AlertTriangle,
 } from 'lucide-react';
 
 const Header = ({ onSectionChange, newAnnouncements, onReadAnnouncement }) => {
@@ -112,9 +108,6 @@ const Header = ({ onSectionChange, newAnnouncements, onReadAnnouncement }) => {
               <p className="text-xs text-gray-500">Employee Portal</p>
             </div>
           </div>
-
-       
-
           {/* Right Side - Notifications and User Menu */}
           <div className="flex items-center space-x-4">
             <NotificationSystem 

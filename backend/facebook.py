@@ -677,7 +677,7 @@ async def main_async():
 
     async with async_playwright() as p:
         # Launch browser
-        browser = await p.chromium.launch(headless=False, args=["--start-maximized", "--disable-notifications"])
+        browser = await p.chromium.launch(headless=True, args=["--start-maximized", "--disable-notifications"])
         
         # Create context with storage state if available
         context_args = {"viewport": None} # Disable viewport to allow maximize

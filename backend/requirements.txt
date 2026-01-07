@@ -50,3 +50,4 @@ openpyxl>=3.0.10
 gsheets==0.6.1
 selenium
 webdriver-manager
+playwright

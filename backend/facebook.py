@@ -139,7 +139,8 @@ async def fb_manual_login(page, context):
     print("2. Solve any 'I'm not a robot' / captcha / 2FA.")
     print("3. Make sure your feed/home is visible.")
     # Blocking input is fine here as it's the setup phase
-    await asyncio.to_thread(input, "\nWhen you are fully logged in, press ENTER here to continue... (DO NOT CLOSE THE BROWSER)\n")
+    # await asyncio.to_thread(input, "\nWhen you are fully logged in, press ENTER here to continue... (DO NOT CLOSE THE BROWSER)\n")
+    print("Manual login is not supported in headless server environments.")
     await save_cookies(context)
 
 
@@ -716,7 +717,7 @@ async def main_async():
             print(f"\n[INFO] Saved data to MongoDB for date: {current_date}")
                 
         finally:
-            input("\nPress ENTER to close browser...")
+            # input("\nPress ENTER to close browser...")
             await browser.close()
 
 def main():

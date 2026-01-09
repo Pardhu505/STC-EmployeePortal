@@ -350,7 +350,7 @@ export function FacebookTracking() {
       });
   }, []);
 
-  const pageUrls = useMemo(() => data ? Array.from(new Set(data.pages.map(p => p.page_url))) : [], [data]);
+  const pageUrls = useMemo(() => (data && data.pages) ? Array.from(new Set(data.pages.map(p => p.page_url))) : [], [data]);
 
   const handlePageToggle = (url) => {
     setSelectedPages((prev) => {
@@ -370,7 +370,7 @@ export function FacebookTracking() {
 
   // Available posts for the single selected channel (for the dropdown options)
   const availablePosts = useMemo(() => {
-    if (selectedPages.length !== 1 || !data) return [];
+    if (selectedPages.length !== 1 || !data || !data.pages) return [];
     const page = data.pages.find(p => p.page_url === selectedPages[0]);
     if (!page || !page.posts) return [];
     return page.posts.map((post, index) => ({
@@ -421,9 +421,9 @@ export function FacebookTracking() {
 
     // Filter by Post Type (Videos vs Posts)
     if (postType === "Videos") {
-      allPosts = allPosts.filter(p => p.url && (p.url.includes("/videos/") || p.url.includes("/reel/")));
+      allPosts = allPosts.filter(p => p.post_url && (p.post_url.includes("/videos/") || p.post_url.includes("/reel/")));
     } else if (postType === "Posts") {
-      allPosts = allPosts.filter(p => !p.url || (!p.url.includes("/videos/") && !p.url.includes("/reel/")));
+      allPosts = allPosts.filter(p => !p.post_url || (!p.post_url.includes("/videos/") && !p.post_url.includes("/reel/")));
     }
 
     // Filter by Date Range

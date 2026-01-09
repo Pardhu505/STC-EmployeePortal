@@ -3,6 +3,7 @@ import re
 import asyncio
 import pickle
 import os
+import shutil
 from datetime import datetime, timedelta
 from typing import List, Set, Dict, Any, Tuple
 
@@ -509,10 +510,21 @@ def create_driver():
     
     # Fallback for Render if env var is missing but binary exists in standard location
     if not chrome_bin:
-        for path in ["/usr/bin/google-chrome", "/usr/bin/google-chrome-stable", "/opt/google/chrome/google-chrome", "/usr/bin/chromium", "/usr/bin/chromium-browser"]:
+        paths_to_check = [
+            "/opt/render/project/.render/chrome/opt/google/chrome/google-chrome",
+            "/usr/bin/google-chrome", 
+            "/usr/bin/google-chrome-stable", 
+            "/opt/google/chrome/google-chrome", 
+            "/usr/bin/chromium", 
+            "/usr/bin/chromium-browser"
+        ]
+        for path in paths_to_check:
             if os.path.exists(path):
                 chrome_bin = path
                 break
+
+    if not chrome_bin:
+        chrome_bin = shutil.which("google-chrome") or shutil.which("chromium")
 
     if chrome_bin:
         print(f"[INFO] Using Chrome binary at: {chrome_bin}")

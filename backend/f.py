@@ -503,6 +503,26 @@ def create_driver():
     opts = Options()
     opts.add_argument("--start-maximized")
     opts.add_argument("--disable-notifications")
+    # opts.add_argument("--headless=new")
+    opts.add_argument("--no-sandbox")
+    opts.add_argument("--disable-dev-shm-usage")
+    opts.add_argument("--disable-gpu")
+
+    chrome_bin = os.environ.get("CHROME_BIN") or os.environ.get("GOOGLE_CHROME_BIN")
+    
+    # Fallback for Render if env var is missing but binary exists in standard location
+    if not chrome_bin:
+        for path in ["/usr/bin/google-chrome", "/usr/bin/google-chrome-stable", "/opt/google/chrome/google-chrome"]:
+            if os.path.exists(path):
+                chrome_bin = path
+                break
+
+    if chrome_bin:
+        print(f"[INFO] Using Chrome binary at: {chrome_bin}")
+        opts.binary_location = chrome_bin
+    else:
+        print("[INFO] CHROME_BIN not set. Selenium will search system PATH.")
+
     service = Service(ChromeDriverManager().install())
     return webdriver.Chrome(service=service, options=opts)
 
@@ -1090,8 +1110,8 @@ def run_selenium_scraper():
                 collect_captions_step(driver, seen_texts, posts_ordered)
 
                 # Smart scroll control (taken from your caption-only script)
-                max_scrolls = 200          # hard safety limit
-                no_new_limit = 8           # stop after 8 scrolls with no new captions
+                max_scrolls = 5000         # hard safety limit (increased to scrape all)
+                no_new_limit = 20          # stop after 20 scrolls with no new captions
                 no_new_in_row = 0
 
                 last_height = driver.execute_script("return document.body.scrollHeight")
@@ -1099,7 +1119,7 @@ def run_selenium_scraper():
                 for i in range(max_scrolls):
                     driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
                     print(f"\n[SCROLL] {i+1}/{max_scrolls}")
-                    time.sleep(3)
+                    time.sleep(4)
 
                     new_captions = collect_captions_step(driver, seen_texts, posts_ordered)
 
@@ -1112,8 +1132,8 @@ def run_selenium_scraper():
 
                     if new_height == last_height:
                         print("[INFO] Page height stopped increasing.")
-                        if no_new_in_row >= 2:
-                            print("[INFO] No new captions in last 2 scrolls and height stable. Stopping.")
+                        if no_new_in_row >= 5:
+                            print("[INFO] No new captions in last 5 scrolls and height stable. Stopping.")
                             break
                     last_height = new_height
 

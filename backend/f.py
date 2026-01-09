@@ -1228,6 +1228,11 @@ async def scrape_and_save_task():
         print("No posts found to save.")
 
 
+@router.get("/")
+async def root():
+    return {"message": "Facebook Scraper Service is Running. Go to /docs to use the API."}
+
+
 @router.post("/run-scrape")
 async def trigger_facebook_scrape(background_tasks: BackgroundTasks):
     """

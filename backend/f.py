@@ -18,7 +18,7 @@ from selenium.common.exceptions import (
     NoSuchElementException,
 )
 from webdriver_manager.chrome import ChromeDriverManager
-from fastapi import APIRouter, BackgroundTasks
+from fastapi import FastAPI, APIRouter, BackgroundTasks
 from database import stc_db
 from pymongo import MongoClient
 
@@ -486,6 +486,10 @@ COMMENTS_SHARES_REL_XPATH = (
 FOLLOWERS_STRONG_XPATH = "//a[contains(@href, '/followers/')]/strong"
 
 router = APIRouter()
+
+# Initialize the main FastAPI app
+app = FastAPI()
+app.include_router(router)
 
 COOKIES_FILE = "fb_cookies.pkl"
 
@@ -1241,4 +1245,5 @@ async def get_facebook_data():
     return posts
 
 if __name__ == "__main__":
-    asyncio.run(scrape_and_save_task())
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)

@@ -11,12 +11,13 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.keys import Keys
 from selenium.common.exceptions import (
     StaleElementReferenceException,
     NoSuchElementException,
 )
 from webdriver_manager.chrome import ChromeDriverManager
-from fastapi import APIRouter
+from fastapi import APIRouter, BackgroundTasks
 from database import stc_db
 from pymongo import MongoClient
 
@@ -464,11 +465,7 @@ TARGET_PAGES = [
 ]
 
 # Caption container (same as in your smart-stop code)
-CAPTION_XPATH = (
-    "//div[contains(@class,'xdj266r') and contains(@class,'x14z9mp') "
-    "and contains(@class,'xat24cr') and contains(@class,'x1lziwak') "
-    "and contains(@class,'x1vvkbs') and contains(@class,'x126k92a')]"
-)
+CAPTION_XPATH = "//div[@role='article']//div[@dir='auto']"
 
 # Likes span class inside the same post area
 LIKES_REL_XPATH = ".//span[contains(@class,'x135b78x')]"
@@ -503,7 +500,7 @@ def create_driver():
     opts = Options()
     opts.add_argument("--start-maximized")
     opts.add_argument("--disable-notifications")
-    # opts.add_argument("--headless=new")
+    opts.add_argument("--headless=new")
     opts.add_argument("--no-sandbox")
     opts.add_argument("--disable-dev-shm-usage")
     opts.add_argument("--disable-gpu")
@@ -512,7 +509,7 @@ def create_driver():
     
     # Fallback for Render if env var is missing but binary exists in standard location
     if not chrome_bin:
-        for path in ["/usr/bin/google-chrome", "/usr/bin/google-chrome-stable", "/opt/google/chrome/google-chrome"]:
+        for path in ["/usr/bin/google-chrome", "/usr/bin/google-chrome-stable", "/opt/google/chrome/google-chrome", "/usr/bin/chromium", "/usr/bin/chromium-browser"]:
             if os.path.exists(path):
                 chrome_bin = path
                 break
@@ -549,7 +546,8 @@ def fb_manual_login(driver):
         print("1. Log in to Facebook in the opened browser.")
         print("2. Solve any 'I'm not a robot' / captcha / 2FA.")
         print("3. Make sure your feed/home is visible.")
-        input("\nWhen you are fully logged in, press ENTER here to continue...\n")
+        # input("\nWhen you are fully logged in, press ENTER here to continue...\n")
+        print("[WARN] Manual login required but running in headless mode. Skipping interactive login.")
 
         # 3. Save cookies for next time
         with open(COOKIES_FILE, "wb") as f:
@@ -1118,6 +1116,11 @@ def run_selenium_scraper():
 
                 for i in range(max_scrolls):
                     driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+                    try:
+                        # Press ESCAPE to close potential blocking popups (login/cookies)
+                        driver.find_element(By.TAG_NAME, "body").send_keys(Keys.ESCAPE)
+                    except Exception:
+                        pass
                     print(f"\n[SCROLL] {i+1}/{max_scrolls}")
                     time.sleep(4)
 
@@ -1210,12 +1213,12 @@ async def scrape_and_save_task():
 
 
 @router.post("/run-scrape")
-async def trigger_facebook_scrape():
+async def trigger_facebook_scrape(background_tasks: BackgroundTasks):
     """
-    Triggers the Facebook scraping process synchronously.
+    Triggers the Facebook scraping process in the background.
     """
-    await scrape_and_save_task()
-    return {"message": "Facebook scraping completed successfully."}
+    background_tasks.add_task(scrape_and_save_task)
+    return {"message": "Facebook scraping started in the background."}
 
 @router.get("/data")
 async def get_facebook_data():

@@ -489,7 +489,6 @@ router = APIRouter()
 
 # Initialize the main FastAPI app
 app = FastAPI()
-app.include_router(router)
 
 COOKIES_FILE = "fb_cookies.pkl"
 
@@ -1248,6 +1247,8 @@ async def get_facebook_data():
     """
     posts = await stc_db["facebook_posts"].find({}, {"_id": 0}).to_list(length=None)
     return posts
+
+app.include_router(router)
 
 if __name__ == "__main__":
     import uvicorn

@@ -1248,6 +1248,12 @@ async def get_facebook_data():
     posts = await stc_db["facebook_posts"].find({}, {"_id": 0}).to_list(length=None)
     return posts
 
+@app.on_event("startup")
+async def startup_event():
+    print(">>> Web Server Ready. Send POST to /run-scrape to start scraping.")
+    # Uncomment the line below to run scraper automatically on deployment
+    # asyncio.create_task(scrape_and_save_task())
+
 app.include_router(router)
 
 if __name__ == "__main__":

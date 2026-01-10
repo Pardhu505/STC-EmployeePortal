@@ -11,6 +11,7 @@ from datetime import datetime, timedelta
 from typing import List, Set, Dict, Any, Tuple
 
 import pandas as pd
+from dotenv import load_dotenv
 import psutil
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -26,6 +27,8 @@ from fastapi import FastAPI, APIRouter, BackgroundTasks
 from database import stc_db
 from pymongo import MongoClient
 
+# Load environment variables from .env file if present
+load_dotenv()
 
 TARGET_PAGES = [
     "https://www.facebook.com/aitheylite",
@@ -1138,8 +1141,18 @@ def run_selenium_scraper():
     
     # Setup MongoDB connection for immediate saving
     mongo_url = os.environ.get("ATTENDANCE_MONGO_URL")
-    client = MongoClient(mongo_url)
-    daily_data_col = client['facebook_db']['daily_data']
+    client = None
+    daily_data_col = None
+
+    if mongo_url:
+        try:
+            client = MongoClient(mongo_url, tlsAllowInvalidCertificates=True)
+            daily_data_col = client['facebook_db']['daily_data']
+            print("[INFO] Connected to MongoDB for saving posts.")
+        except Exception as e:
+            print(f"[WARN] Could not connect to MongoDB: {e}. Data will not be saved.")
+    else:
+        print("[WARN] ATTENDANCE_MONGO_URL not set. Data will not be saved.")
 
     try:
         fb_manual_login(driver)
@@ -1227,7 +1240,7 @@ def run_selenium_scraper():
                         break
                 
                 # Save posts for this account immediately
-                if posts_ordered:
+                if posts_ordered and daily_data_col is not None:
                     print(f"[INFO] Saving {len(posts_ordered)} posts for {page_url} to facebook_db.daily_data...")
                     for p in posts_ordered:
                         daily_data_col.update_one(

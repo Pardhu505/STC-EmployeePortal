@@ -4,6 +4,7 @@ import asyncio
 import pickle
 import os
 import shutil
+import subprocess
 from datetime import datetime, timedelta
 from typing import List, Set, Dict, Any, Tuple
 
@@ -535,8 +536,26 @@ def create_driver():
     else:
         print("[INFO] CHROME_BIN not set. Selenium will search system PATH.")
 
-    service = Service(ChromeDriverManager().install())
-    return webdriver.Chrome(service=service, options=opts)
+    driver_path = None
+    if chrome_bin and os.path.exists(chrome_bin):
+        try:
+            res = subprocess.run([chrome_bin, "--version"], capture_output=True, text=True)
+            if res.returncode == 0:
+                ver_match = re.search(r"(\d+\.\d+\.\d+\.\d+)", res.stdout)
+                if ver_match:
+                    chrome_ver = ver_match.group(1)
+                    print(f"[INFO] Detected Chrome version: {chrome_ver}")
+                    try:
+                        driver_path = ChromeDriverManager(driver_version=chrome_ver).install()
+                    except TypeError:
+                        driver_path = ChromeDriverManager(version=chrome_ver).install()
+        except Exception as e:
+            print(f"[WARN] Failed to match ChromeDriver version: {e}")
+
+    if not driver_path:
+        driver_path = ChromeDriverManager().install()
+
+    return webdriver.Chrome(service=Service(driver_path), options=opts)
 
 
 def fb_manual_login(driver):

@@ -11,6 +11,7 @@ from datetime import datetime, timedelta
 from typing import List, Set, Dict, Any, Tuple
 
 import pandas as pd
+import psutil
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.service import Service
@@ -498,6 +499,11 @@ COOKIES_FILE = "fb_cookies.pkl"
 # Ensure logs are flushed immediately to the console (crucial for Render)
 sys.stdout.reconfigure(line_buffering=True)
 
+def log_memory_usage():
+    process = psutil.Process(os.getpid())
+    mem_mb = process.memory_info().rss / 1024 / 1024
+    print(f"[MEMORY] Python Process Usage: {mem_mb:.2f} MB")
+
 
 # ---------- SETUP ----------
 
@@ -514,7 +520,6 @@ def create_driver():
     opts.add_argument("--no-sandbox")
     opts.add_argument("--disable-dev-shm-usage")
     opts.add_argument("--disable-gpu")
-    opts.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
 
     chrome_bin = os.environ.get("CHROME_BIN") or os.environ.get("GOOGLE_CHROME_BIN")
     
@@ -1066,9 +1071,6 @@ def collect_captions_step(
     Returns: how many *new* captions were added this step.
     """
     try:
-        # Debug: Check if post containers exist at all
-        if not driver.find_elements(By.XPATH, "//div[@role='article']"):
-            print("[DEBUG] No post containers (role='article') found. Page might not be loaded correctly.")
         elements = driver.find_elements(By.XPATH, CAPTION_XPATH)
     except Exception:
         print("[STEP] No caption elements found this step.")
@@ -1153,13 +1155,23 @@ def run_selenium_scraper():
                 print(f"[DEBUG] Page Title: {driver.title}")
 
                 if "checkpoint" in driver.current_url or "challenge" in driver.current_url:
-                    print("[CRITICAL] Facebook Checkpoint detected! Session locked due to IP change.")
-                    print("ACTION REQUIRED: Log in locally -> Settings -> Security -> Approve 'Suspicious Login'.")
-                    return all_posts
+                    print("[CRITICAL] Facebook Checkpoint detected!")
+                    print(">>> ACTION REQUIRED: Open Facebook on your PHONE/PC immediately.")
+                    print(">>> Check Notifications (Bell Icon) for 'Review recent login'. Click 'THIS WAS ME'.")
+                    print(">>> Waiting 120 seconds for manual approval...")
+                    time.sleep(120)
+                    
+                    print(">>> Refreshing page...")
+                    driver.refresh()
+                    time.sleep(10)
+                    
+                    if "checkpoint" in driver.current_url or "challenge" in driver.current_url:
+                        print("[ERROR] Still stuck at checkpoint. Stopping.")
+                        return all_posts
+                    print("[SUCCESS] Checkpoint passed! Resuming scrape.")
 
                 if "login" in driver.current_url or "Log In" in driver.title:
                     print("[ERROR] Redirected to login page. Cookies are likely invalid/expired.")
-                    # If we are redirected to login, the session is dead. Stop trying other pages.
                     return all_posts
 
                 # -------- Followers (once) --------
@@ -1191,6 +1203,7 @@ def run_selenium_scraper():
                     except Exception:
                         pass
                     print(f"\n[SCROLL] {i+1}/{max_scrolls}")
+                    log_memory_usage()
                     time.sleep(4)
 
                     new_captions = collect_captions_step(driver, seen_texts, posts_ordered)

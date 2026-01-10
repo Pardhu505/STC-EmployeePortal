@@ -6,13 +6,11 @@ import os
 import shutil
 import subprocess
 import base64
-import sys
+import base64
 from datetime import datetime, timedelta
 from typing import List, Set, Dict, Any, Tuple
 
 import pandas as pd
-from dotenv import load_dotenv
-import psutil
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.service import Service
@@ -27,8 +25,6 @@ from fastapi import FastAPI, APIRouter, BackgroundTasks
 from database import stc_db
 from pymongo import MongoClient
 
-# Load environment variables from .env file if present
-load_dotenv()
 
 TARGET_PAGES = [
     "https://www.facebook.com/aitheylite",
@@ -499,14 +495,6 @@ app = FastAPI()
 
 COOKIES_FILE = "fb_cookies.pkl"
 
-# Ensure logs are flushed immediately to the console (crucial for Render)
-sys.stdout.reconfigure(line_buffering=True)
-
-def log_memory_usage():
-    process = psutil.Process(os.getpid())
-    mem_mb = process.memory_info().rss / 1024 / 1024
-    print(f"[MEMORY] Python Process Usage: {mem_mb:.2f} MB")
-
 
 # ---------- SETUP ----------
 
@@ -587,7 +575,7 @@ def fb_manual_login(driver):
             print("[INFO] Cookies loaded from FB_COOKIES_BASE64. Refreshing page...")
             driver.refresh()
             cookies_loaded = True
-            time.sleep(5)
+            time.sleep(10)
         except Exception as e:
             print(f"[WARN] Failed to load cookies from ENV: {e}")
 
@@ -600,12 +588,13 @@ def fb_manual_login(driver):
                     driver.add_cookie(cookie)
             print("[INFO] Cookies loaded from file. Refreshing page...")
             driver.refresh()
-            time.sleep(5)
+            time.sleep(10)
         except Exception as e:
             print(f"[WARN] Failed to load cookies: {e}")
 
     # 3. Check if we need to log in (look for login form or 'login' in URL)
     if driver.find_elements(By.ID, "email") or "login" in driver.current_url:
+        print(f"[DEBUG] Login check failed. Current URL: {driver.current_url}")
         print("\n[MANUAL LOGIN REQUIRED]")
         print("1. Log in to Facebook in the opened browser.")
         print("2. Solve any 'I'm not a robot' / captcha / 2FA.")
@@ -613,8 +602,10 @@ def fb_manual_login(driver):
         # input("\nWhen you are fully logged in, press ENTER here to continue...\n")
         print("[WARN] Manual login required but running in headless mode. Skipping interactive login.")
         print("[WARN] Scraper will likely fail to scroll. Please set FB_COOKIES_BASE64 env var.")
+        return False
     else:
         print("[INFO] Logged in successfully via cookies.")
+        return True
 
 
 def safe_inner_text(driver, el) -> str:
@@ -1141,51 +1132,20 @@ def run_selenium_scraper():
     
     # Setup MongoDB connection for immediate saving
     mongo_url = os.environ.get("ATTENDANCE_MONGO_URL")
-    client = None
-    daily_data_col = None
-
-    if mongo_url:
-        try:
-            client = MongoClient(mongo_url, tlsAllowInvalidCertificates=True)
-            daily_data_col = client['facebook_db']['daily_data']
-            print("[INFO] Connected to MongoDB for saving posts.")
-        except Exception as e:
-            print(f"[WARN] Could not connect to MongoDB: {e}. Data will not be saved.")
-    else:
-        print("[WARN] ATTENDANCE_MONGO_URL not set. Data will not be saved.")
+    client = MongoClient(mongo_url)
+    daily_data_col = client['facebook_db']['daily_data']
 
     try:
-        fb_manual_login(driver)
+        if not fb_manual_login(driver):
+            print("[CRITICAL] Login failed (Cookies invalid or expired). Aborting scrape.")
+            driver.quit()
+            return []
 
         for page_url in TARGET_PAGES:
             try:
                 print(f"\n[STEP] Processing page: {page_url}")
                 driver.get(page_url)
                 time.sleep(8)
-
-                # DEBUG: Check if we are actually on the page or redirected to login
-                print(f"[DEBUG] Current URL: {driver.current_url}")
-                print(f"[DEBUG] Page Title: {driver.title}")
-
-                if "checkpoint" in driver.current_url or "challenge" in driver.current_url:
-                    print("[CRITICAL] Facebook Checkpoint detected!")
-                    print(">>> ACTION REQUIRED: Open Facebook on your PHONE/PC immediately.")
-                    print(">>> Check Notifications (Bell Icon) for 'Review recent login'. Click 'THIS WAS ME'.")
-                    print(">>> Waiting 120 seconds for manual approval...")
-                    time.sleep(120)
-                    
-                    print(">>> Refreshing page...")
-                    driver.refresh()
-                    time.sleep(10)
-                    
-                    if "checkpoint" in driver.current_url or "challenge" in driver.current_url:
-                        print("[ERROR] Still stuck at checkpoint. Stopping.")
-                        return all_posts
-                    print("[SUCCESS] Checkpoint passed! Resuming scrape.")
-
-                if "login" in driver.current_url or "Log In" in driver.title:
-                    print("[ERROR] Redirected to login page. Cookies are likely invalid/expired.")
-                    return all_posts
 
                 # -------- Followers (once) --------
                 followers = get_follower_count(driver)
@@ -1216,7 +1176,6 @@ def run_selenium_scraper():
                     except Exception:
                         pass
                     print(f"\n[SCROLL] {i+1}/{max_scrolls}")
-                    log_memory_usage()
                     time.sleep(4)
 
                     new_captions = collect_captions_step(driver, seen_texts, posts_ordered)
@@ -1240,7 +1199,7 @@ def run_selenium_scraper():
                         break
                 
                 # Save posts for this account immediately
-                if posts_ordered and daily_data_col is not None:
+                if posts_ordered:
                     print(f"[INFO] Saving {len(posts_ordered)} posts for {page_url} to facebook_db.daily_data...")
                     for p in posts_ordered:
                         daily_data_col.update_one(
@@ -1317,7 +1276,6 @@ async def trigger_facebook_scrape(background_tasks: BackgroundTasks):
     """
     Triggers the Facebook scraping process in the background.
     """
-    print("[API] Received request to start scraping. Adding background task...")
     background_tasks.add_task(scrape_and_save_task)
     return {"message": "Facebook scraping started in the background."}
 

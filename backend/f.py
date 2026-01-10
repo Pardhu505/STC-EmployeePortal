@@ -1232,7 +1232,7 @@ async def root():
     return {"message": "Facebook Scraper Service is Running. Go to /docs to use the API."}
 
 
-@router.post("/run-scrape")
+@router.api_route("/run-scrape", methods=["GET", "POST"])
 async def trigger_facebook_scrape(background_tasks: BackgroundTasks):
     """
     Triggers the Facebook scraping process in the background.

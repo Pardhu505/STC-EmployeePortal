@@ -5,6 +5,7 @@ import pickle
 import os
 import shutil
 import subprocess
+import base64
 from datetime import datetime, timedelta
 from typing import List, Set, Dict, Any, Tuple
 
@@ -561,20 +562,36 @@ def create_driver():
 def fb_manual_login(driver):
     driver.get("https://www.facebook.com")
 
-    # 1. Try to load cookies
-    if os.path.exists(COOKIES_FILE):
+    cookies_loaded = False
+
+    # 1. Try to load cookies from ENV (Best for Render)
+    if os.environ.get("FB_COOKIES_BASE64"):
+        try:
+            cookies_b64 = os.environ.get("FB_COOKIES_BASE64")
+            cookies = pickle.loads(base64.b64decode(cookies_b64))
+            for cookie in cookies:
+                driver.add_cookie(cookie)
+            print("[INFO] Cookies loaded from FB_COOKIES_BASE64. Refreshing page...")
+            driver.refresh()
+            cookies_loaded = True
+            time.sleep(5)
+        except Exception as e:
+            print(f"[WARN] Failed to load cookies from ENV: {e}")
+
+    # 2. Try to load cookies from file (Fallback)
+    if not cookies_loaded and os.path.exists(COOKIES_FILE):
         try:
             with open(COOKIES_FILE, "rb") as f:
                 cookies = pickle.load(f)
                 for cookie in cookies:
                     driver.add_cookie(cookie)
-            print("[INFO] Cookies loaded. Refreshing page...")
+            print("[INFO] Cookies loaded from file. Refreshing page...")
             driver.refresh()
             time.sleep(5)
         except Exception as e:
             print(f"[WARN] Failed to load cookies: {e}")
 
-    # 2. Check if we need to log in (look for login form or 'login' in URL)
+    # 3. Check if we need to log in (look for login form or 'login' in URL)
     if driver.find_elements(By.ID, "email") or "login" in driver.current_url:
         print("\n[MANUAL LOGIN REQUIRED]")
         print("1. Log in to Facebook in the opened browser.")
@@ -582,11 +599,7 @@ def fb_manual_login(driver):
         print("3. Make sure your feed/home is visible.")
         # input("\nWhen you are fully logged in, press ENTER here to continue...\n")
         print("[WARN] Manual login required but running in headless mode. Skipping interactive login.")
-
-        # 3. Save cookies for next time
-        with open(COOKIES_FILE, "wb") as f:
-            pickle.dump(driver.get_cookies(), f)
-        print(f"[INFO] Cookies saved to {COOKIES_FILE}")
+        print("[WARN] Scraper will likely fail to scroll. Please set FB_COOKIES_BASE64 env var.")
     else:
         print("[INFO] Logged in successfully via cookies.")
 

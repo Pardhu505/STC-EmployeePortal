@@ -514,6 +514,7 @@ def create_driver():
     opts.add_argument("--no-sandbox")
     opts.add_argument("--disable-dev-shm-usage")
     opts.add_argument("--disable-gpu")
+    opts.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
 
     chrome_bin = os.environ.get("CHROME_BIN") or os.environ.get("GOOGLE_CHROME_BIN")
     
@@ -1150,8 +1151,16 @@ def run_selenium_scraper():
                 # DEBUG: Check if we are actually on the page or redirected to login
                 print(f"[DEBUG] Current URL: {driver.current_url}")
                 print(f"[DEBUG] Page Title: {driver.title}")
+
+                if "checkpoint" in driver.current_url or "challenge" in driver.current_url:
+                    print("[CRITICAL] Facebook Checkpoint detected! Session locked due to IP change.")
+                    print("ACTION REQUIRED: Log in locally -> Settings -> Security -> Approve 'Suspicious Login'.")
+                    return all_posts
+
                 if "login" in driver.current_url or "Log In" in driver.title:
                     print("[ERROR] Redirected to login page. Cookies are likely invalid/expired.")
+                    # If we are redirected to login, the session is dead. Stop trying other pages.
+                    return all_posts
 
                 # -------- Followers (once) --------
                 followers = get_follower_count(driver)

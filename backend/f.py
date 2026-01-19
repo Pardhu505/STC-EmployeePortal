@@ -8,6 +8,10 @@ import subprocess
 import base64
 from datetime import datetime, timedelta
 from typing import List, Set, Dict, Any, Tuple
+import math
+import concurrent.futures
+import zipfile
+import sys
 
 import pandas as pd
 from selenium import webdriver
@@ -20,7 +24,7 @@ from selenium.common.exceptions import (
     NoSuchElementException,
 )
 from webdriver_manager.chrome import ChromeDriverManager
-from fastapi import FastAPI, APIRouter, BackgroundTasks
+from fastapi import APIRouter, BackgroundTasks
 from database import stc_db
 from pymongo import MongoClient
 
@@ -468,7 +472,11 @@ TARGET_PAGES = [
 ]
 
 # Caption container (same as in your smart-stop code)
-CAPTION_XPATH = "//div[@role='article']//div[@dir='auto']"
+CAPTION_XPATH = (
+    "//div[contains(@class,'xdj266r') and contains(@class,'x14z9mp') "
+    "and contains(@class,'xat24cr') and contains(@class,'x1lziwak') "
+    "and contains(@class,'x1vvkbs') and contains(@class,'x126k92a')]"
+)
 
 # Likes span class inside the same post area
 LIKES_REL_XPATH = ".//span[contains(@class,'x135b78x')]"
@@ -484,13 +492,7 @@ COMMENTS_SHARES_REL_XPATH = (
     "and contains(@class,'x1sur9pj')]"
 )
 
-# Followers (strong inside link that has /followers/ in href)
-FOLLOWERS_STRONG_XPATH = "//a[contains(@href, '/followers/')]/strong"
-
 router = APIRouter()
-
-# Initialize the main FastAPI app
-app = FastAPI()
 
 COOKIES_FILE = "fb_cookies.pkl"
 
@@ -506,61 +508,74 @@ def create_driver():
     opts = Options()
     opts.add_argument("--start-maximized")
     opts.add_argument("--disable-notifications")
-    opts.add_argument("--headless=new")
+    # opts.add_argument("--headless=new")
     opts.add_argument("--no-sandbox")
     opts.add_argument("--disable-dev-shm-usage")
     opts.add_argument("--disable-gpu")
-    opts.add_argument("--remote-debugging-port=9222")
-    opts.add_argument("--disable-extensions")
+    # opts.add_argument("--disable-extensions")
     opts.add_argument("--disable-software-rasterizer")
-    opts.add_argument("--window-size=1920,1080")
-
-    chrome_bin = os.environ.get("CHROME_BIN") or os.environ.get("GOOGLE_CHROME_BIN")
     
-    # Fallback for Render if env var is missing but binary exists in standard location
-    if not chrome_bin:
-        paths_to_check = [
-            "/opt/render/project/.render/chrome/opt/google/chrome/google-chrome",
-            "/usr/bin/google-chrome", 
-            "/usr/bin/google-chrome-stable", 
-            "/opt/google/chrome/google-chrome", 
-            "/usr/bin/chromium", 
-            "/usr/bin/chromium-browser"
-        ]
-        for path in paths_to_check:
-            if os.path.exists(path):
-                chrome_bin = path
-                break
+    # Force English language to ensure metrics scraping works (e.g. "Comments", "Shares")
+    opts.add_argument("--lang=en-US")
+    opts.add_experimental_option("prefs", {"intl.accept_languages": "en-US"})
 
-    if not chrome_bin:
-        chrome_bin = shutil.which("google-chrome") or shutil.which("chromium")
+    # Option: Use ScrapingBee Proxy (Free Tier)
+    scrapingbee_api_key = os.environ.get("SCRAPINGBEE_API_KEY", "4OZI42TQMZDIYCYHC8SW796JM9748K2BFW5KBE2XR7AOI7GI1AWHWT4YVKVVVRQV9YF1YD7NKZ3BNVTU")
+    if scrapingbee_api_key:
+        print("[INFO] Configuring ScrapingBee Proxy...")
+        plugin_file = 'proxy_auth_plugin.zip'
+        with zipfile.ZipFile(plugin_file, 'w') as zp:
+            zp.writestr("manifest.json", """
+            {
+                "version": "1.0.0",
+                "manifest_version": 2,
+                "name": "Chrome Proxy",
+                "permissions": ["proxy", "tabs", "unlimitedStorage", "storage", "<all_urls>", "webRequest", "webRequestBlocking"],
+                "background": {"scripts": ["background.js"]},
+                "minimum_chrome_version":"22.0.0"
+            }
+            """)
+            zp.writestr("background.js", f"""
+            var config = {{
+                    mode: "fixed_servers",
+                    rules: {{
+                      singleProxy: {{
+                        scheme: "http",
+                        host: "proxy.scrapingbee.com",
+                        port: 8886
+                      }},
+                      bypassList: ["localhost"]
+                    }}
+                  }};
+            chrome.proxy.settings.set({{value: config, scope: "regular"}}, function() {{}});
+            function callbackFn(details) {{
+                return {{
+                    authCredentials: {{
+                        username: "{scrapingbee_api_key}",
+                        password: "render_js=False&premium_proxy=true"
+                    }}
+                }};
+            }}
+            chrome.webRequest.onAuthRequired.addListener(
+                        callbackFn,
+                        {{urls: ["<all_urls>"]}},
+                        ['blocking']
+            );
+            """)
+        opts.add_extension(plugin_file)
 
-    if chrome_bin:
-        print(f"[INFO] Using Chrome binary at: {chrome_bin}")
-        opts.binary_location = chrome_bin
-    else:
-        print("[INFO] CHROME_BIN not set. Selenium will search system PATH.")
+    # Option 3: Use scraping APIs (Browserless) for Zero infra headache on Render
+    # Set BROWSERLESS_API_KEY in your Render environment variables
+    browserless_api_key = os.environ.get("BROWSERLESS_API_KEY")
+    if browserless_api_key:
+        print("[INFO] Connecting to Browserless (Remote WebDriver)...")
+        return webdriver.Remote(
+            command_executor=f"https://chrome.browserless.io/webdriver?token={browserless_api_key}",
+            options=opts
+        )
 
-    driver_path = None
-    if chrome_bin and os.path.exists(chrome_bin):
-        try:
-            res = subprocess.run([chrome_bin, "--version"], capture_output=True, text=True)
-            if res.returncode == 0:
-                ver_match = re.search(r"(\d+\.\d+\.\d+\.\d+)", res.stdout)
-                if ver_match:
-                    chrome_ver = ver_match.group(1)
-                    print(f"[INFO] Detected Chrome version: {chrome_ver}")
-                    try:
-                        driver_path = ChromeDriverManager(driver_version=chrome_ver).install()
-                    except TypeError:
-                        driver_path = ChromeDriverManager(version=chrome_ver).install()
-        except Exception as e:
-            print(f"[WARN] Failed to match ChromeDriver version: {e}")
-
-    if not driver_path:
-        driver_path = ChromeDriverManager().install()
-
-    return webdriver.Chrome(service=Service(driver_path), options=opts)
+    service = Service(ChromeDriverManager().install())
+    return webdriver.Chrome(service=service, options=opts)
 
 
 def fb_manual_login(driver):
@@ -598,14 +613,22 @@ def fb_manual_login(driver):
     # 3. Check if we need to log in (look for login form or 'login' in URL)
     if driver.find_elements(By.ID, "email") or "login" in driver.current_url:
         print(f"[DEBUG] Login check failed. Current URL: {driver.current_url}")
+        
+        # Prevent blocking input on Render/Remote environment
+        if os.environ.get("RENDER") or os.environ.get("BROWSERLESS_API_KEY") or os.environ.get("SCRAPINGBEE_API_KEY"):
+            print("[ERROR] Manual login required but running in remote environment. Aborting.")
+            sys.exit(1)
+
         print("\n[MANUAL LOGIN REQUIRED]")
         print("1. Log in to Facebook in the opened browser.")
         print("2. Solve any 'I'm not a robot' / captcha / 2FA.")
         print("3. Make sure your feed/home is visible.")
-        # input("\nWhen you are fully logged in, press ENTER here to continue...\n")
-        print("[WARN] Manual login required but running in headless mode. Skipping interactive login.")
-        print("[WARN] Scraper will likely fail to scroll. Please set FB_COOKIES_BASE64 env var.")
-        return False
+        input("\nWhen you are fully logged in, press ENTER here to continue...\n")
+        
+        with open(COOKIES_FILE, "wb") as f:
+            pickle.dump(driver.get_cookies(), f)
+        print(f"[INFO] Cookies saved to {COOKIES_FILE}")
+        return True
     else:
         print("[INFO] Logged in successfully via cookies.")
         return True
@@ -744,11 +767,14 @@ def extract_like_number(raw: str) -> str:
     if not raw:
         return ""
     raw = raw.replace("\u00a0", " ").strip()
-    m = re.search(r"([\d.,]+K?)", raw)
+    m = re.search(r"([\d.,]+[KMB]?)", raw, re.IGNORECASE)
     if not m:
         return ""
-    return m.group(1)
+    return m.group(1).upper()
 
+
+# Followers (strong inside link that has /followers/ in href)
+FOLLOWERS_STRONG_XPATH = "//a[contains(@href, '/followers/')]/strong"
 
 # ---------- FOLLOWER COUNT ----------
 
@@ -1019,8 +1045,7 @@ def get_video_views(driver, container) -> str:
 def get_metrics_for_caption_el(driver, cap_el) -> Dict[str, Any]:
     """
     Full pipeline for metrics of a single caption element:
-      - likes: using ancestor-walk logic
-      - comments & shares: from the same container (if found)
+      - likes, comments, shares: extracted from the post container (role='article')
       - url: from timestamp/post link, walking up from caption
       - date: from the same link
       - type: inferred from URL
@@ -1028,6 +1053,7 @@ def get_metrics_for_caption_el(driver, cap_el) -> Dict[str, Any]:
     """
     likes, container = find_likes_for_caption_el(driver, cap_el)
     comments, shares = get_comments_shares_from_container(driver, container)
+
     url, date_str = get_post_details_from_ancestors(driver, cap_el)
     
     post_type = get_post_type(url)
@@ -1127,114 +1153,125 @@ def collect_captions_step(
 
 # ---------- MAIN ----------
 
-def run_selenium_scraper():
-    print("=== Scrape ALL captions + likes + comments + shares + followers + URL (smart-stop) ===\n")
+def scrape_single_page(driver, page_url, daily_data_col) -> List[Dict[str, Any]]:
+    print(f"\n[STEP] Processing page: {page_url}")
+    posts_ordered = []
+    try:
+        driver.get(page_url)
+        time.sleep(8)
 
+        # Followers
+        followers = get_follower_count(driver)
+        if followers:
+            print(f"[INFO] Followers count for {page_url}: {followers}")
+
+        seen_texts = set()
+
+        # Initial capture
+        collect_captions_step(driver, seen_texts, posts_ordered)
+
+        max_scrolls = 5000
+        no_new_limit = 20
+        no_new_in_row = 0
+        last_height = driver.execute_script("return document.body.scrollHeight")
+
+        for i in range(max_scrolls):
+            driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+            try:
+                driver.find_element(By.TAG_NAME, "body").send_keys(Keys.ESCAPE)
+            except Exception:
+                pass
+            
+            time.sleep(4)
+            new_captions = collect_captions_step(driver, seen_texts, posts_ordered)
+
+            if new_captions == 0:
+                no_new_in_row += 1
+            else:
+                no_new_in_row = 0
+
+            new_height = driver.execute_script("return document.body.scrollHeight")
+            if new_height == last_height:
+                if no_new_in_row >= 5:
+                    break
+            last_height = new_height
+
+            if no_new_in_row >= no_new_limit:
+                break
+        
+        if posts_ordered:
+            print(f"[INFO] Saving {len(posts_ordered)} posts for {page_url}...")
+            for p in posts_ordered:
+                if followers:
+                    p["followers_count"] = followers
+                daily_data_col.update_one({"url": p["url"]}, {"$set": p}, upsert=True)
+        
+        return posts_ordered
+    except Exception as e:
+        print(f"[ERROR] Failed to scrape {page_url}: {e}")
+        return []
+
+def worker_process(urls):
     driver = create_driver()
-    all_posts = []
-    
-    # Setup MongoDB connection for immediate saving
     mongo_url = os.environ.get("ATTENDANCE_MONGO_URL")
     client = MongoClient(mongo_url)
     daily_data_col = client['facebook_db']['daily_data']
-
+    results = []
+    
     try:
-        if not fb_manual_login(driver):
-            print("[CRITICAL] Login failed (Cookies invalid or expired). Aborting scrape.")
-            driver.quit()
-            return []
-
-        for page_url in TARGET_PAGES:
-            try:
-                print(f"\n[STEP] Processing page: {page_url}")
-                driver.get(page_url)
-                time.sleep(8)
-
-                # -------- Followers (once) --------
-                followers = get_follower_count(driver)
-                if followers:
-                    print(f"\n[INFO] Followers count: {followers}")
-                else:
-                    print("\n[INFO] Could not read followers count.")
-
-                seen_texts: Set[str] = set()
-                posts_ordered: List[Dict[str, Any]] = []
-
-                # Initial capture before scrolling
-                print("\n[STEP] Initial capture before scrolling...")
-                collect_captions_step(driver, seen_texts, posts_ordered)
-
-                # Smart scroll control (taken from your caption-only script)
-                max_scrolls = 5000         # hard safety limit (increased to scrape all)
-                no_new_limit = 20          # stop after 20 scrolls with no new captions
-                no_new_in_row = 0
-
-                last_height = driver.execute_script("return document.body.scrollHeight")
-
-                for i in range(max_scrolls):
-                    driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-                    try:
-                        # Press ESCAPE to close potential blocking popups (login/cookies)
-                        driver.find_element(By.TAG_NAME, "body").send_keys(Keys.ESCAPE)
-                    except Exception:
-                        pass
-                    print(f"\n[SCROLL] {i+1}/{max_scrolls}")
-                    time.sleep(4)
-
-                    new_captions = collect_captions_step(driver, seen_texts, posts_ordered)
-
-                    if new_captions == 0:
-                        no_new_in_row += 1
-                    else:
-                        no_new_in_row = 0
-
-                    new_height = driver.execute_script("return document.body.scrollHeight")
-
-                    if new_height == last_height:
-                        print("[INFO] Page height stopped increasing.")
-                        if no_new_in_row >= 5:
-                            print("[INFO] No new captions in last 5 scrolls and height stable. Stopping.")
-                            break
-                    last_height = new_height
-
-                    if no_new_in_row >= no_new_limit:
-                        print(f"[INFO] No new captions for {no_new_limit} consecutive scrolls. Stopping.")
-                        break
-                
-                # Save posts for this account immediately
-                if posts_ordered:
-                    print(f"[INFO] Saving {len(posts_ordered)} posts for {page_url} to facebook_db.daily_data...")
-                    for p in posts_ordered:
-                        daily_data_col.update_one(
-                            {"url": p["url"]}, 
-                            {"$set": p}, 
-                            upsert=True
-                        )
-                all_posts.extend(posts_ordered)
-            except Exception as e:
-                print(f"[ERROR] Failed to scrape {page_url}: {e}")
-                continue
-
-        # ---------- FINAL RESULTS ----------
-        print("\n========== FINAL CAPTIONS + METRICS ==========")
-        for idx, p in enumerate(all_posts, start=1):
-            print(f"\nPOST {idx}:")
-            print("Caption :", p["caption"])
-            print("Likes   :", p["likes"])
-            print("Comments:", p["comments"])
-            print("Shares  :", p["shares"])
-            print("Type    :", p["type"])
-            print("Views   :", p["views"])
-            print("Date    :", p["posted_date"])
-            print("URL     :", p["url"])
-        print("\nTotal unique captions collected:", len(all_posts))
-        print("====================================")
-
-        return all_posts
-
+        if fb_manual_login(driver):
+            for url in urls:
+                results.extend(scrape_single_page(driver, url, daily_data_col))
+    except Exception as e:
+        print(f"[ERROR] Worker exception: {e}")
     finally:
-        # input("\nPress ENTER to close browser...")
         driver.quit()
+        client.close()
+    return results
+
+def run_selenium_scraper():
+    print("=== Scrape ALL captions + likes + comments + shares + followers + URL (Parallel 5 tabs) ===\n")
+    
+    # Pre-flight check to ensure cookies are valid or perform one-time login
+    print("[INFO] Performing pre-flight login check...")
+    check_driver = create_driver()
+    if not fb_manual_login(check_driver):
+        print("[CRITICAL] Login failed. Aborting.")
+        check_driver.quit()
+        return []
+    check_driver.quit()
+    print("[INFO] Pre-flight login successful. Starting parallel workers...")
+    
+    num_workers = 1
+    # Distribute pages among workers
+    chunk_size = math.ceil(len(TARGET_PAGES) / num_workers)
+    chunks = [TARGET_PAGES[i:i + chunk_size] for i in range(0, len(TARGET_PAGES), chunk_size)]
+    
+    all_posts = []
+    with concurrent.futures.ThreadPoolExecutor(max_workers=num_workers) as executor:
+        futures = [executor.submit(worker_process, chunk) for chunk in chunks]
+        for future in concurrent.futures.as_completed(futures):
+            try:
+                all_posts.extend(future.result())
+            except Exception as e:
+                print(f"[ERROR] A worker thread failed: {e}")
+
+    # ---------- FINAL RESULTS ----------
+    print("\n========== FINAL CAPTIONS + METRICS ==========")
+    for idx, p in enumerate(all_posts, start=1):
+        print(f"\nPOST {idx}:")
+        print("Caption :", p["caption"])
+        print("Likes   :", p["likes"])
+        print("Comments:", p["comments"])
+        print("Shares  :", p["shares"])
+        print("Type    :", p["type"])
+        print("Views   :", p["views"])
+        print("Date    :", p["posted_date"])
+        print("URL     :", p["url"])
+    print("\nTotal unique captions collected:", len(all_posts))
+    print("====================================")
+
+    return all_posts
 
 
 async def scrape_and_save_task():
@@ -1249,7 +1286,8 @@ async def scrape_and_save_task():
     
     if posts:
         print(f"Saving {len(posts)} posts to MongoDB...")
-        collection = stc_db["facebook_posts"]
+        collection_posts = stc_db["facebook_posts"]
+        collection_daily = stc_db.client['facebook_db']['daily_data']
         
         # Optional: Clear old data or upsert. Here we insert new ones.
         # To avoid duplicates, we can use 'url' as a unique key if desired.
@@ -1258,7 +1296,8 @@ async def scrape_and_save_task():
         
         for p in posts:
             # Update if exists, else insert
-            await collection.update_one(
+            await collection_posts.update_one({"url": p["url"]}, {"$set": p}, upsert=True)
+            await collection_daily.update_one(
                 {"url": p["url"]}, 
                 {"$set": p}, 
                 upsert=True
@@ -1288,16 +1327,8 @@ async def get_facebook_data():
     Fetches scraped Facebook data from MongoDB.
     """
     posts = await stc_db["facebook_posts"].find({}, {"_id": 0}).to_list(length=None)
+    posts = await stc_db.client['facebook_db']['daily_data'].find({}, {"_id": 0}).to_list(length=None)
     return posts
 
-@app.on_event("startup")
-async def startup_event():
-    print(">>> Web Server Ready. Send POST to /run-scrape to start scraping.")
-    # Uncomment the line below to run scraper automatically on deployment
-    # asyncio.create_task(scrape_and_save_task())
-
-app.include_router(router)
-
 if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    asyncio.run(scrape_and_save_task())

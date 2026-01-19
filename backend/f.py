@@ -24,7 +24,7 @@ from selenium.common.exceptions import (
     NoSuchElementException,
 )
 from webdriver_manager.chrome import ChromeDriverManager
-from fastapi import APIRouter, FastAPI
+from fastapi import APIRouter, FastAPI, BackgroundTasks
 from database import stc_db
 from pymongo import MongoClient
 

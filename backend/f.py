@@ -24,7 +24,7 @@ from selenium.common.exceptions import (
     NoSuchElementException,
 )
 from webdriver_manager.chrome import ChromeDriverManager
-from fastapi import APIRouter, BackgroundTasks
+from fastapi import APIRouter, FastAPI
 from database import stc_db
 from pymongo import MongoClient
 
@@ -1329,6 +1329,9 @@ async def get_facebook_data():
     posts = await stc_db["facebook_posts"].find({}, {"_id": 0}).to_list(length=None)
     posts = await stc_db.client['facebook_db']['daily_data'].find({}, {"_id": 0}).to_list(length=None)
     return posts
+
+app = FastAPI()
+app.include_router(router)
 
 if __name__ == "__main__":
     asyncio.run(scrape_and_save_task())

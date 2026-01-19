@@ -508,7 +508,8 @@ def create_driver():
     opts = Options()
     opts.add_argument("--start-maximized")
     opts.add_argument("--disable-notifications")
-    # opts.add_argument("--headless=new")
+    opts.add_argument("--headless=new")
+    opts.add_argument("--window-size=1920,1080")
     opts.add_argument("--no-sandbox")
     opts.add_argument("--disable-dev-shm-usage")
     opts.add_argument("--disable-gpu")
@@ -517,10 +518,13 @@ def create_driver():
     
     # Force English language to ensure metrics scraping works (e.g. "Comments", "Shares")
     opts.add_argument("--lang=en-US")
-    opts.add_experimental_option("prefs", {"intl.accept_languages": "en-US"})
+    opts.add_experimental_option("prefs", {
+        "intl.accept_languages": "en-US",
+        "profile.managed_default_content_settings.images": 2
+    })
 
     # Option: Use ScrapingBee Proxy (Free Tier)
-    scrapingbee_api_key = os.environ.get("SCRAPINGBEE_API_KEY", "4OZI42TQMZDIYCYHC8SW796JM9748K2BFW5KBE2XR7AOI7GI1AWHWT4YVKVVVRQV9YF1YD7NKZ3BNVTU")
+    scrapingbee_api_key = os.environ.get("SCRAPINGBEE_API_KEY")
     if scrapingbee_api_key:
         print("[INFO] Configuring ScrapingBee Proxy...")
         plugin_file = 'proxy_auth_plugin.zip'

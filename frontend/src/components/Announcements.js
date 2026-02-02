@@ -1,20 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Textarea } from './ui/textarea'; // Corrected import
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { Calendar, User, AlertCircle, Info, CheckCircle, Plus, Send, Shield, Trash2, X, Loader2, Clock } from 'lucide-react';
+import { Calendar, User, AlertCircle, Info, CheckCircle, Plus, Send, Shield, Trash2, Loader2, Clock } from 'lucide-react';
 import { useToast } from "../hooks/use-toast";
 import { API_BASE_URL } from '../config/api';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
 import { Checkbox } from './ui/checkbox';
 
 const Announcements = ({ announcements, setAnnouncements }) => {
-  const { user, isAdmin, showNotification } = useAuth();
+  const { user, isAdmin } = useAuth();
   const [selectedPriority, setSelectedPriority] = useState('all');
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [newAnnouncement, setNewAnnouncement] = useState({

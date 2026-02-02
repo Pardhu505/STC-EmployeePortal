@@ -1,25 +1,20 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { API_BASE_URL } from '../config/api';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Badge } from './ui/badge';
 import { Avatar, AvatarFallback } from './ui/avatar';
-import { Separator } from './ui/separator';
 import { 
   Shield, 
   Users, 
   Search, 
   Edit3, 
   Save, 
-  X,
   Lock,
   Eye,
   EyeOff,
-  UserCheck,
-  UserX,
   Trash2,
   AlertTriangle,
 } from 'lucide-react';
@@ -39,27 +34,23 @@ const AdminPanel = () => {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [userToDelete, setUserToDelete] = useState(null);
   const [allEmployees, setAllEmployees] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  const fetchEmployees = async () => {
-    setLoading(true);
+  const fetchEmployees = useCallback(async () => {
     try {
       // Use the centralized API function
       const data = await employeeAPI.getAllEmployees();
       setAllEmployees(data);
     } catch (error) {
       toast({ title: "Error", description: error.message || "Failed to fetch employees.", variant: "destructive" });
-    } finally {
-      setLoading(false);
     }
-  };
+  }, [toast]);
 
   useEffect(() => {
     if (isAdmin) {
       fetchEmployees();
     }
-  }, [user]);
+  }, [isAdmin, fetchEmployees]);
 
   const filteredEmployees = allEmployees.filter(emp => 
     emp.name.toLowerCase().includes(searchTerm.toLowerCase()) ||

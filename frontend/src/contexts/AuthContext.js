@@ -599,13 +599,13 @@ if (isChannelMessage && currentChannelRef.current?.name === message.channel_id) 
     console.log(" User logged out");
   }, []);
 
-  const sendWebSocketMessage = (message) => {
+  const sendWebSocketMessage = useCallback((message) => {
     if (webSocketRef.current && webSocketRef.current.readyState === WebSocket.OPEN) {
       webSocketRef.current.send(JSON.stringify(message));
     } else {
       console.warn(" WS not connected. Message not sent:", message);
     }
-  };
+  }, []);
 
   const clearNewMessages = useCallback(() => {
     // Also mark all current new messages as read in localStorage

@@ -81,7 +81,7 @@ export function YoutubeTracking() {
 
   useEffect(() => {
     // Fetch directly from the scraper service
-    fetch("https://youtube-hgci.onrender.com/raw-data")
+    fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent("https://youtube-hgci.onrender.com/raw-data")}`)
       .then((res) => res.json())
       .then((json) => {
         const raw = json.raw_videos || [];

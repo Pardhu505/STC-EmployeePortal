@@ -9,11 +9,9 @@ import {
   Area,
 } from "recharts";
 import { API_BASE_URL } from "../config/api";
-import { Button } from "@/components/ui/button";
 import { 
   ArrowUp, 
   ArrowDown, 
-  Trophy, 
   ThumbsUp, 
   MessageCircle, 
   ExternalLink, 
@@ -28,7 +26,6 @@ import {
   X,
   Zap,
   AtSign,
-  Eye
 } from "lucide-react";
 
 /* -------------------------
@@ -281,7 +278,6 @@ export function FacebookTracking() {
   const [postType, setPostType] = useState("All");
   const [topN, setTopN] = useState(20);
 
-  const PRESET_KEYS = ['all_time', 'yesterday', 'this_month', 'this_year', 'custom'];
   const PRESET_LABELS = ['All Time', 'Yesterday', 'This Month', 'This Year', 'Custom'];
 
   // Close dropdown when clicking outside
@@ -455,12 +451,12 @@ export function FacebookTracking() {
     };
 
     return { posts: slicedPosts, summary, pages: data.pages };
-  }, [data, selectedPages, selectedPostIds, startDate, endDate, topN]);
+  }, [data, selectedPages, selectedPostIds, startDate, endDate, topN, postType]);
 
   // --- Display Data (Top N based on selection) ---
   const displayablePosts = useMemo(() => {
     return [...processedData.posts];
-  }, [processedData.posts, topN]);
+  }, [processedData.posts]);
 
   // --- Sorting ---
   const sortedPosts = useMemo(() => {
@@ -488,11 +484,6 @@ export function FacebookTracking() {
     // Use displayablePosts (Top 20 or All filtered)
     return [...displayablePosts].reverse();
   }, [displayablePosts]);
-
-  const topPost = useMemo(() => {
-    if (processedData.posts.length === 0) return null;
-    return processedData.posts.reduce((prev, current) => (prev.likesVal > current.likesVal) ? prev : current);
-  }, [processedData.posts]);
 
   const insights = useMemo(() => {
     if (!processedData.posts.length) return { topLikes: null, topComments: null, topShares: null, bestDay: "N/A" };

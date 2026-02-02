@@ -27,23 +27,7 @@ const FileUpload = ({ onFileUploaded, channelId, recipientId, disabled = false }
   const [totalFiles, setTotalFiles] = useState(0);
   const [uploadedFilesCount, setUploadedFilesCount] = useState(0);
 
-  const getFileIcon = (file) => {
-    const type = file.type;
-    if (type.startsWith('image/')) return <ImageIcon className="h-8 w-8 text-blue-500" />;
-    if (type.startsWith('video/')) return <VideoIcon className="h-8 w-8 text-purple-500" />;
-    if (type.includes('text') || type.includes('document')) return <FileTextIcon className="h-8 w-8 text-green-500" />;
-    return <FileIcon className="h-8 w-8 text-gray-500" />;
-  };
-
-  const formatFileSize = (bytes) => {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-  };
-
-  const uploadFile = async (file) => {
+  const uploadFile = useCallback(async (file) => {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('sender_id', user.id);
@@ -73,7 +57,7 @@ const FileUpload = ({ onFileUploaded, channelId, recipientId, disabled = false }
       setUploadError(error.message);
       return false;
     }
-  };
+  }, [user, channelId, recipientId, onFileUploaded]);
 
   const onDrop = useCallback(async (acceptedFiles) => {
     if (acceptedFiles.length === 0) return;
@@ -130,7 +114,7 @@ const FileUpload = ({ onFileUploaded, channelId, recipientId, disabled = false }
         }, 2000);
       }
     }
-  }, [channelId, recipientId, user, uploadError, onFileUploaded, uploadMode]);
+  }, [uploadMode, uploadFile, uploadError]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,

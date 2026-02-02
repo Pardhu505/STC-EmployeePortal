@@ -2,9 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { API_BASE_URL } from '../config/api';
 import { useAuth } from '../contexts/AuthContext';
 import { getHolidaysForYear } from './Holidays';
-import { ChevronRight, ChevronDown, Calendar } from 'lucide-react';
-import DatePicker from "react-datepicker";
-import "react-datepicker/dist/react-datepicker.css";
+import { ChevronRight, ChevronDown } from 'lucide-react';
 const HRAttendance = () => {
   const { user } = useAuth();
   const [allAttendanceData, setAllAttendanceData] = useState([]);

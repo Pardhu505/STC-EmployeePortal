@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, createContext, useContext } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAuth, AuthProvider } from "../contexts/AuthContext";
 import { API_BASE_URL } from '../config/api';
 import { getHolidaysForYear } from './Holidays';
@@ -7,11 +7,12 @@ import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 
 // Main component for displaying attendance
+const ATTENDANCE_API_URL = `${API_BASE_URL}/api/attendance-report`;
+
 const EMPAttendance = () => {
   
   const { user, loading: authLoading } = useAuth();
   const [employeeDetails, setEmployeeDetails] = useState({ empCode: null, empName: null });
-  const ATTENDANCE_API_URL = `${API_BASE_URL}/api/attendance-report`;
 
   const [attendanceData, setAttendanceData] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -36,7 +37,7 @@ useEffect(() => {
 
 
 
-  const fetchAttendanceData = async () => {
+  const fetchAttendanceData = useCallback(async () => {
     if (authLoading || !employeeDetails.empCode) {
       setLoading(false);
       return;
@@ -61,19 +62,11 @@ useEffect(() => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [authLoading, employeeDetails.empCode, selectedMonthDate]);
 
   useEffect(() => {
     fetchAttendanceData();
-  }, [employeeDetails.empCode, selectedMonthDate]);
-
-  const formatMinutesToHoursMinutes = (totalMinutes) => {
-    if (totalMinutes < 0 || isNaN(totalMinutes)) return '00:00';
-    const hours = Math.floor(totalMinutes / 60);
-    const minutes = Math.floor(totalMinutes % 60);
-    const pad = (num) => num.toString().padStart(2, '0');
-    return `${pad(hours)}:${pad(minutes)}`;
-  };
+  }, [fetchAttendanceData]);
 
   // --- Detailed Day-wise Report Data (for expansion) ---
   const detailedDayWiseData = useMemo(() => {

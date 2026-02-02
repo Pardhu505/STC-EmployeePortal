@@ -82,7 +82,7 @@ export function YoutubeTracking() {
 
   useEffect(() => {
     // Fetch directly from the scraper service
-    fetch("https://youtube-hgci.onrender.com/raw-data")
+    fetch("http://3.145.173.223:8000/raw-data")
       .then((res) => {
         if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
         return res.json();

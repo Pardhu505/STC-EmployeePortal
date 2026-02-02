@@ -1,6 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { API_BASE_URL } from '../config/api';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -11,10 +10,9 @@ import { Separator } from './ui/separator';
 import { User, Building, Users, Calendar, Edit3, Save, X, Network, ChevronRight, Lock, Eye, EyeOff, Upload, Trash2 } from 'lucide-react';
 import { useToast } from '../hooks/use-toast';
 import { fetchUserProfile, updateUserProfile, fetchEmployeesWorkDetails } from '../api'; // Correctly import from api.js
-import { employeeAPI } from '../Services/api'; // Keep for other functions if needed
 
 const UserProfile = () => {
-  const { user, updateProfile, uploadProfilePicture, removeProfilePicture } = useAuth();
+  const { user, updateProfile, removeProfilePicture } = useAuth();
   const { toast } = useToast();
   const [isEditing, setIsEditing] = useState(false);
   const [showPasswordChange, setShowPasswordChange] = useState(false);
@@ -42,7 +40,6 @@ const UserProfile = () => {
   // State for fetched data from API
   const [userDetails, setUserDetails] = useState(null);
   const [allEmployees, setAllEmployees] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [loginTime, setLoginTime] = useState(null);
   
   // Fetch user and employee data from API
@@ -51,8 +48,6 @@ const UserProfile = () => {
           if (!user?.email) return;
 
           try {
-              setLoading(true);
-
               // Fetch all employees for the org chart and team view
               const allEmps = await fetchEmployeesWorkDetails();
               setAllEmployees(allEmps);
@@ -73,8 +68,6 @@ const UserProfile = () => {
                   description: error.message || "Failed to load profile data.",
                   variant: "destructive",
               });
-          } finally {
-              setLoading(false);
           }
       };
       fetchData();

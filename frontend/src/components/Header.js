@@ -1,13 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { Button } from './ui/button';
-import { Input } from './ui/input';
 import { Avatar, AvatarImage, AvatarFallback } from './ui/avatar';
-import { Badge } from './ui/badge';
 import NotificationSystem from './NotificationSystem';
 import { API_BASE_URL } from '../config/api';
-import { employeeAPI } from '../Services/api';
 import { useToast } from '../hooks/use-toast';
 import {
   DropdownMenu,
@@ -28,13 +25,12 @@ import {
 import {
   LogOut,
   User,
-  Users,
   UserX,
   AlertTriangle,
 } from 'lucide-react';
 
 const Header = ({ onSectionChange, newAnnouncements, onReadAnnouncement }) => {
-  const { user, logout, newMessages, clearNewMessages, setNewMessages } = useAuth();
+  const { user, logout, newMessages, setNewMessages } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [showDeactivateDialog, setShowDeactivateDialog] = useState(false);

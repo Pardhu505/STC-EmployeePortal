@@ -82,20 +82,60 @@ export function YoutubeTracking() {
   }, [dropdownRef]);
 
   useEffect(() => {
-    const params = new URLSearchParams();
-    if (fromDate) params.append("start_date", fromDate);
-    if (toDate) params.append("end_date", toDate);
-
-    fetch(`${API_BASE_URL}/api/youtube/youtube-data?${params.toString()}`)
+    // Fetch directly from the scraper service
+    fetch("https://youtube-hgci.onrender.com/raw-data")
       .then((res) => res.json())
-      .then((json) => setData(json))
+      .then((json) => {
+        const raw = json.raw_videos || [];
+        
+        // Transform raw data to the format expected by the dashboard
+        const trending = raw.map(v => ({
+          id: v.video_id,
+          title: v.video_title,
+          views: v.viewCount,
+          likes: v.likeCount,
+          comments: v.commentCount,
+          channel: v.channel_handle,
+          channel_id: v.channel_id,
+          upload_date: v.publishedAt || v.retrieved_at,
+          thumbnail: v.thumbnail_url
+        }));
+
+        const uniqueChannels = [];
+        const seen = new Set();
+        raw.forEach(v => {
+            if (v.channel_handle && !seen.has(v.channel_handle)) {
+                seen.add(v.channel_handle);
+                uniqueChannels.push({ handle: v.channel_handle, id: v.channel_id });
+            }
+        });
+
+        const summary = {
+            channelsCount: uniqueChannels.length,
+            totalVideos: raw.length
+        };
+
+        setData({ trending, channels: uniqueChannels, summary });
+      })
       .catch((err) => console.error("API error:", err));
-  }, [fromDate, toDate]);
+  }, []);
 
   const globallySortedVideos = React.useMemo(() => {
     if (!data?.trending) return [];
 
-    const sorted = [...data.trending];
+    let sorted = [...data.trending];
+
+    // Client-side Date Filtering
+    if (fromDate) {
+      const start = new Date(fromDate);
+      sorted = sorted.filter(v => new Date(v.upload_date) >= start);
+    }
+    if (toDate) {
+      const end = new Date(toDate);
+      // Set end date to end of day to include the selected day
+      end.setHours(23, 59, 59, 999);
+      sorted = sorted.filter(v => new Date(v.upload_date) <= end);
+    }
 
     sorted.sort((a, b) => {
       const { key, direction } = sortConfig;
@@ -148,7 +188,7 @@ export function YoutubeTracking() {
     });
 
     return sorted;
-  }, [data, sortConfig]);
+  }, [data, sortConfig, fromDate, toDate]);
 
   const finalVideos = React.useMemo(() => {
     let filtered = globallySortedVideos;

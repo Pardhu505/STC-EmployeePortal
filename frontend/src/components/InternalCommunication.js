@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
+import { Card, CardContent } from './ui/card';
 import { Button } from './ui/button';
 import { API_BASE_URL } from '../config/api';
 import { Input } from './ui/input';
@@ -20,20 +20,17 @@ import {
   Hash,
   Users,
   Search,
-  Send,
   // Plus, // Not used
   Settings,
   MessageSquare,
   Clock,
   UserPlus,
   Building,
-  ChevronRight,
   // Dot, // Not used
   Trash2,
   ArrowLeft,
   MoreVertical,
   Circle,
-  X,
   Check
 } from 'lucide-react';
 import {
@@ -41,7 +38,6 @@ import {
   // MOCK_MESSAGES, // To be replaced by WebSocket messages
   USER_STATUS as MOCK_USER_STATUS // Keep for "busy" status, online/offline from AuthContext
 } from '../data/mock';
-import { employeeAPI } from '../Services/api';
 import DirectChat from './DirectChat'; // This component will handle the 1-on-1 chat
 import chatImage from '../data/chat.jpg'; // Import the placeholder image
 import ChatInput from './ChatInput'; // Extracted input logic for reusability
@@ -63,22 +59,18 @@ const MessageStatus = ({ status }) => {
 };
 
 const InternalCommunication = () => {
-  const { user, sendWebSocketMessage, userStatuses, setCurrentChannel, setCurrentChatUser, showNotification, requestNotificationPermission, newMessages, setNewMessages, allChannels, allEmployees, navigationTarget, clearChatNotifications } = useAuth();
+  const { user, sendWebSocketMessage, userStatuses, newMessages, allChannels, allEmployees, navigationTarget, clearChatNotifications } = useAuth();
   const [selectedChannel, setSelectedChannel] = useState(null);
   const [channels, setChannels] = useState([]);
   const [messages, setMessages] = useState([]); // Messages will come from WebSocket and API
-  const [newMessage, setNewMessage] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState('channels');
   // const [userStatus, setUserStatusState] = useState(MOCK_USER_STATUS.ONLINE); // Current user's status, primarily for "busy"
   const [allEmployeesList, setAllEmployeesList] = useState([]); // For people tab
   const [selectedEmployee, setSelectedEmployee] = useState(null);
   const [viewMode, setViewMode] = useState('channels'); // 'channels' or 'directChat'
-  const [selectedFile, setSelectedFile] = useState(null);
-  const [showOldChats, setShowOldChats] = useState(false);
   const messagesEndRef = useRef(null);
   const [unreadCounts, setUnreadCounts] = useState({});
-  const fileInputRef = useRef(null);
   
   // Use a ref to track the selected channel to avoid stale closures in the WebSocket listener
   const selectedChannelRef = useRef(selectedChannel);
@@ -154,7 +146,6 @@ const InternalCommunication = () => {
   useEffect(() => {
     const savedViewMode = localStorage.getItem('viewMode');
     const savedEmployeeId = localStorage.getItem('selectedEmployeeId');
-    const savedShowOldChats = localStorage.getItem('showOldChats');
     if (savedViewMode) {
       setViewMode(savedViewMode);
     }
@@ -163,9 +154,6 @@ const InternalCommunication = () => {
       if (employee) {
         setSelectedEmployee(employee);
       }
-    }
-    if (savedShowOldChats !== null) {
-      setShowOldChats(JSON.parse(savedShowOldChats));
     }
   }, [allEmployeesList]);
 
@@ -596,7 +584,6 @@ const handleReactionClick = (message, emoji) => {
     setMessages(prevMessages => [...prevMessages, optimisticMessage]);
 
     // Reset state after sending
-    setNewMessage('');
     setReplyTo(null);
   };
 

@@ -7,10 +7,8 @@ import {
   CartesianGrid,
   BarChart,
   Bar,
-  Cell,
 } from "recharts";
-import { API_BASE_URL } from "../config/api";
-import { ChevronDown, ArrowUp, ArrowDown, Trophy, Eye, ThumbsUp, MessageCircle, ExternalLink, Users, Video, MonitorPlay, TrendingUp, Zap, Calendar, Filter } from "lucide-react";
+import { ChevronDown, ArrowUp, ArrowDown, Trophy, Eye, ThumbsUp, MessageCircle, ExternalLink, Video, MonitorPlay, TrendingUp, Zap, Calendar, Filter } from "lucide-react";
 
 const toNumber = (v) => {
   if (v === null || v === undefined) return 0;
@@ -221,15 +219,9 @@ export function YoutubeTracking() {
     return [...filteredVideosForCharts].sort((a, b) => toNumber(b.comments) - toNumber(a.comments)).slice(0, 10);
   }, [filteredVideosForCharts]);
 
-  const subscribersData = React.useMemo(() => {
-    if (selectedChannels.length === 0) return [];
-    return [...filteredVideosForCharts].sort((a, b) => (a.upload_date || "").localeCompare(b.upload_date || ""));
-  }, [filteredVideosForCharts, selectedChannels]);
-
   const insights = React.useMemo(() => {
     if (!finalVideos.length) return [];
     
-    const totalV = finalVideos.reduce((a, b) => a + toNumber(b.views), 0);
     const totalE = finalVideos.reduce((a, b) => a + toNumber(b.likes) + toNumber(b.comments), 0);
 
     const days = {};

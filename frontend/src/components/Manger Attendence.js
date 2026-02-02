@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, createContext, useContext } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { employeeAPI, managerAPI } from "../Services/api";
 import { useAuth, AuthProvider } from "../contexts/AuthContext";
 import { getHolidaysForYear } from "./Holidays";
@@ -140,27 +140,6 @@ const ReportingManagerReport = () => {
   // Toggle expanded row
   const toggleRow = (empCode) => {
     setExpandedRows(prev => ({ ...prev, [empCode]: !prev[empCode] }));
-  };
-
-  // ---------- CALCULATIONS ---------- (unchanged)
-  const calcLateBy = (inTime) => {
-    if (!inTime) return 0;
-    const [h, m] = inTime.split(":").map(Number);
-    return Math.max(0, h * 60 + m - 600);
-  };
-
-  const calcWorkMins = (inTime, outTime) => {
-    if (!inTime || !outTime) return 0;
-    const [ih, im] = inTime.split(":").map(Number);
-    const [oh, om] = outTime.split(":").map(Number);
-    return oh * 60 + om - (ih * 60 + im);
-  };
-
-  const fmt = (mins) => {
-    if (!mins || mins < 0) return "00:00";
-    const h = String(Math.floor(mins / 60)).padStart(2, "0");
-    const m = String(mins % 60).padStart(2, "0");
-    return `${h}:${m}`;
   };
 
   // ---------- FILTERED DATA ---------- (unchanged)

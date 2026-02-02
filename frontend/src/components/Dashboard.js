@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useLocation } from 'react-router-dom';
 import { API_BASE_URL } from '../config/api';
@@ -11,22 +11,20 @@ import UserProfile from './UserProfile';
 import Projects from '@/components/Projects';
 import InternalCommunication from './InternalCommunication';
 import AdminPanel from './AdminPanel';
-import AdminRoute from './AdminRoute'; // Import the AdminRoute component
 
 import Meetings from './Meetings'; // Import the new Meetings component
 
 // import PayslipManagement from './PayslipManagement';
 
-import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
+import { Card, CardContent } from './ui/card';
 import { Button } from './ui/button';
 
-import { Calendar, Users, BarChart3, Bell, MessageSquare, Gift, Shield, FileText, CalendarCheck, Map as MapIcon, Video } from 'lucide-react';
+import { Users, BarChart3, Bell, MessageSquare, Gift, Shield, CalendarCheck, Map as MapIcon, Video } from 'lucide-react';
 
 import EAttendance from './EMPAttedence';
 import ManagerReport from './Manger Attendence';
 import AttendanceReport from './AdminAttedenceReport';
 import HRAttendance from './HRAttendance';
-import { employeeAPI } from '../Services/api';
 
 import { fetchEmployeesWorkDetails } from '../api'; // Import the centralized fetch function
 
@@ -103,6 +101,50 @@ const CalendarWidget = () => {
   );
 };
 
+// Helper to check for birthdays
+const checkBirthdays = (employees) => {
+  const today = new Date();
+  const todayMonth = today.getMonth() + 1; // JS months are 0-indexed
+  const todayDay = today.getDate();
+
+  return employees.filter(employee => {
+    if (!employee.date_of_birth) return false;
+    const dob = new Date(employee.date_of_birth);
+    const dobMonth = dob.getMonth() + 1;
+    const dobDay = dob.getDate();
+    return dobMonth === todayMonth && dobDay === todayDay;
+  });
+};
+
+// Helper to generate birthday announcements
+const generateBirthdayAnnouncements = (birthdayEmployees, currentUser) => {
+  return birthdayEmployees.map(employee => {
+    // Check if the current user is the one having a birthday
+    if (currentUser && currentUser.email === employee.email) {
+      // Message for the birthday person
+      return {
+        id: `birthday-personal-${employee.email}`,
+        type: 'birthday-personal',
+        title: `Happy Birthday, ${employee.name}!`,
+        content: `We wish you all the best on your special day. Thank you for being a valuable part of our team. Have a wonderful celebration! 🎂`,
+        author: 'Showtime Consulting',
+        date: new Date().toISOString(),
+        priority: 'high',
+      };
+    }
+    // Message for everyone else
+    return {
+      id: `birthday-announcement-${employee.email}`,
+      type: 'birthday',
+      title: `It's ${employee.name}'s Birthday!`,
+      content: `Join us in wishing ${employee.name} a very happy birthday today! 🎉`,
+      author: 'Showtime HR',
+      date: new Date().toISOString(),
+      priority: 'medium',
+    };
+  });
+};
+
 const Dashboard = () => {
 
   const location = useLocation();
@@ -122,51 +164,7 @@ const Dashboard = () => {
   }, [location.state]);
 
 
-  // Helper to check for birthdays
-  const checkBirthdays = (employees) => {
-    const today = new Date();
-    const todayMonth = today.getMonth() + 1; // JS months are 0-indexed
-    const todayDay = today.getDate();
-
-    return employees.filter(employee => {
-      if (!employee.date_of_birth) return false;
-      const dob = new Date(employee.date_of_birth);
-      const dobMonth = dob.getMonth() + 1;
-      const dobDay = dob.getDate();
-      return dobMonth === todayMonth && dobDay === todayDay;
-    });
-  };
-
-  // Helper to generate birthday announcements
-  const generateBirthdayAnnouncements = (birthdayEmployees, currentUser) => {
-    return birthdayEmployees.map(employee => {
-      // Check if the current user is the one having a birthday
-      if (currentUser && currentUser.email === employee.email) {
-        // Message for the birthday person
-        return {
-          id: `birthday-personal-${employee.email}`,
-          type: 'birthday-personal',
-          title: `Happy Birthday, ${employee.name}!`,
-          content: `We wish you all the best on your special day. Thank you for being a valuable part of our team. Have a wonderful celebration! 🎂`,
-          author: 'Showtime Consulting',
-          date: new Date().toISOString(),
-          priority: 'high',
-        };
-      }
-      // Message for everyone else
-      return {
-        id: `birthday-announcement-${employee.email}`,
-        type: 'birthday',
-        title: `It's ${employee.name}'s Birthday!`,
-        content: `Join us in wishing ${employee.name} a very happy birthday today! 🎉`,
-        author: 'Showtime HR',
-        date: new Date().toISOString(),
-        priority: 'medium',
-      };
-    });
-  };
-
-  const fetchAnnouncements = async () => {
+  const fetchAnnouncements = useCallback(async () => {
     // Do not fetch if user is not yet available
     if (!user) return;
 
@@ -187,7 +185,7 @@ const Dashboard = () => {
     } catch (error) {
       console.error("Dashboard: Failed to fetch announcements", error);
     }
-  };
+  }, [user, allEmployees]);
 
   useEffect(() => {
     // Fetch employees only once when the user is available
@@ -221,7 +219,7 @@ const Dashboard = () => {
     };
     
     window.addEventListener('websocket-message', handleNewAnnouncement);
-    return () => window.removeEventListener('websocket-message', handleNewAnnouncement);  }, [user, allEmployees]); // Now this is safe because allEmployees is set elsewhere
+    return () => window.removeEventListener('websocket-message', handleNewAnnouncement);  }, [user, allEmployees, fetchAnnouncements]); // Now this is safe because allEmployees is set elsewhere
 
 
 
@@ -231,7 +229,7 @@ const Dashboard = () => {
       fetchAnnouncements();
     }, 120000); // Re-fetch every 2 minutes to reduce load
     return () => clearInterval(intervalId); // Cleanup on component unmount
-  }, []); // Empty dependency array ensures this runs only once
+  }, [fetchAnnouncements]); // Empty dependency array ensures this runs only once
 
   // Handle navigation from notifications
   useEffect(() => {

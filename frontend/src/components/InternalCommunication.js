@@ -106,6 +106,36 @@ const InternalCommunication = () => {
     fetchUnreadCounts();
   }, [fetchUnreadCounts]); // Only fetch on initial load
 
+  // Fetch old messages when clicking on a channel
+  const fetchMessagesForChannel = useCallback(async (channel) => {
+    if (channel && user?.email) {
+      try {
+        console.log('Fetching messages for channel:', channel.name, 'for user:', user.email);
+        const response = await fetch(`${API_BASE_URL}/api/channel-messages?channel_id=${channel.name}&user_id=${user.email}&limit=50`);
+        console.log('Fetch response status:', response.status);
+        if (response.ok) {
+          let oldMessages = await response.json();
+          console.log('Fetched old messages:', oldMessages.length);
+          
+          // Process fetched messages to add status
+          const processedMessages = oldMessages.map(msg => {
+            // For channel messages, we can simplify the status.
+            // If it's from the current user and has an ID, it's 'sent'.
+            // The backend doesn't provide read receipts for channels in this implementation.
+            const status = (msg.sender_id === user.email && msg.id) ? 'sent' : 'none';
+            return { ...msg, status };
+          });
+
+          setMessages(processedMessages);
+        } else {
+          console.error('Failed to fetch messages:', response.statusText);
+        }
+      } catch (error) {
+        console.error('Error fetching messages:', error);
+      }
+    }
+  }, [user?.email]);
+
 
   // Format channels and calculate member counts in a single effect
   useEffect(() => {
@@ -141,7 +171,7 @@ const InternalCommunication = () => {
     // This ensures the placeholder is shown until the user makes a selection.
     setSelectedChannel(null);
 
-  }, [user?.email, channels]);
+  }, [user, channels]);
 
   useEffect(() => {
     const savedViewMode = localStorage.getItem('viewMode');
@@ -160,7 +190,7 @@ const InternalCommunication = () => {
   // Handle navigation from notifications
   useEffect(() => {
     // This effect handles navigation from the notification system.
-    if (navigationTarget && navigationTarget.section === 'communication' && channels.length > 0 && allEmployeesList.length > 0) {
+    if (navigationTarget && navigationTarget.section === 'communication' && channels.length > 0 && allEmployeesList.length > 0 && fetchMessagesForChannel) {
       if (navigationTarget.type === 'channel') {
         const channelToSelect = channels.find(c => c.name === navigationTarget.id);
         if (channelToSelect) {
@@ -181,40 +211,10 @@ const InternalCommunication = () => {
       // It's important to clear the target after navigation to prevent re-triggering
       // This can be done in AuthContext, but for simplicity, we assume it's a one-time event.
     }
-  }, [navigationTarget, channels, allEmployeesList]);
+  }, [navigationTarget, channels, allEmployeesList, fetchMessagesForChannel]);
 
   // Current user's status from AuthContext, default to 'offline' if not found
   const currentUserStatus = userStatuses[user?.email] || MOCK_USER_STATUS.OFFLINE;
-
-  // Fetch old messages when clicking on a channel
-  const fetchMessagesForChannel = async (channel) => {
-    if (channel && user?.email) {
-      try {
-        console.log('Fetching messages for channel:', channel.name, 'for user:', user.email);
-        const response = await fetch(`${API_BASE_URL}/api/channel-messages?channel_id=${channel.name}&user_id=${user.email}&limit=50`);
-        console.log('Fetch response status:', response.status);
-        if (response.ok) {
-          let oldMessages = await response.json();
-          console.log('Fetched old messages:', oldMessages.length);
-          
-          // Process fetched messages to add status
-          const processedMessages = oldMessages.map(msg => {
-            // For channel messages, we can simplify the status.
-            // If it's from the current user and has an ID, it's 'sent'.
-            // The backend doesn't provide read receipts for channels in this implementation.
-            const status = (msg.sender_id === user.email && msg.id) ? 'sent' : 'none';
-            return { ...msg, status };
-          });
-
-          setMessages(processedMessages);
-        } else {
-          console.error('Failed to fetch messages:', response.statusText);
-        }
-      } catch (error) {
-        console.error('Error fetching messages:', error);
-      }
-    }
-  };
 
   // WebSocket message handling
   useEffect(() => {
@@ -463,19 +463,6 @@ const handleReactionClick = (message, emoji) => {
       }
       return msg;
     }));
-  };
-
-  const groupReactions = (reactions) => {
-    if (!reactions) return [];
-    const grouped = {};
-    reactions.forEach(r => {
-      if (!grouped[r.reaction_type]) {
-        grouped[r.reaction_type] = { emoji: r.reaction_type, count: 0, users: [] };
-      }
-      grouped[r.reaction_type].count += 1;
-      grouped[r.reaction_type].users.push(r.user_id);
-    });
-    return Object.values(grouped);
   };
 
   const handleEmployeeClick = (employee) => {

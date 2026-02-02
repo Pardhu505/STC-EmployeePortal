@@ -1,24 +1,5 @@
-import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
-import { employeeAPI } from '../Services/api';
+import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { API_BASE_URL } from '../config/api';
-// Prevent duplicate notifications across sessions
-const getShownMessageIds = () => {
-  try {
-    return new Set(JSON.parse(localStorage.getItem('shownMessageIds') || '[]'));
-  } catch {
-    return new Set();
-  }
-};
-
-const addShownMessageId = (id) => {
-  if (!id) return;
-  const ids = JSON.parse(localStorage.getItem('shownMessageIds') || '[]');
-  if (!ids.includes(id)) {
-    ids.push(id);
-    if (ids.length > 500) ids.splice(0, ids.length - 200); // keep recent 200
-    localStorage.setItem('shownMessageIds', JSON.stringify(ids));
-  }
-};
 
 // Auto-detect WS URL with fallback
 const WS_URL = API_BASE_URL.replace(/^http/, 'ws') + "/api/ws";
@@ -41,13 +22,6 @@ const getReadMessageIds = () => {
   return saved ? new Set(JSON.parse(saved)) : new Set();
 };
 
-const addReadMessageId = (messageId) => {
-  if (!messageId) return;
-  const readIds = getReadMessageIds();
-  readIds.add(messageId);
-  localStorage.setItem('readMessageIds', JSON.stringify(Array.from(readIds)));
-};
-
 const addMultipleReadMessageIds = (messageIds) => {
   if (!messageIds || messageIds.length === 0) return;
   const readIds = getReadMessageIds();
@@ -61,7 +35,6 @@ export const AuthProvider = ({ children }) => {
   const webSocketRef = useRef(null);
   const [userStatuses, setUserStatuses] = useState({});
   const [isConnected, setIsConnected] = useState(false);
-  const [connectionError, setConnectionError] = useState(null);
   const reconnectTimeoutRef = useRef(null);
   const reconnectAttempts = useRef(0);
   const maxReconnectAttempts = 5;
@@ -81,7 +54,7 @@ export const AuthProvider = ({ children }) => {
   currentChannelRef.current = currentChannel;
   currentChatUserRef.current = currentChatUser;
 
-  const isActiveChat = (msg) => {
+  const isActiveChat = useCallback((msg) => {
     if (!msg) return false;
     
     // DIRECT MESSAGE: Check if the sender is the person we are currently chatting with.
@@ -94,14 +67,61 @@ export const AuthProvider = ({ children }) => {
       return true;
     
     return false;
-  };
+  }, []);
 
   const [allEmployees, setAllEmployees] = useState([]);
   const [navigationTarget, setNavigationTarget] = useState(null);
 
+  const navigateTo = useCallback((target) => {
+    // Target can be { section: 'announcements' } or { section: 'communication', type: 'channel', id: 'general' }
+    setNavigationTarget(target);
+  }, []);
+
+  // Helper to navigate to a specific chat.
+  // This centralizes the navigation logic for chat-related actions.
+  const navigateToChat = useCallback((target) => {
+    // Wraps the general navigateTo with the 'communication' section
+    navigateTo({ section: 'communication', ...target });
+  }, [navigateTo]);
+
+  // Notification functions
+  const showNotification = useCallback((title, options = {}) => {
+    if ('Notification' in window && Notification.permission === 'granted') {
+      console.log('Showing browser notification:', title);
+      const notification = new Notification(title, {
+        icon: '/favicon.ico',
+        ...options
+      });
+
+      // Add onclick handler to navigate to the correct chat
+      notification.onclick = () => {
+        console.log('Browser notification clicked. Data:', options.data);
+        if (options.data) {
+          if (options.data.channel) {
+
+            navigateToChat({ type: 'channel', id: options.data.channel });
+            navigateTo({ section: 'communication', type: 'channel', id: options.data.channel });
+          } else if (options.data.isDirectMessage) {
+            // For a DM, the target is the sender of the message
+            navigateTo({ type: 'dm', id: options.data.senderName });
+            navigateTo({ section: 'communication', type: 'dm', id: options.data.senderName });
+
+          }
+        }
+        // Bring the window to the front
+        window.focus();
+      };
+
+      return notification;
+    } else {
+      console.log('Browser notification permission not granted:', Notification.permission);
+      // No alert fallback, messages are shown in the notification system
+    }
+    return null;
+  }, [navigateTo, navigateToChat]);
 
   // WebSocket Connect
-  const connectWebSocket = (userId) => {
+  const connectWebSocket = useCallback((userId) => {
     if (webSocketRef.current && webSocketRef.current.readyState === WebSocket.OPEN) {
       console.log(" WebSocket already connected for:", userId);
       return;
@@ -264,9 +284,9 @@ if (isChannelMessage && currentChannelRef.current?.name === message.channel_id) 
 
             let shouldNotify = true;
 
-            if (isChannelMessage && currentChannel === message.recipient_id) {
+            if (isChannelMessage && currentChannelRef.current?.name === message.recipient_id) {
               shouldNotify = false; // Don't notify if user is viewing this channel
-            } else if (isDirectMessage && currentChatUser === message.sender_id) {
+            } else if (isDirectMessage && currentChatUserRef.current === message.sender_id) {
               shouldNotify = false; // Don't notify if user is chatting with this person
             }
 
@@ -432,13 +452,13 @@ if (isChannelMessage && currentChannelRef.current?.name === message.channel_id) 
           connectWebSocket(userId);
         }, timeout);
       } else {
-        setConnectionError("Unable to connect to WebSocket after multiple attempts.");
+        console.error("Unable to connect to WebSocket after multiple attempts.");
       }
     };
-  };
+  }, [isActiveChat, showNotification, userChannels]);
 
   // WebSocket Disconnect
-  const disconnectWebSocket = () => {
+  const disconnectWebSocket = useCallback(() => {
     if (webSocketRef.current) {
       console.log("🔌 Disconnecting WS for:", user?.id);
       webSocketRef.current.close();
@@ -449,7 +469,7 @@ if (isChannelMessage && currentChannelRef.current?.name === message.channel_id) 
       clearInterval(pingIntervalRef.current);
       pingIntervalRef.current = null;
     }
-  };
+  }, [user?.id]);
 
   //  Auto-manage WS on user state
   useEffect(() => {
@@ -459,7 +479,7 @@ if (isChannelMessage && currentChannelRef.current?.name === message.channel_id) 
       disconnectWebSocket();
     }
     return () => disconnectWebSocket();
-  }, [user]);
+  }, [user, connectWebSocket, disconnectWebSocket]);
 
   // Fetch user's channels for notification filtering
   useEffect(() => {
@@ -535,7 +555,7 @@ if (isChannelMessage && currentChannelRef.current?.name === message.channel_id) 
   }, []);
 
   
-  const login = async (email, password) => {
+  const login = useCallback(async (email, password) => {
     try {
       // API login
       const response = await fetch(`${API_BASE_URL}/api/login`, {
@@ -570,14 +590,14 @@ if (isChannelMessage && currentChannelRef.current?.name === message.channel_id) 
       console.error("Login failed:", err);
       throw err;
     }
-  };
+  }, []);
 
-  const logout = () => {
+  const logout = useCallback(() => {
     setUser(null);
     localStorage.removeItem("showtimeUser");
     setUserStatuses({});
     console.log(" User logged out");
-  };
+  }, []);
 
   const sendWebSocketMessage = (message) => {
     if (webSocketRef.current && webSocketRef.current.readyState === WebSocket.OPEN) {
@@ -587,58 +607,22 @@ if (isChannelMessage && currentChannelRef.current?.name === message.channel_id) 
     }
   };
 
-  const clearNewMessages = () => {
+  const clearNewMessages = useCallback(() => {
     // Also mark all current new messages as read in localStorage
     addMultipleReadMessageIds(newMessages.map(msg => msg.id));
     setNewMessages([]);
-  };
+  }, [newMessages]);
 
-  // Notification functions
-  const showNotification = (title, options = {}) => {
-    if ('Notification' in window && Notification.permission === 'granted') {
-      console.log('Showing browser notification:', title);
-      const notification = new Notification(title, {
-        icon: '/favicon.ico',
-        ...options
-      });
-
-      // Add onclick handler to navigate to the correct chat
-      notification.onclick = () => {
-        console.log('Browser notification clicked. Data:', options.data);
-        if (options.data) {
-          if (options.data.channel) {
-
-            navigateToChat({ type: 'channel', id: options.data.channel });
-            navigateTo({ section: 'communication', type: 'channel', id: options.data.channel });
-          } else if (options.data.isDirectMessage) {
-            // For a DM, the target is the sender of the message
-            navigateTo({ type: 'dm', id: options.data.senderName });
-            navigateTo({ section: 'communication', type: 'dm', id: options.data.senderName });
-
-          }
-        }
-        // Bring the window to the front
-        window.focus();
-      };
-
-      return notification;
-    } else {
-      console.log('Browser notification permission not granted:', Notification.permission);
-      // No alert fallback, messages are shown in the notification system
-    }
-    return null;
-  };
-
-  const requestNotificationPermission = async () => {
+  const requestNotificationPermission = useCallback(async () => {
     if ('Notification' in window && Notification.permission === 'default') {
       const permission = await Notification.requestPermission();
       setNotificationPermission(permission);
       return permission;
     }
     return Notification.permission;
-  };
+  }, []);
 
-  const updateProfile = async (profileData) => {
+  const updateProfile = useCallback(async (profileData) => {
     // This function now only updates the local state (in AuthContext and localStorage).
     // The API call is handled by the component that triggers the update (e.g., UserProfile.js).
     // This makes the function more generic and reusable.
@@ -648,9 +632,9 @@ if (isChannelMessage && currentChannelRef.current?.name === message.channel_id) 
       localStorage.setItem("showtimeUser", JSON.stringify(updatedUser));
       return updatedUser;
     });
-  };
+  }, []);
 
-  const removeProfilePicture = async () => {
+  const removeProfilePicture = useCallback(async () => {
     if (!user || !user.email) {
       console.error("Cannot remove profile picture: user not logged in.");
       throw new Error("User not authenticated");
@@ -679,19 +663,19 @@ if (isChannelMessage && currentChannelRef.current?.name === message.channel_id) 
       console.error("Failed to remove profile picture via API:", error);
       throw error;
     }
-  };
+  }, [user, updateProfile]);
 
-  const uploadProfilePicture = (file) =>
+  const uploadProfilePicture = useCallback((file) =>
     new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => resolve(reader.result);
       reader.onerror = reject;
       reader.readAsDataURL(file);
-    });
+    }), []);
 
 
   // New function to refresh the global employee list
-  const refreshAllEmployees = async () => {
+  const refreshAllEmployees = useCallback(async () => {
     try {
       const employeesResponse = await fetch(`${API_BASE_URL}/api/employees`);
       if (employeesResponse.ok) {
@@ -701,10 +685,10 @@ if (isChannelMessage && currentChannelRef.current?.name === message.channel_id) 
     } catch (error) {
       console.error("Failed to refresh employees list:", error);
     }
-  };
+  }, []);
 
 
-  const signup = async ({ name, email, password, designation, department, team, empCode }) => {
+  const signup = useCallback(async ({ name, email, password, designation, department, team, empCode }) => {
     try {
       const response = await fetch(`${API_BASE_URL}/api/signup`, {
         method: 'POST',
@@ -724,20 +708,8 @@ if (isChannelMessage && currentChannelRef.current?.name === message.channel_id) 
     } catch (err) {
       throw err;
     }
-  };
+  }, [login, refreshAllEmployees]);
 
-  const navigateTo = (target) => {
-    // Target can be { section: 'announcements' } or { section: 'communication', type: 'channel', id: 'general' }
-    setNavigationTarget(target);
-  };
-
-  // Helper to navigate to a specific chat.
-  // This centralizes the navigation logic for chat-related actions.
-  const navigateToChat = (target) => {
-    // Wraps the general navigateTo with the 'communication' section
-    navigateTo({ section: 'communication', ...target });
-  };
-  
   // Centralized check for administrator privileges.
   // This logic can be used throughout the app via the useAuth hook.
   const isAdmin = React.useMemo(() => {
@@ -748,7 +720,7 @@ if (isChannelMessage && currentChannelRef.current?.name === message.channel_id) 
            designation === 'system admin';
   }, [user]);
 
-  const clearChatNotifications = (id, isChannel = false) => {
+  const clearChatNotifications = useCallback((id, isChannel = false) => {
     setNewMessages(prev =>
       prev.filter(msg => {
         if (isChannel) {
@@ -761,7 +733,7 @@ if (isChannelMessage && currentChannelRef.current?.name === message.channel_id) 
         }
       })
     );
-  };
+  }, []);
 
   const value = React.useMemo(() => {
     return {
@@ -798,7 +770,8 @@ if (isChannelMessage && currentChannelRef.current?.name === message.channel_id) 
       clearChatNotifications,
       refreshAllEmployees, // Expose the refresh function
     };
-  }, [user, isAdmin, loading, isConnected, userStatuses, newMessages, currentChannel, currentChatUser, notificationPermission, allChannels, allEmployees, navigationTarget]);
+  }, [user, isAdmin, loading, isConnected, userStatuses, newMessages, currentChannel, currentChatUser, notificationPermission, allChannels, allEmployees, navigationTarget,
+      login, logout, signup, updateProfile, removeProfilePicture, uploadProfilePicture, sendWebSocketMessage, clearNewMessages, showNotification, requestNotificationPermission, navigateTo, navigateToChat, clearChatNotifications, refreshAllEmployees]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

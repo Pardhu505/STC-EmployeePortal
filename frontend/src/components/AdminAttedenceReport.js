@@ -409,13 +409,11 @@ const AttendanceReport = () => {
         }
       };
 
-    return { employees: [], summary: {} };
   }, [employeeData, selectedDate, searchQuery, checkedNames, checkedCodes]);
 
   const filteredData = getFilteredData();
   const employeesToDisplay = filteredData.employees;
   const summaryData = filteredData.summary;
-  const showTable = filteredData.employees.length > 0;
   const renderContent = () => {
     if (loading) {
       return (

@@ -59,6 +59,7 @@ const KPI = ({ label, value, color, icon: Icon }) => (
 ------------------------- */
 export function YoutubeTracking() {
   const [data, setData] = useState(null);
+  const [error, setError] = useState(null);
   const [selectedChannels, setSelectedChannels] = useState([]);
   const [videoType, setVideoType] = useState("All");
   const [fromDate, setFromDate] = useState("");
@@ -82,7 +83,10 @@ export function YoutubeTracking() {
   useEffect(() => {
     // Fetch directly from the scraper service
     fetch("https://youtube-hgci.onrender.com/raw-data")
-      .then((res) => res.json())
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+        return res.json();
+      })
       .then((json) => {
         const raw = json.raw_videos || [];
         
@@ -115,7 +119,10 @@ export function YoutubeTracking() {
 
         setData({ trending, channels: uniqueChannels, summary });
       })
-      .catch((err) => console.error("API error:", err));
+      .catch((err) => {
+        console.error("API error:", err);
+        setError(err.message);
+      });
   }, []);
 
   const globallySortedVideos = React.useMemo(() => {
@@ -239,6 +246,7 @@ export function YoutubeTracking() {
     ];
   }, [finalVideos]);
 
+  if (error) return <div className="p-10 text-center text-red-600">Error loading data: {error}</div>;
   if (!data) {
     return <div className="p-10 text-center">Loading dashboard...</div>;
   }

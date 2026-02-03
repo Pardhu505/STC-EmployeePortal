@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import {
   ResponsiveContainer,
   XAxis,
@@ -58,8 +58,11 @@ const KPI = ({ label, value, color, icon: Icon }) => (
    MAIN COMPONENT
 ------------------------- */
 export function YoutubeTracking() {
-  const [data, setData] = useState(null);
+  const [videos, setVideos] = useState([]);
   const [error, setError] = useState(null);
+  const [cursor, setCursor] = useState(null);
+  const [hasNext, setHasNext] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [selectedChannels, setSelectedChannels] = useState([]);
   const [videoType, setVideoType] = useState("All");
   const [fromDate, setFromDate] = useState("");
@@ -67,6 +70,7 @@ export function YoutubeTracking() {
   const [sortConfig, setSortConfig] = useState({ key: "views", direction: "asc" });
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
+  const [knownChannels, setKnownChannels] = useState(new Set());
 
   useEffect(() => {
     function handleClickOutside(event) {
@@ -80,18 +84,24 @@ export function YoutubeTracking() {
     };
   }, [dropdownRef]);
 
-  useEffect(() => {
-    // Fetch directly from the scraper service
-    fetch(`https://merge-healing-reducing-qualities.trycloudflare.com/raw-data`)
-      .then((res) => {
-        if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
-        return res.json();
-      })
-      .then((json) => {
-        const raw = json.raw_videos || [];
-        
-        // Transform raw data to the format expected by the dashboard
-        const trending = raw.map(v => ({
+  const fetchVideos = useCallback(async (isReset = false) => {
+    if (isLoading && !isReset) return;
+    setIsLoading(true);
+    try {
+      const currentCursor = isReset ? null : cursor;
+      const params = new URLSearchParams({
+        limit: 50,
+        ...(currentCursor && { cursor: currentCursor }),
+        ...(selectedChannels.length && { channels: selectedChannels.join(",") }),
+        ...(fromDate && { fromDate }),
+        ...(toDate && { toDate }),
+      });
+
+      const res = await fetch(`https://merge-healing-reducing-qualities.trycloudflare.com/videos?${params}`);
+      if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+      const data = await res.json();
+
+      const newItems = data.items.map(v => ({
           id: v.video_id,
           title: v.video_title,
           views: v.viewCount,
@@ -101,46 +111,33 @@ export function YoutubeTracking() {
           channel_id: v.channel_id,
           upload_date: v.publishedAt || v.retrieved_at,
           thumbnail: v.thumbnail_url
-        }));
+      }));
 
-        const uniqueChannels = [];
-        const seen = new Set();
-        raw.forEach(v => {
-            if (v.channel_handle && !seen.has(v.channel_handle)) {
-                seen.add(v.channel_handle);
-                uniqueChannels.push({ handle: v.channel_handle, id: v.channel_id });
-            }
-        });
-
-        const summary = {
-            channelsCount: uniqueChannels.length,
-            totalVideos: raw.length
-        };
-
-        setData({ trending, channels: uniqueChannels, summary });
-      })
-      .catch((err) => {
-        console.error("API error:", err);
-        setError(err.message);
+      setVideos(prev => isReset ? newItems : [...prev, ...newItems]);
+      setCursor(data.nextCursor);
+      setHasNext(data.hasNext);
+      
+      setKnownChannels(prev => {
+        const next = new Set(prev);
+        newItems.forEach(v => { if(v.channel) next.add(v.channel); });
+        return next;
       });
-  }, []);
+
+    } catch (err) {
+      console.error("API error:", err);
+      setError(err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [cursor, selectedChannels, fromDate, toDate, isLoading]);
+
+  useEffect(() => {
+    fetchVideos(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedChannels, fromDate, toDate]);
 
   const globallySortedVideos = React.useMemo(() => {
-    if (!data?.trending) return [];
-
-    let sorted = [...data.trending];
-
-    // Client-side Date Filtering
-    if (fromDate) {
-      const start = new Date(fromDate);
-      sorted = sorted.filter(v => new Date(v.upload_date) >= start);
-    }
-    if (toDate) {
-      const end = new Date(toDate);
-      // Set end date to end of day to include the selected day
-      end.setHours(23, 59, 59, 999);
-      sorted = sorted.filter(v => new Date(v.upload_date) <= end);
-    }
+    let sorted = [...videos];
 
     sorted.sort((a, b) => {
       const { key, direction } = sortConfig;
@@ -193,26 +190,21 @@ export function YoutubeTracking() {
     });
 
     return sorted;
-  }, [data, sortConfig, fromDate, toDate]);
+  }, [videos, sortConfig]);
 
   const finalVideos = React.useMemo(() => {
     let filtered = globallySortedVideos;
-    if (selectedChannels.length > 0) {
-      filtered = filtered.filter((v) => selectedChannels.includes(v.channel));
-    }
     if (videoType === "Shorts") {
       filtered = filtered.filter(v => (v.title || "").toLowerCase().includes("#shorts"));
     } else if (videoType === "Videos") {
       filtered = filtered.filter(v => !(v.title || "").toLowerCase().includes("#shorts"));
     }
     return filtered;
-  }, [globallySortedVideos, selectedChannels, videoType]);
+  }, [globallySortedVideos, videoType]);
 
   const filteredVideosForCharts = React.useMemo(() => {
-    if (!data?.trending) return [];
-    if (selectedChannels.length === 0) return data.trending;
-    return data.trending.filter((v) => selectedChannels.includes(v.channel));
-  }, [data, selectedChannels]);
+    return finalVideos;
+  }, [finalVideos]);
 
   const top10ByViews = React.useMemo(() => {
     return [...filteredVideosForCharts].sort((a, b) => toNumber(b.views) - toNumber(a.views)).slice(0, 10);
@@ -247,11 +239,11 @@ export function YoutubeTracking() {
   }, [finalVideos]);
 
   if (error) return <div className="p-10 text-center text-red-600">Error loading data: {error}</div>;
-  if (!data) {
+  if (isLoading && videos.length === 0) {
     return <div className="p-10 text-center">Loading dashboard...</div>;
   }
 
-  const channelHandles = Array.from(new Set((data.channels || []).map((c) => c.handle)));
+  const channelHandles = Array.from(knownChannels).sort();
 
   const handleChannelToggle = (handle) => {
     setSelectedChannels((prev) => {
@@ -267,14 +259,13 @@ export function YoutubeTracking() {
     }));
   };
 
-  let kpiChannels = data.summary?.channelsCount || 0;
-  let kpiVideos = data.summary?.totalVideos || 0;
+  let kpiChannels = channelHandles.length;
+  let kpiVideos = videos.length;
   let channelLabel = "Channels";
 
   if (selectedChannels.length > 0) {
     kpiChannels = selectedChannels.length;
     channelLabel = "Selected Channels";
-    kpiVideos = finalVideos.length;
   }
 
   const totalViews = finalVideos.reduce((acc, curr) => acc + (curr.views || 0), 0);
@@ -576,9 +567,6 @@ export function YoutubeTracking() {
             </thead>
             <tbody>
               {finalVideos.map((v) => {
-                const channel = (data.channels || []).find(
-                  (c) => c.handle === v.channel
-                );
                 const url = `https://www.youtube.com/watch?v=${v.id}`;
                 const engagementCount = toNumber(v.likes) + toNumber(v.comments);
                 
@@ -602,7 +590,7 @@ export function YoutubeTracking() {
                         {v.channel}
                       </span>
                     </td>
-                    <td className="px-3 py-2 max-w-[100px] truncate" title={channel?.id}>{channel?.id}</td>
+                    <td className="px-3 py-2 max-w-[100px] truncate" title={v.channel_id}>{v.channel_id}</td>
                     <td className="px-3 py-2">{v.views ? v.views.toLocaleString() : 0}</td>
                     <td className="px-3 py-2">{v.likes ? v.likes.toLocaleString() : 0}</td>
                     <td className="px-3 py-2">{v.comments ? v.comments.toLocaleString() : 0}</td>
@@ -614,6 +602,17 @@ export function YoutubeTracking() {
             </tbody>
           </table>
         </div>
+      </div>
+
+      {/* LOAD MORE */}
+      <div className="flex justify-center mt-6 mb-10">
+        <button
+          onClick={() => fetchVideos(false)}
+          disabled={!hasNext || isLoading}
+          className="px-6 py-2 bg-blue-600 text-white rounded-lg font-semibold shadow-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        >
+          {isLoading ? "Loading..." : hasNext ? "Load More Videos" : "No More Videos"}
+        </button>
       </div>
     </div>
   );

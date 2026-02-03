@@ -62,7 +62,8 @@ export function YoutubeTracking() {
     total_likes: 0,
     total_comments: 0,
     total_channels: 0,
-    avg_engagement: 0
+    avg_engagement: 0,
+    best_posting_day: "N/A"
   });
   const [error, setError] = useState(null);
   const [cursor, setCursor] = useState(null);
@@ -75,7 +76,7 @@ export function YoutubeTracking() {
   const [sortConfig, setSortConfig] = useState({ key: null, direction: "asc" });
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
-  const [knownChannels, setKnownChannels] = useState(new Set());
+  const [allChannels, setAllChannels] = useState([]);
 
   useEffect(() => {
     function handleClickOutside(event) {
@@ -88,6 +89,16 @@ export function YoutubeTracking() {
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [dropdownRef]);
+
+  // Fetch all channels for dropdown
+  useEffect(() => {
+    fetch(`${API_BASE_URL}/channels`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.channels) setAllChannels(data.channels);
+      })
+      .catch(err => console.error("Failed to fetch channels:", err));
+  }, []);
 
   const fetchVideos = useCallback(async (isReset = false) => {
     if (isLoading && !isReset) return;
@@ -121,12 +132,6 @@ export function YoutubeTracking() {
       setVideos(prev => isReset ? newItems : [...prev, ...newItems]);
       setCursor(data.nextCursor);
       setHasNext(data.hasNext);
-      
-      setKnownChannels(prev => {
-        const next = new Set(prev);
-        newItems.forEach(v => { if(v.channel) next.add(v.channel); });
-        return next;
-      });
 
     } catch (err) {
       console.error("API error:", err);
@@ -260,29 +265,19 @@ export function YoutubeTracking() {
   const top10ByComments = topVideos.byComments;
 
   const insights = React.useMemo(() => {
-    if (!finalVideos.length) return [];
-    
-    const days = {};
-    finalVideos.forEach(v => {
-        const d = new Date(v.upload_date).toLocaleDateString('en-US', { weekday: 'long' });
-        if(!days[d]) days[d] = 0;
-        days[d] += toNumber(v.views);
-    });
-    const bestDay = Object.keys(days).reduce((a, b) => days[a] > days[b] ? a : b, "Monday");
-
     return [
         { icon: Zap, color: "#facc15", label: "Avg Engagement", value: (kpiData.avg_engagement * 100).toFixed(2) + "%", sub: "Rate per view" },
-        { icon: Calendar, color: "#60a5fa", label: "Best Posting Day", value: bestDay, sub: "Highest Views" },
+        { icon: Calendar, color: "#60a5fa", label: "Best Posting Day", value: kpiData.best_posting_day, sub: "Highest Views" },
         { icon: TrendingUp, color: "#34d399", label: "Active Videos", value: kpiData.total_videos.toLocaleString(), sub: "In selection" }
     ];
-  }, [finalVideos, kpiData]);
+  }, [kpiData]);
 
   if (error) return <div className="p-10 text-center text-red-600">Error loading data: {error}</div>;
   if (isLoading && videos.length === 0) {
     return <div className="p-10 text-center">Loading dashboard...</div>;
   }
 
-  const channelHandles = Array.from(knownChannels).sort();
+  const channelHandles = allChannels;
 
   const handleChannelToggle = (handle) => {
     setSelectedChannels((prev) => {

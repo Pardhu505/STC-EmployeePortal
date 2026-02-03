@@ -312,7 +312,7 @@ export function YoutubeTracking() {
       </div>
 
       {/* FILTER + KPIs */}
-      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-2 md:gap-4 mb-4 md:mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-3 gap-2 md:gap-4 mb-4 md:mb-6">
         <div 
           className="bg-white rounded-xl p-4 relative flex flex-col justify-center transition-transform hover:-translate-y-1 z-30" 
           ref={dropdownRef}
@@ -384,20 +384,22 @@ export function YoutubeTracking() {
       </div>
 
       {/* INSIGHTS STRIP */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        {insights.map((insight, i) => (
-          <div key={i} className="bg-white border border-gray-200 rounded-xl p-4 flex items-center gap-4 shadow-sm">
-            <div className="p-3 rounded-full" style={{ background: `linear-gradient(135deg, ${insight.color}15, ${insight.color}30)`, color: insight.color }}>
-              <insight.icon size={20} />
+      {selectedChannels.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          {insights.map((insight, i) => (
+            <div key={i} className="bg-white border border-gray-200 rounded-xl p-4 flex items-center gap-4 shadow-sm">
+              <div className="p-3 rounded-full" style={{ background: `linear-gradient(135deg, ${insight.color}15, ${insight.color}30)`, color: insight.color }}>
+                <insight.icon size={20} />
+              </div>
+              <div>
+                <div className="text-xs font-bold text-gray-400 uppercase">{insight.label}</div>
+                <div className="text-lg font-bold text-gray-800">{insight.value}</div>
+                <div className="text-[10px] text-gray-500">{insight.sub}</div>
+              </div>
             </div>
-            <div>
-              <div className="text-xs font-bold text-gray-400 uppercase">{insight.label}</div>
-              <div className="text-lg font-bold text-gray-800">{insight.value}</div>
-              <div className="text-[10px] text-gray-500">{insight.sub}</div>
-            </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
       {/* CHARTS */}
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-2 md:gap-4 mb-4 md:mb-6">

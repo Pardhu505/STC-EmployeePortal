@@ -196,6 +196,7 @@ export function YoutubeTracking() {
   }, [selectedChannels, fromDate, toDate]);
 
   useEffect(() => {
+    setCursor(null);
     fetchVideos(true);
     fetchTopVideos();
     fetchKPIs();

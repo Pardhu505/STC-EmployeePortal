@@ -62,6 +62,7 @@ export function YoutubeTracking() {
   const [videoType, setVideoType] = useState("All");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
+  const [sortConfig, setSortConfig] = useState({ key: null, direction: "asc" });
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
   const [knownChannels, setKnownChannels] = useState(new Set());
@@ -173,6 +174,14 @@ export function YoutubeTracking() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedChannels, fromDate, toDate]);
 
+  const requestSort = (key) => {
+    let direction = "asc";
+    if (sortConfig.key === key && sortConfig.direction === "asc") {
+      direction = "desc";
+    }
+    setSortConfig({ key, direction });
+  };
+
   const finalVideos = React.useMemo(() => {
     let filtered = [...videos];
     if (videoType === "Shorts") {
@@ -180,8 +189,42 @@ export function YoutubeTracking() {
     } else if (videoType === "Videos") {
       filtered = filtered.filter(v => !(v.title || "").toLowerCase().includes("#shorts"));
     }
+
+    if (sortConfig.key) {
+      filtered.sort((a, b) => {
+        const { key, direction } = sortConfig;
+        
+        if (key === 'engagement') {
+           const engA = toNumber(a.likes) + toNumber(a.comments);
+           const engB = toNumber(b.likes) + toNumber(b.comments);
+           return direction === 'asc' ? engA - engB : engB - engA;
+        }
+
+        const valA = a[key];
+        const valB = b[key];
+
+        if (['views', 'likes', 'comments'].includes(key)) {
+           const numA = toNumber(valA);
+           const numB = toNumber(valB);
+           return direction === 'asc' ? numA - numB : numB - numA;
+        }
+        
+        if (key === 'upload_date') {
+            const dateA = new Date(valA || 0);
+            const dateB = new Date(valB || 0);
+            return direction === 'asc' ? dateA - dateB : dateB - dateA;
+        }
+
+        // Strings
+        const strA = String(valA || "").toLowerCase();
+        const strB = String(valB || "").toLowerCase();
+        if (strA < strB) return direction === 'asc' ? -1 : 1;
+        if (strA > strB) return direction === 'asc' ? 1 : -1;
+        return 0;
+      });
+    }
     return filtered;
-  }, [videos, videoType]);
+  }, [videos, videoType, sortConfig]);
 
   const top10ByViews = topVideos.byViews;
   const top10ByLikes = topVideos.byLikes;
@@ -482,14 +525,46 @@ export function YoutubeTracking() {
           <table className="min-w-full text-sm">
             <thead className="bg-gray-100 sticky top-0">
               <tr>
-                <th className="px-3 py-2 text-left">Video</th>
-                <th className="px-3 py-2 text-left">Channel Handle</th>
-                <th className="px-3 py-2 text-left">Channel ID</th>
-                <th className="px-3 py-2 text-left">View Count</th>
-                <th className="px-3 py-2 text-left">Like Count</th>
-                <th className="px-3 py-2 text-left">Comment Count</th>
-                <th className="px-3 py-2 text-left">Engagement</th>
-                <th className="px-3 py-2 text-left">Date Posted</th>
+                <th className="px-3 py-2 text-left cursor-pointer hover:bg-gray-200" onClick={() => requestSort('title')}>
+                  <div className="flex items-center gap-1">
+                    Video {sortConfig.key === 'title' && (sortConfig.direction === 'asc' ? <ArrowUp size={14} /> : <ArrowDown size={14} />)}
+                  </div>
+                </th>
+                <th className="px-3 py-2 text-left cursor-pointer hover:bg-gray-200" onClick={() => requestSort('channel')}>
+                  <div className="flex items-center gap-1">
+                    Channel Handle {sortConfig.key === 'channel' && (sortConfig.direction === 'asc' ? <ArrowUp size={14} /> : <ArrowDown size={14} />)}
+                  </div>
+                </th>
+                <th className="px-3 py-2 text-left cursor-pointer hover:bg-gray-200" onClick={() => requestSort('channel_id')}>
+                  <div className="flex items-center gap-1">
+                    Channel ID {sortConfig.key === 'channel_id' && (sortConfig.direction === 'asc' ? <ArrowUp size={14} /> : <ArrowDown size={14} />)}
+                  </div>
+                </th>
+                <th className="px-3 py-2 text-left cursor-pointer hover:bg-gray-200" onClick={() => requestSort('views')}>
+                  <div className="flex items-center gap-1">
+                    View Count {sortConfig.key === 'views' && (sortConfig.direction === 'asc' ? <ArrowUp size={14} /> : <ArrowDown size={14} />)}
+                  </div>
+                </th>
+                <th className="px-3 py-2 text-left cursor-pointer hover:bg-gray-200" onClick={() => requestSort('likes')}>
+                  <div className="flex items-center gap-1">
+                    Like Count {sortConfig.key === 'likes' && (sortConfig.direction === 'asc' ? <ArrowUp size={14} /> : <ArrowDown size={14} />)}
+                  </div>
+                </th>
+                <th className="px-3 py-2 text-left cursor-pointer hover:bg-gray-200" onClick={() => requestSort('comments')}>
+                  <div className="flex items-center gap-1">
+                    Comment Count {sortConfig.key === 'comments' && (sortConfig.direction === 'asc' ? <ArrowUp size={14} /> : <ArrowDown size={14} />)}
+                  </div>
+                </th>
+                <th className="px-3 py-2 text-left cursor-pointer hover:bg-gray-200" onClick={() => requestSort('engagement')}>
+                  <div className="flex items-center gap-1">
+                    Engagement {sortConfig.key === 'engagement' && (sortConfig.direction === 'asc' ? <ArrowUp size={14} /> : <ArrowDown size={14} />)}
+                  </div>
+                </th>
+                <th className="px-3 py-2 text-left cursor-pointer hover:bg-gray-200" onClick={() => requestSort('upload_date')}>
+                  <div className="flex items-center gap-1">
+                    Date Posted {sortConfig.key === 'upload_date' && (sortConfig.direction === 'asc' ? <ArrowUp size={14} /> : <ArrowDown size={14} />)}
+                  </div>
+                </th>
               </tr>
             </thead>
             <tbody>

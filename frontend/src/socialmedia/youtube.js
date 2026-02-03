@@ -56,6 +56,14 @@ const KPI = ({ label, value, color, icon: Icon }) => (
 export function YoutubeTracking() {
   const [videos, setVideos] = useState([]);
   const [topVideos, setTopVideos] = useState({ byViews: [], byLikes: [], byComments: [] });
+  const [kpiData, setKpiData] = useState({
+    total_videos: 0,
+    total_views: 0,
+    total_likes: 0,
+    total_comments: 0,
+    total_channels: 0,
+    avg_engagement: 0
+  });
   const [error, setError] = useState(null);
   const [cursor, setCursor] = useState(null);
   const [hasNext, setHasNext] = useState(true);
@@ -170,9 +178,27 @@ export function YoutubeTracking() {
     }
   }, [selectedChannels, fromDate, toDate]);
 
+  const fetchKPIs = useCallback(async () => {
+    try {
+      const params = new URLSearchParams({
+        ...(selectedChannels.length && { channels: selectedChannels.join(",") }),
+        ...(fromDate && { fromDate }),
+        ...(toDate && { toDate }),
+      });
+
+      const res = await fetch(`${API_BASE_URL}/videos/kpis?${params}`);
+      if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+      const data = await res.json();
+      setKpiData(data);
+    } catch (err) {
+      console.error("Error fetching KPIs:", err);
+    }
+  }, [selectedChannels, fromDate, toDate]);
+
   useEffect(() => {
     fetchVideos(true);
     fetchTopVideos();
+    fetchKPIs();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedChannels, fromDate, toDate]);
 
@@ -235,8 +261,6 @@ export function YoutubeTracking() {
   const insights = React.useMemo(() => {
     if (!finalVideos.length) return [];
     
-    const totalE = finalVideos.reduce((a, b) => a + toNumber(b.likes) + toNumber(b.comments), 0);
-
     const days = {};
     finalVideos.forEach(v => {
         const d = new Date(v.upload_date).toLocaleDateString('en-US', { weekday: 'long' });
@@ -246,11 +270,11 @@ export function YoutubeTracking() {
     const bestDay = Object.keys(days).reduce((a, b) => days[a] > days[b] ? a : b, "Monday");
 
     return [
-        { icon: Zap, color: "#facc15", label: "Total Engagement", value: totalE.toLocaleString(), sub: "Likes + Comments" },
+        { icon: Zap, color: "#facc15", label: "Avg Engagement", value: (kpiData.avg_engagement * 100).toFixed(2) + "%", sub: "Rate per view" },
         { icon: Calendar, color: "#60a5fa", label: "Best Posting Day", value: bestDay, sub: "Highest Views" },
-        { icon: TrendingUp, color: "#34d399", label: "Active Videos", value: finalVideos.length, sub: "In selection" }
+        { icon: TrendingUp, color: "#34d399", label: "Active Videos", value: kpiData.total_videos.toLocaleString(), sub: "In selection" }
     ];
-  }, [finalVideos]);
+  }, [finalVideos, kpiData]);
 
   if (error) return <div className="p-10 text-center text-red-600">Error loading data: {error}</div>;
   if (isLoading && videos.length === 0) {
@@ -266,18 +290,11 @@ export function YoutubeTracking() {
     });
   };
 
-  let kpiChannels = channelHandles.length;
-  let kpiVideos = videos.length;
   let channelLabel = "Channels";
 
   if (selectedChannels.length > 0) {
-    kpiChannels = selectedChannels.length;
     channelLabel = "Selected Channels";
   }
-
-  const totalViews = finalVideos.reduce((acc, curr) => acc + (curr.views || 0), 0);
-  const totalLikes = finalVideos.reduce((acc, curr) => acc + (curr.likes || 0), 0);
-  const totalComments = finalVideos.reduce((acc, curr) => acc + (curr.comments || 0), 0);
 
   return (
     <div className="p-2 md:p-6 bg-gray-50 min-h-screen text-gray-800 w-full max-w-full overflow-x-hidden">
@@ -384,11 +401,11 @@ export function YoutubeTracking() {
           )}
         </div>
 
-        <KPI label={channelLabel} value={kpiChannels} color="#60a5fa" icon={MonitorPlay} />
-        <KPI label="Videos" value={kpiVideos} color="#f87171" icon={Video} />
-        <KPI label="Total Views" value={totalViews} color="#818cf8" icon={Eye} />
-        <KPI label="Total Likes" value={totalLikes} color="#34d399" icon={ThumbsUp} />
-        <KPI label="Total Comments" value={totalComments} color="#fbbf24" icon={MessageCircle} />
+        <KPI label={channelLabel} value={kpiData.total_channels} color="#60a5fa" icon={MonitorPlay} />
+        <KPI label="Videos" value={kpiData.total_videos} color="#f87171" icon={Video} />
+        <KPI label="Total Views" value={kpiData.total_views} color="#818cf8" icon={Eye} />
+        <KPI label="Total Likes" value={kpiData.total_likes} color="#34d399" icon={ThumbsUp} />
+        <KPI label="Total Comments" value={kpiData.total_comments} color="#fbbf24" icon={MessageCircle} />
       </div>
 
       {/* INSIGHTS STRIP */}

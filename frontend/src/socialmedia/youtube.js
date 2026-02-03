@@ -10,6 +10,8 @@ import {
 } from "recharts";
 import { ChevronDown, ArrowUp, ArrowDown, Trophy, Eye, ThumbsUp, MessageCircle, ExternalLink, Video, MonitorPlay, TrendingUp, Zap, Calendar, Filter } from "lucide-react";
 
+const API_BASE_URL = "https://merge-healing-reducing-qualities.trycloudflare.com";
+
 const toNumber = (v) => {
   if (v === null || v === undefined) return 0;
   if (typeof v === "number") return v;
@@ -92,7 +94,7 @@ export function YoutubeTracking() {
         ...(toDate && { toDate }),
       });
 
-      const res = await fetch(`https://merge-healing-reducing-qualities.trycloudflare.com/videos?${params}`);
+      const res = await fetch(`${API_BASE_URL}/videos?${params}`);
       if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
       const data = await res.json();
 
@@ -135,9 +137,9 @@ export function YoutubeTracking() {
       });
 
       const [viewsRes, likesRes, commentsRes] = await Promise.all([
-        fetch(`https://merge-healing-reducing-qualities.trycloudflare.com/videos/top10?metric=views&${params}`),
-        fetch(`https://merge-healing-reducing-qualities.trycloudflare.com/videos/top10?metric=likes&${params}`),
-        fetch(`https://merge-healing-reducing-qualities.trycloudflare.com/videos/top10?metric=comments&${params}`)
+        fetch(`${API_BASE_URL}/videos/top10?metric=views&${params}`),
+        fetch(`${API_BASE_URL}/videos/top10?metric=likes&${params}`),
+        fetch(`${API_BASE_URL}/videos/top10?metric=comments&${params}`)
       ]);
 
       const [viewsData, likesData, commentsData] = await Promise.all([

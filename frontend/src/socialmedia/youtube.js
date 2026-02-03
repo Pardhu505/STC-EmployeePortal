@@ -70,7 +70,6 @@ export function YoutubeTracking() {
   const [hasNext, setHasNext] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedChannels, setSelectedChannels] = useState([]);
-  const [videoType, setVideoType] = useState("All");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [sortConfig, setSortConfig] = useState({ key: null, direction: "asc" });
@@ -218,11 +217,6 @@ export function YoutubeTracking() {
 
   const finalVideos = React.useMemo(() => {
     let filtered = [...videos];
-    if (videoType === "Shorts") {
-      filtered = filtered.filter(v => (v.title || "").toLowerCase().includes("#shorts"));
-    } else if (videoType === "Videos") {
-      filtered = filtered.filter(v => !(v.title || "").toLowerCase().includes("#shorts"));
-    }
 
     if (sortConfig.key) {
       filtered.sort((a, b) => {
@@ -258,7 +252,7 @@ export function YoutubeTracking() {
       });
     }
     return filtered;
-  }, [videos, videoType, sortConfig]);
+  }, [videos, sortConfig]);
 
   const top10ByViews = topVideos.byViews;
   const top10ByLikes = topVideos.byLikes;
@@ -299,21 +293,6 @@ export function YoutubeTracking() {
         <h1 className="text-xl md:text-3xl font-bold text-[#225F8B] text-center md:text-left">
           Youtube Live Dashboard Of Party In-House Channels
         </h1>
-        <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-lg p-1 shadow-sm">
-          {["All", "Videos", "Shorts"].map(type => (
-            <button
-              key={type}
-              onClick={() => setVideoType(type)}
-              className={`px-3 py-1 rounded text-xs font-bold transition-all ${
-                videoType === type 
-                ? "bg-gradient-to-r from-blue-500 to-cyan-500 text-white shadow-md" 
-                : "text-gray-600 hover:bg-gray-100"
-              }`}
-            >
-              {type}
-            </button>
-          ))}
-        </div>
         <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-lg p-2 shadow-sm">
           <div className="text-xs text-gray-500 uppercase tracking-wide">Date Range</div>
           <input
@@ -405,20 +384,22 @@ export function YoutubeTracking() {
       </div>
 
       {/* INSIGHTS STRIP */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        {insights.map((insight, i) => (
-          <div key={i} className="bg-white border border-gray-200 rounded-xl p-4 flex items-center gap-4 shadow-sm">
-            <div className="p-3 rounded-full" style={{ background: `linear-gradient(135deg, ${insight.color}15, ${insight.color}30)`, color: insight.color }}>
-              <insight.icon size={20} />
+      {selectedChannels.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          {insights.map((insight, i) => (
+            <div key={i} className="bg-white border border-gray-200 rounded-xl p-4 flex items-center gap-4 shadow-sm">
+              <div className="p-3 rounded-full" style={{ background: `linear-gradient(135deg, ${insight.color}15, ${insight.color}30)`, color: insight.color }}>
+                <insight.icon size={20} />
+              </div>
+              <div>
+                <div className="text-xs font-bold text-gray-400 uppercase">{insight.label}</div>
+                <div className="text-lg font-bold text-gray-800">{insight.value}</div>
+                <div className="text-[10px] text-gray-500">{insight.sub}</div>
+              </div>
             </div>
-            <div>
-              <div className="text-xs font-bold text-gray-400 uppercase">{insight.label}</div>
-              <div className="text-lg font-bold text-gray-800">{insight.value}</div>
-              <div className="text-[10px] text-gray-500">{insight.sub}</div>
-            </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
       {/* CHARTS */}
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-2 md:gap-4 mb-4 md:mb-6">

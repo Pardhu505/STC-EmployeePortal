@@ -59,6 +59,7 @@ const KPI = ({ label, value, color, icon: Icon }) => (
 ------------------------- */
 export function YoutubeTracking() {
   const [videos, setVideos] = useState([]);
+  const [topVideos, setTopVideos] = useState({ byViews: [], byLikes: [], byComments: [] });
   const [error, setError] = useState(null);
   const [cursor, setCursor] = useState(null);
   const [hasNext, setHasNext] = useState(true);
@@ -131,8 +132,51 @@ export function YoutubeTracking() {
     }
   }, [cursor, selectedChannels, fromDate, toDate, isLoading]);
 
+  const fetchTopVideos = useCallback(async () => {
+    try {
+      const params = new URLSearchParams({
+        ...(selectedChannels.length && { channels: selectedChannels.join(",") }),
+        ...(fromDate && { fromDate }),
+        ...(toDate && { toDate }),
+      });
+
+      const [viewsRes, likesRes, commentsRes] = await Promise.all([
+        fetch(`https://merge-healing-reducing-qualities.trycloudflare.com/videos/top10?metric=views&${params}`),
+        fetch(`https://merge-healing-reducing-qualities.trycloudflare.com/videos/top10?metric=likes&${params}`),
+        fetch(`https://merge-healing-reducing-qualities.trycloudflare.com/videos/top10?metric=comments&${params}`)
+      ]);
+
+      const [viewsData, likesData, commentsData] = await Promise.all([
+        viewsRes.json(),
+        likesRes.json(),
+        commentsRes.json()
+      ]);
+
+      const transform = (v) => ({
+          id: v.video_id,
+          title: v.video_title,
+          views: v.viewCount,
+          likes: v.likeCount,
+          comments: v.commentCount,
+          channel: v.channel_handle,
+          channel_id: v.channel_id,
+          upload_date: v.publishedAt || v.retrieved_at,
+          thumbnail: v.thumbnail_url
+      });
+
+      setTopVideos({
+        byViews: (viewsData.items || []).map(transform),
+        byLikes: (likesData.items || []).map(transform),
+        byComments: (commentsData.items || []).map(transform)
+      });
+    } catch (err) {
+      console.error("Error fetching top videos:", err);
+    }
+  }, [selectedChannels, fromDate, toDate]);
+
   useEffect(() => {
     fetchVideos(true);
+    fetchTopVideos();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedChannels, fromDate, toDate]);
 
@@ -202,21 +246,9 @@ export function YoutubeTracking() {
     return filtered;
   }, [globallySortedVideos, videoType]);
 
-  const filteredVideosForCharts = React.useMemo(() => {
-    return finalVideos;
-  }, [finalVideos]);
-
-  const top10ByViews = React.useMemo(() => {
-    return [...filteredVideosForCharts].sort((a, b) => toNumber(b.views) - toNumber(a.views)).slice(0, 10);
-  }, [filteredVideosForCharts]);
-
-  const top10ByLikes = React.useMemo(() => {
-    return [...filteredVideosForCharts].sort((a, b) => toNumber(b.likes) - toNumber(a.likes)).slice(0, 10);
-  }, [filteredVideosForCharts]);
-
-  const top10ByComments = React.useMemo(() => {
-    return [...filteredVideosForCharts].sort((a, b) => toNumber(b.comments) - toNumber(a.comments)).slice(0, 10);
-  }, [filteredVideosForCharts]);
+  const top10ByViews = topVideos.byViews;
+  const top10ByLikes = topVideos.byLikes;
+  const top10ByComments = topVideos.byComments;
 
   const insights = React.useMemo(() => {
     if (!finalVideos.length) return [];

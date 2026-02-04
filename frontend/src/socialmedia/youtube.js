@@ -10,7 +10,7 @@ import {
 } from "recharts";
 import { ChevronDown, ArrowUp, ArrowDown, Trophy, Eye, ThumbsUp, MessageCircle, ExternalLink, Video, MonitorPlay, TrendingUp, Zap, Calendar, Filter } from "lucide-react";
 
-const API_BASE_URL = "https://rise-supporting-discounts-picture.trycloudflare.com";
+const API_BASE_URL = "https://rim-guards-implied-navy.trycloudflare.com";
 
 const toNumber = (v) => {
   if (v === null || v === undefined) return 0;

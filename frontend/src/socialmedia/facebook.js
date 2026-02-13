@@ -8,7 +8,6 @@ import {
   AreaChart,
   Area,
 } from "recharts";
-import { API_BASE_URL } from "../config/api";
 import { 
   ArrowUp, 
   ArrowDown, 
@@ -28,6 +27,8 @@ import {
   AtSign,
 } from "lucide-react";
 
+const API_BASE_URL = "https://garlic-landscapes-walnut-thanksgiving.trycloudflare.com";
+
 /* -------------------------
    HELPERS
 ------------------------- */
@@ -46,6 +47,10 @@ const parseFbNumber = (str) => {
 
 const parseDate = (dateStr) => {
   if (!dateStr) return null;
+  // Handle YYYY-MM-DD
+  if (dateStr.includes('-')) {
+    return new Date(dateStr);
+  }
   const parts = dateStr.split('/');
   if (parts.length === 3) {
     return new Date(`${parts[2]}-${parts[1]}-${parts[0]}`); // YYYY-MM-DD
@@ -263,7 +268,9 @@ const DateArcSelector = ({ options, selected, onSelect }) => {
    MAIN COMPONENT
 ------------------------- */
 export function FacebookTracking() {
-  const [data, setData] = useState(null);
+  const [posts, setPosts] = useState([]);
+  const [pagination, setPagination] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [selectedPages, setSelectedPages] = useState([]);
   const [selectedPostIds, setSelectedPostIds] = useState([]);
@@ -331,22 +338,30 @@ export function FacebookTracking() {
     }
   }, [datePreset]);
 
-  useEffect(() => {
-    fetch(`${API_BASE_URL}/api/facebook/data`)
-      .then(res => {
-        if (!res.ok) {
-          throw new Error(`HTTP error! status: ${res.status}`);
-        }
-        return res.json();
-      })
-      .then(json => setData(json))
-      .catch(err => {
-        console.error("Failed to load JSON", err);
-        setError(err.message);
-      });
+  const fetchPosts = useCallback(async (pageNum = 1, isReset = false) => {
+    setIsLoading(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/facebook/data?page=${pageNum}&limit=50`);
+      if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+      const json = await res.json();
+      
+      if (json.data) {
+        setPosts(prev => isReset ? json.data : [...prev, ...json.data]);
+        setPagination(json.pagination);
+      }
+    } catch (err) {
+      console.error("Failed to load data", err);
+      setError(err.message);
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
 
-  const pageUrls = useMemo(() => (data && data.pages) ? Array.from(new Set(data.pages.map(p => p.page_url))) : [], [data]);
+  useEffect(() => {
+    fetchPosts(1, true);
+  }, [fetchPosts]);
+
+  const pageUrls = useMemo(() => Array.from(new Set(posts.map(p => p.channel_url).filter(Boolean))), [posts]);
 
   const handlePageToggle = (url) => {
     setSelectedPages((prev) => {
@@ -366,49 +381,38 @@ export function FacebookTracking() {
 
   // Available posts for the single selected channel (for the dropdown options)
   const availablePosts = useMemo(() => {
-    if (selectedPages.length !== 1 || !data || !data.pages) return [];
-    const page = data.pages.find(p => p.page_url === selectedPages[0]);
-    if (!page || !page.posts) return [];
-    return page.posts.map((post, index) => ({
-      id: `${page.page_url}-${index}`,
-      caption: post.caption || `Post ${index + 1}`
+    if (selectedPages.length !== 1) return [];
+    return posts
+      .filter(p => p.channel_url === selectedPages[0])
+      .map((p, i) => ({
+        id: p._id || `${p.channel_url}-${i}`,
+        caption: p.caption || `Post ${i + 1}`
     }));
-  }, [data, selectedPages]);
+  }, [posts, selectedPages]);
 
   // --- Process Data ---
   const processedData = useMemo(() => {
-    if (!data || !data.pages) return { posts: [], summary: {} };
-
-    let filteredPages = data.pages;
-    // If selectedPages is not empty, filter by them. Otherwise use all.
+    let filteredPosts = posts;
+    
     if (selectedPages.length > 0) {
-      filteredPages = data.pages.filter(p => selectedPages.includes(p.page_url));
+      filteredPosts = posts.filter(p => selectedPages.includes(p.channel_url));
     }
 
-    // Flatten posts
-    let allPosts = [];
-    filteredPages.forEach(page => {
-      if (page.posts) {
-        // Assuming posts are scraped latest first. 
-        // We add page info to each post for the table
-        const pagePosts = page.posts.map((post, index) => ({
-          ...post,
-          id: `${page.page_url}-${index}`,
-          page_url: page.page_url,
-          likesVal: parseFbNumber(post.likes),
-          commentsVal: parseFbNumber(post.comments),
-          sharesVal: parseFbNumber(post.shares),
-          viewsVal: parseFbNumber(post.views),
-          engagementVal: post.engagement || 0,
-          mentions: post.mentions || [],
-          mentionsVal: (post.mentions || []).length,
-          followersVal: parseFbNumber(page.followers), // Added for Followers Trend
-          // Create a short label for charts
-          label: `Post ${page.posts.length - index}` 
-        }));
-        allPosts = [...allPosts, ...pagePosts];
-      }
-    });
+    let allPosts = filteredPosts.map((post, index) => ({
+      ...post,
+      id: post._id || `${post.channel_url}-${index}`,
+      page_url: post.channel_url,
+      post_url: post.url,
+      likesVal: parseFbNumber(post.likes),
+      commentsVal: parseFbNumber(post.comments),
+      sharesVal: parseFbNumber(post.shares),
+      viewsVal: parseFbNumber(post.views),
+      engagementVal: (parseFbNumber(post.likes) + parseFbNumber(post.comments) + parseFbNumber(post.shares)),
+      mentions: post.mentions || [],
+      mentionsVal: (post.mentions || []).length,
+      followersVal: parseFbNumber(post.followers),
+      label: `Post ${index}`
+    }));
 
     // Filter posts if single page selected and post filter is active
     if (selectedPages.length === 1 && selectedPostIds.length > 0) {
@@ -417,9 +421,9 @@ export function FacebookTracking() {
 
     // Filter by Post Type (Videos vs Posts)
     if (postType === "Videos") {
-      allPosts = allPosts.filter(p => p.post_url && (p.post_url.includes("/videos/") || p.post_url.includes("/reel/")));
+      allPosts = allPosts.filter(p => p.type === "Video" || p.type === "Reel" || (p.post_url && (p.post_url.includes("/videos/") || p.post_url.includes("/reel/"))));
     } else if (postType === "Posts") {
-      allPosts = allPosts.filter(p => !p.post_url || (!p.post_url.includes("/videos/") && !p.post_url.includes("/reel/")));
+      allPosts = allPosts.filter(p => p.type === "Post" && (!p.post_url || (!p.post_url.includes("/videos/") && !p.post_url.includes("/reel/"))));
     }
 
     // Filter by Date Range
@@ -439,10 +443,17 @@ export function FacebookTracking() {
     allPosts.sort((a, b) => b.likesVal - a.likesVal);
     const slicedPosts = allPosts.slice(0, topN);
 
+    const uniqueChannels = new Set(filteredPosts.map(p => p.channel_url));
+    let totalFollowers = 0;
+    uniqueChannels.forEach(url => {
+        const p = filteredPosts.find(post => post.channel_url === url);
+        if (p) totalFollowers += parseFbNumber(p.followers);
+    });
+
     // Calculate Summary
     const summary = {
-      totalAccounts: filteredPages.length,
-      totalFollowers: filteredPages.reduce((acc, p) => acc + parseFbNumber(p.followers), 0),
+      totalAccounts: uniqueChannels.size,
+      totalFollowers: totalFollowers,
       totalPosts: allPosts.length,
       totalLikes: slicedPosts.reduce((acc, p) => acc + p.likesVal, 0),
       totalComments: slicedPosts.reduce((acc, p) => acc + p.commentsVal, 0),
@@ -450,8 +461,8 @@ export function FacebookTracking() {
       totalEngagement: slicedPosts.reduce((acc, p) => acc + p.engagementVal, 0),
     };
 
-    return { posts: slicedPosts, summary, pages: data.pages };
-  }, [data, selectedPages, selectedPostIds, startDate, endDate, topN, postType]);
+    return { posts: slicedPosts, summary };
+  }, [posts, selectedPages, selectedPostIds, startDate, endDate, topN, postType]);
 
   // --- Display Data (Top N based on selection) ---
   const displayablePosts = useMemo(() => {
@@ -518,7 +529,7 @@ export function FacebookTracking() {
   };
 
   if (error) return <div className="p-10 text-center text-red-600">Error loading data: {error}</div>;
-  if (!data) return <div className="p-10 text-center">Loading dashboard...</div>;
+  if (isLoading && posts.length === 0) return <div className="p-10 text-center">Loading dashboard...</div>;
 
   return (
     <div className="p-2 md:p-6 bg-gray-50 min-h-screen text-gray-800 w-full max-w-full overflow-x-hidden">
@@ -914,6 +925,17 @@ export function FacebookTracking() {
             </tbody>
           </table>
         </div>
+      </div>
+
+      {/* LOAD MORE */}
+      <div className="flex justify-center mt-6 mb-10">
+        <button
+          onClick={() => fetchPosts((pagination?.page || 1) + 1, false)}
+          disabled={isLoading || (pagination && pagination.page >= pagination.total_pages)}
+          className="px-6 py-2 bg-blue-600 text-white rounded-lg font-semibold shadow-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        >
+          {isLoading ? "Loading..." : (pagination && pagination.page < pagination.total_pages) ? "Load More Posts" : "No More Posts"}
+        </button>
       </div>
     </div>
   );

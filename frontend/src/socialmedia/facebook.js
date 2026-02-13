@@ -26,7 +26,6 @@ import {
   Check,
   X,
   Zap,
-  AtSign,
   Eye,
 } from "lucide-react";
 

@@ -7,6 +7,8 @@ import {
   CartesianGrid,
   AreaChart,
   Area,
+  BarChart,
+  Bar,
 } from "recharts";
 import { 
   ArrowUp, 
@@ -25,6 +27,7 @@ import {
   X,
   Zap,
   AtSign,
+  Eye,
 } from "lucide-react";
 
 const API_BASE_URL = "https://garlic-landscapes-walnut-thanksgiving.trycloudflare.com";
@@ -264,6 +267,59 @@ const DateArcSelector = ({ options, selected, onSelect }) => {
   );
 };
 
+const TopAccountsChart = ({ data }) => {
+  const [metric, setMetric] = useState('engagement'); // 'engagement' or 'posts'
+
+  const chartData = useMemo(() => {
+    const stats = {};
+    data.forEach(p => {
+       const key = p.page_url;
+       if (!stats[key]) {
+         stats[key] = { name: p.channel_name || key, engagement: 0, posts: 0 };
+       }
+       stats[key].engagement += p.engagementVal;
+       stats[key].posts += 1;
+    });
+    
+    let arr = Object.values(stats);
+    arr.sort((a, b) => b[metric] - a[metric]);
+    return arr.slice(0, 10);
+  }, [data, metric]);
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden flex flex-col h-full min-w-0">
+       <div className="p-3 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+         <h3 className="font-bold text-sm text-gray-700">Top 10 Accounts</h3>
+         <div className="flex gap-1">
+           <button 
+             onClick={() => setMetric('engagement')}
+             className={`px-2 py-1 text-[10px] rounded transition-colors ${metric === 'engagement' ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'}`}
+           >
+             Engagement
+           </button>
+           <button 
+             onClick={() => setMetric('posts')}
+             className={`px-2 py-1 text-[10px] rounded transition-colors ${metric === 'posts' ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'}`}
+           >
+             Posts
+           </button>
+         </div>
+       </div>
+       <div className="p-2 flex-1 h-48">
+         <ResponsiveContainer width="100%" height="100%">
+           <BarChart data={chartData} layout="vertical" margin={{ top: 5, right: 30, left: 40, bottom: 5 }}>
+             <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f3f4f6" />
+             <XAxis type="number" hide />
+             <YAxis type="category" dataKey="name" width={80} tick={{fontSize: 10}} interval={0} />
+             <Tooltip cursor={{fill: '#f9fafb'}} contentStyle={{fontSize: '12px', borderRadius: '8px'}} />
+             <Bar dataKey={metric} fill={metric === 'engagement' ? '#facc15' : '#818cf8'} radius={[0, 4, 4, 0]} barSize={12} />
+           </BarChart>
+         </ResponsiveContainer>
+       </div>
+    </div>
+  );
+};
+
 /* -------------------------
    MAIN COMPONENT
 ------------------------- */
@@ -461,7 +517,7 @@ export function FacebookTracking() {
       totalEngagement: slicedPosts.reduce((acc, p) => acc + p.engagementVal, 0),
     };
 
-    return { posts: slicedPosts, summary };
+    return { posts: slicedPosts, summary, allFilteredPosts: allPosts };
   }, [posts, selectedPages, selectedPostIds, startDate, endDate, topN, postType]);
 
   // --- Display Data (Top N based on selection) ---
@@ -854,15 +910,19 @@ export function FacebookTracking() {
           icon={Zap} 
         />
 
-        {/* 6. MENTIONS CHART */}
-        <TrendChart 
-          title="Mentions Count Trend" 
-          data={chartData} 
-          dataKey="mentionsVal" 
-          color="#ec4899" 
-          color2="#f472b6"
-          icon={AtSign} 
-        />
+        {/* 6. TOP ACCOUNTS / PROFILE GROWTH */}
+        {selectedPages.length === 1 ? (
+           <TrendChart 
+             title="Views Trend" 
+             data={chartData} 
+             dataKey="viewsVal" 
+             color="#ec4899" 
+             color2="#f472b6"
+             icon={Eye} 
+           />
+        ) : (
+           <TopAccountsChart data={processedData.allFilteredPosts} />
+        )}
       </div>
 
       {/* TABLE */}

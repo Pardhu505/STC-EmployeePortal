@@ -29,7 +29,7 @@ import {
   Eye,
 } from "lucide-react";
 
-const API_BASE_URL = "https://okay-contains-middle-photograph.trycloudflare.com";
+const API_BASE_URL = "https://cheats-slim-leg-cannon.trycloudflare.com";
 
 /* -------------------------
    HELPERS
@@ -339,6 +339,7 @@ export function FacebookTracking() {
   const [datePreset, setDatePreset] = useState('all_time');
   const [postType, setPostType] = useState("All");
   const [topN, setTopN] = useState(20);
+  const [kpis, setKpis] = useState({ best_posting_day: "N/A" });
 
   const PRESET_LABELS = ['All Time', 'Yesterday', 'This Month', 'This Year', 'Custom'];
 
@@ -400,9 +401,32 @@ export function FacebookTracking() {
       if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
       const json = await res.json();
       
-      if (json.data) {
-        setPosts(prev => isReset ? json.data : [...prev, ...json.data]);
-        setPagination(json.pagination);
+      // Handle both { data: [...] } and raw [...] responses from the new DB source
+      let fetchedData = Array.isArray(json) ? json : (json.data || []);
+      const paginationData = json.pagination || null;
+
+      if (fetchedData.length > 0) {
+        // Flatten nested structure if present (channels -> posts)
+        let flatPosts = [];
+        if (fetchedData[0] && Array.isArray(fetchedData[0].posts)) {
+            fetchedData.forEach(channel => {
+                if (Array.isArray(channel.posts)) {
+                    channel.posts.forEach(p => {
+                        flatPosts.push({
+                            ...p,
+                            channel_name: channel.channel_name,
+                            channel_url: channel.channel_url,
+                            followers: channel.followers
+                        });
+                    });
+                }
+            });
+        } else {
+            flatPosts = fetchedData;
+        }
+
+        setPosts(prev => isReset ? flatPosts : [...prev, ...flatPosts]);
+        setPagination(paginationData);
       }
     } catch (err) {
       console.error("Failed to load data", err);
@@ -415,6 +439,25 @@ export function FacebookTracking() {
   useEffect(() => {
     fetchPosts(1, true);
   }, [fetchPosts]);
+
+  useEffect(() => {
+    const fetchKpis = async () => {
+        try {
+            let url = `${API_BASE_URL}/api/facebook/kpis`;
+            if (selectedPages.length === 1) {
+                url += `?channel_url=${encodeURIComponent(selectedPages[0])}`;
+            }
+            const res = await fetch(url);
+            const data = await res.json();
+            if (data.best_posting_day) {
+                setKpis(prev => ({ ...prev, best_posting_day: data.best_posting_day }));
+            }
+        } catch (e) {
+            console.error(e);
+        }
+    };
+    fetchKpis();
+  }, [selectedPages]);
 
   const pageUrls = useMemo(() => Array.from(new Set(posts.map(p => p.channel_url).filter(Boolean))), [posts]);
 
@@ -831,7 +874,7 @@ export function FacebookTracking() {
                   <Calendar size={24} />
               </div>
               <div className="text-xs font-bold uppercase tracking-wider mb-1 text-pink-700">Best Posting Day</div>
-              <div className="text-2xl font-black text-pink-800">{insights.bestDay}</div>
+              <div className="text-2xl font-black text-pink-800">{kpis.best_posting_day}</div>
           </div>
         )}
       </div>

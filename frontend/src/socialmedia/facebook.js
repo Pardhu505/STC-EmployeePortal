@@ -38,7 +38,7 @@ const parseFbNumber = (str) => {
   if (!str) return 0;
   if (typeof str === 'number') return str;
   let s = String(str).toUpperCase().replace(/,/g, '').trim();
-  if (s.includes('K')) {
+  if (s.includes('K')) {''
     return parseFloat(s.replace('K', '')) * 1000;
   }
   if (s.includes('M')) {
@@ -406,26 +406,9 @@ export function FacebookTracking() {
       const paginationData = json.pagination || null;
 
       if (fetchedData.length > 0) {
-        // Flatten nested structure if present (channels -> posts)
-        let flatPosts = [];
-        if (fetchedData[0] && Array.isArray(fetchedData[0].posts)) {
-            fetchedData.forEach(channel => {
-                if (Array.isArray(channel.posts)) {
-                    channel.posts.forEach(p => {
-                        flatPosts.push({
-                            ...p,
-                            channel_name: channel.channel_name,
-                            channel_url: channel.channel_url,
-                            followers: channel.followers
-                        });
-                    });
-                }
-            });
-        } else {
-            flatPosts = fetchedData;
-        }
+        // Backend now prepares the data (flattened posts), so we use it directly
 
-        setPosts(prev => isReset ? flatPosts : [...prev, ...flatPosts]);
+        setPosts(prev => isReset ? fetchedData : [...prev, ...fetchedData]);
         setPagination(paginationData);
       }
     } catch (err) {

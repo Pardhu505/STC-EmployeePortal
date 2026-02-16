@@ -38,7 +38,7 @@ const parseFbNumber = (str) => {
   if (!str) return 0;
   if (typeof str === 'number') return str;
   let s = String(str).toUpperCase().replace(/,/g, '').trim();
-  if (s.includes('K')) {''
+  if (s.includes('K')) {
     return parseFloat(s.replace('K', '')) * 1000;
   }
   if (s.includes('M')) {

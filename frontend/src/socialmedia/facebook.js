@@ -47,18 +47,7 @@ const parseFbNumber = (str) => {
   return parseFloat(s) || 0;
 };
 
-const parseDate = (dateStr) => {
-  if (!dateStr) return null;
-  // Handle YYYY-MM-DD
-  if (dateStr.includes('-')) {
-    return new Date(dateStr);
-  }
-  const parts = dateStr.split('/');
-  if (parts.length === 3) {
-    return new Date(`${parts[2]}-${parts[1]}-${parts[0]}`); // YYYY-MM-DD
-  }
-  return null;
-};
+
 
 /* -------------------------
    KPI CARD
@@ -345,7 +334,6 @@ export function FacebookTracking() {
   const [backendKpis, setBackendKpis] = useState({});
   const [backendChannels, setBackendChannels] = useState([]);
   const [backendTopPosts, setBackendTopPosts] = useState([]);
-  const [backendTopAccounts, setBackendTopAccounts] = useState([]);
   const [bestPostingDay, setBestPostingDay] = useState("N/A");
 
   const PRESET_LABELS = ['All Time', 'Yesterday', 'This Month', 'This Year', 'Custom'];
@@ -432,7 +420,6 @@ export function FacebookTracking() {
       if (json.kpis) setBackendKpis(json.kpis);
       if (json.channels) setBackendChannels(json.channels);
       if (json.top_posts) setBackendTopPosts(json.top_posts);
-      if (json.top_accounts) setBackendTopAccounts(json.top_accounts);
       if (json.best_posting_day) setBestPostingDay(json.best_posting_day);
       setKpis(prev => ({ ...prev, best_posting_day: json.best_posting_day || 'N/A' }));
 

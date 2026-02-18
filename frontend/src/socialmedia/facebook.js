@@ -29,7 +29,7 @@ import {
   Eye,
 } from "lucide-react";
 
-const API_BASE_URL = "https://cheats-slim-leg-cannon.trycloudflare.com";
+const API_BASE_URL = "https://precipitation-mrs-video-flights.trycloudflare.com";
 
 /* -------------------------
    HELPERS

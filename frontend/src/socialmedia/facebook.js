@@ -29,7 +29,7 @@ import {
   Eye,
 } from "lucide-react";
 
-const API_BASE_URL = "https://deviant-modules-royal-pages.trycloudflare.com";
+const API_BASE_URL = "https://training-eval-cho-genetics.trycloudflare.com";
 
 /* -------------------------
    HELPERS

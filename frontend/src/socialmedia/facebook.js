@@ -10,17 +10,17 @@ import {
   BarChart,
   Bar,
 } from "recharts";
-import { 
-  ArrowUp, 
-  ArrowDown, 
-  ThumbsUp, 
-  MessageCircle, 
-  ExternalLink, 
-  Share2, 
-  FileText, 
-  Users, 
+import {
+  ArrowUp,
+  ArrowDown,
+  ThumbsUp,
+  MessageCircle,
+  ExternalLink,
+  Share2,
+  FileText,
+  Users,
   Calendar,
-  Filter, 
+  Filter,
   ChevronDown,
   MonitorPlay,
   Check,
@@ -64,9 +64,9 @@ const parseDate = (dateStr) => {
    KPI CARD
 ------------------------- */
 const KPI = ({ label, value, color, icon: Icon, className }) => (
-  <div 
+  <div
     className="bg-white rounded-xl p-4 flex items-center justify-between relative overflow-hidden transition-transform hover:-translate-y-1"
-    style={{ 
+    style={{
       boxShadow: `4px 4px 0px 0px ${color}`,
       border: `2px solid ${color}`
     }}
@@ -78,26 +78,26 @@ const KPI = ({ label, value, color, icon: Icon, className }) => (
       </div>
     </div>
     {Icon && (
-      <div 
+      <div
         className="p-2 rounded-lg z-10"
         style={{ background: `linear-gradient(135deg, ${color}20, ${color}40)`, color: color }}
       >
         <Icon size={20} />
       </div>
     )}
-    <div 
+    <div
       className="absolute -right-4 -bottom-4 w-20 h-20 rounded-full opacity-10 z-0"
       style={{ backgroundColor: color }}
     />
   </div>
 );
 
-const ArcSlider = ({ 
-  value, 
-  min, 
-  max, 
-  onChange, 
-  label, 
+const ArcSlider = ({
+  value,
+  min,
+  max,
+  onChange,
+  label,
   colors = { start: "#8A1974", end: "#CC18A8", track: "#fce7f3", text: "#8A1974" },
   size = 200,
   formatValue
@@ -142,15 +142,15 @@ const ArcSlider = ({
     const dx = clientX - centerX;
     const dy = clientY - centerY;
     let deg = Math.atan2(dy, dx) * 180 / Math.PI;
-    
+
     let effectiveAngle = 0;
-    if (deg < 0) { effectiveAngle = deg; } 
+    if (deg < 0) { effectiveAngle = deg; }
     else { effectiveAngle = deg > 90 ? -180 : 0; }
-    
+
     let pct = (effectiveAngle + 180) / 180;
     if (pct < 0) pct = 0;
     if (pct > 1) pct = 1;
-    
+
     const step = 1; // Assuming step is 1 for this slider
     const rawValue = min + pct * (max - min);
     const newValue = Math.round(rawValue / step) * step;
@@ -166,7 +166,7 @@ const ArcSlider = ({
     const handleMouseMove = (e) => { if (isDragging) { e.preventDefault(); updateValue(e.clientX, e.clientY); } };
     const handleMouseUp = () => { setIsDragging(false); };
     const handleTouchMove = (e) => { if (isDragging && e.touches.length > 0) { e.preventDefault(); updateValue(e.touches[0].clientX, e.touches[0].clientY); } };
-    
+
     if (isDragging) {
       window.addEventListener('mousemove', handleMouseMove);
       window.addEventListener('mouseup', handleMouseUp);
@@ -185,11 +185,11 @@ const ArcSlider = ({
 
   return (
     <div className="flex flex-col items-center justify-center w-full select-none py-2" style={{ width: '100%' }}>
-      <svg ref={svgRef} width="100%" viewBox={`0 0 ${width} ${height}`} className="cursor-pointer touch-none w-full h-full max-h-[250px] overflow-visible" onMouseDown={handleMouseDown} onTouchStart={(e) => { if(e.touches.length > 0) { setIsDragging(true); updateValue(e.touches[0].clientX, e.touches[0].clientY); } }}>
+      <svg ref={svgRef} width="100%" viewBox={`0 0 ${width} ${height}`} className="cursor-pointer touch-none w-full h-full max-h-[250px] overflow-visible" onMouseDown={handleMouseDown} onTouchStart={(e) => { if (e.touches.length > 0) { setIsDragging(true); updateValue(e.touches[0].clientX, e.touches[0].clientY); } }}>
         <defs><linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stopColor={colors.start} /><stop offset="100%" stopColor={colors.end} /></linearGradient></defs>
         <path d={trackPath} fill="none" stroke={colors.track} strokeWidth={strokeWidth} strokeLinecap="round" />
         <path d={progressPath} fill="none" stroke={`url(#${gradientId})`} strokeWidth={strokeWidth} strokeLinecap="round" />
-        <circle cx={current.x} cy={current.y} r={strokeWidth * 0.8} fill="#fff" stroke={colors.text} strokeWidth={3} style={{filter: 'drop-shadow(0px 2px 2px rgba(0,0,0,0.2))'}} />
+        <circle cx={current.x} cy={current.y} r={strokeWidth * 0.8} fill="#fff" stroke={colors.text} strokeWidth={3} style={{ filter: 'drop-shadow(0px 2px 2px rgba(0,0,0,0.2))' }} />
         <text x={cx} y={cy - (size * 0.20)} textAnchor="middle" className="font-bold" style={{ fontSize: size * 0.10, fill: colors.text, fontWeight: '800' }}>{displayValue}</text>
         <text x={cx} y={cy - (size * 0.08)} textAnchor="middle" className="font-medium uppercase tracking-wider" style={{ fontSize: size * 0.06, fill: colors.text }}>{label}</text>
       </svg>
@@ -199,7 +199,7 @@ const ArcSlider = ({
 
 const DateArcSelector = ({ options, selected, onSelect }) => {
   const [hovered, setHovered] = useState(null);
-  
+
   const width = 400;
   const height = 220;
   const cx = 200;
@@ -272,14 +272,14 @@ const TopAccountsChart = ({ data }) => {
   const chartData = useMemo(() => {
     const stats = {};
     data.forEach(p => {
-       const key = p.page_url;
-       if (!stats[key]) {
-         stats[key] = { name: p.channel_name || key, engagement: 0, posts: 0 };
-       }
-       stats[key].engagement += p.engagementVal;
-       stats[key].posts += 1;
+      const key = p.page_url;
+      if (!stats[key]) {
+        stats[key] = { name: p.channel_name || key, engagement: 0, posts: 0 };
+      }
+      stats[key].engagement += p.engagementVal;
+      stats[key].posts += 1;
     });
-    
+
     let arr = Object.values(stats);
     arr.sort((a, b) => b[metric] - a[metric]);
     return arr.slice(0, 10);
@@ -287,34 +287,34 @@ const TopAccountsChart = ({ data }) => {
 
   return (
     <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden flex flex-col h-full min-w-0">
-       <div className="p-3 border-b border-gray-100 flex justify-between items-center bg-gray-50">
-         <h3 className="font-bold text-sm text-gray-700">Top 10 Accounts</h3>
-         <div className="flex gap-1">
-           <button 
-             onClick={() => setMetric('engagement')}
-             className={`px-2 py-1 text-[10px] rounded transition-colors ${metric === 'engagement' ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'}`}
-           >
-             Engagement
-           </button>
-           <button 
-             onClick={() => setMetric('posts')}
-             className={`px-2 py-1 text-[10px] rounded transition-colors ${metric === 'posts' ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'}`}
-           >
-             Posts
-           </button>
-         </div>
-       </div>
-       <div className="p-2 flex-1 h-48">
-         <ResponsiveContainer width="100%" height="100%">
-           <BarChart data={chartData} layout="vertical" margin={{ top: 5, right: 30, left: 40, bottom: 5 }}>
-             <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f3f4f6" />
-             <XAxis type="number" hide />
-             <YAxis type="category" dataKey="name" width={80} tick={{fontSize: 10}} interval={0} />
-             <Tooltip cursor={{fill: '#f9fafb'}} contentStyle={{fontSize: '12px', borderRadius: '8px'}} />
-             <Bar dataKey={metric} fill={metric === 'engagement' ? '#facc15' : '#818cf8'} radius={[0, 4, 4, 0]} barSize={12} />
-           </BarChart>
-         </ResponsiveContainer>
-       </div>
+      <div className="p-3 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+        <h3 className="font-bold text-sm text-gray-700">Top 10 Accounts</h3>
+        <div className="flex gap-1">
+          <button
+            onClick={() => setMetric('engagement')}
+            className={`px-2 py-1 text-[10px] rounded transition-colors ${metric === 'engagement' ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'}`}
+          >
+            Engagement
+          </button>
+          <button
+            onClick={() => setMetric('posts')}
+            className={`px-2 py-1 text-[10px] rounded transition-colors ${metric === 'posts' ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'}`}
+          >
+            Posts
+          </button>
+        </div>
+      </div>
+      <div className="p-2 flex-1 h-48">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={chartData} layout="vertical" margin={{ top: 5, right: 30, left: 40, bottom: 5 }}>
+            <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f3f4f6" />
+            <XAxis type="number" hide />
+            <YAxis type="category" dataKey="name" width={80} tick={{ fontSize: 10 }} interval={0} />
+            <Tooltip cursor={{ fill: '#f9fafb' }} contentStyle={{ fontSize: '12px', borderRadius: '8px' }} />
+            <Bar dataKey={metric} fill={metric === 'engagement' ? '#facc15' : '#818cf8'} radius={[0, 4, 4, 0]} barSize={12} />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
     </div>
   );
 };
@@ -340,6 +340,13 @@ export function FacebookTracking() {
   const [postType, setPostType] = useState("All");
   const [topN, setTopN] = useState(20);
   const [kpis, setKpis] = useState({ best_posting_day: "N/A" });
+
+  // Backend-provided aggregated data
+  const [backendKpis, setBackendKpis] = useState({});
+  const [backendChannels, setBackendChannels] = useState([]);
+  const [backendTopPosts, setBackendTopPosts] = useState([]);
+  const [backendTopAccounts, setBackendTopAccounts] = useState([]);
+  const [bestPostingDay, setBestPostingDay] = useState("N/A");
 
   const PRESET_LABELS = ['All Time', 'Yesterday', 'This Month', 'This Year', 'Custom'];
 
@@ -394,55 +401,61 @@ export function FacebookTracking() {
     }
   }, [datePreset]);
 
-  const fetchPosts = useCallback(async (pageNum = 1, isReset = false) => {
+  const fetchPosts = useCallback(async (pageNum = 1) => {
     setIsLoading(true);
     try {
-      const res = await fetch(`${API_BASE_URL}/api/facebook/data?page=${pageNum}&limit=50`);
+      // Build query params — pass all filters to backend
+      const params = new URLSearchParams();
+      params.set('page', pageNum);
+      params.set('limit', '500');
+      if (selectedPages.length > 0) {
+        selectedPages.forEach(p => params.append('channels', p));
+      }
+      if (startDate) params.set('start_date', startDate);
+      if (endDate) params.set('end_date', endDate);
+      if (postType !== 'All') params.set('post_type', postType);
+
+      const res = await fetch(`${API_BASE_URL}/api/facebook/data?${params.toString()}`);
       if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
       const json = await res.json();
-      
-      // Handle both { data: [...] } and raw [...] responses from the new DB source
-      let fetchedData = Array.isArray(json) ? json : (json.data || []);
-      const paginationData = json.pagination || null;
 
-      if (fetchedData.length > 0) {
-        // Backend now prepares the data (flattened posts), so we use it directly
-
-        setPosts(prev => isReset ? fetchedData : [...prev, ...fetchedData]);
-        setPagination(paginationData);
+      if (json.error) {
+        throw new Error(json.error);
       }
+
+      // Store backend-provided data
+      const fetchedData = Array.isArray(json) ? json : (json.data || []);
+      setPosts(fetchedData);
+      setPagination(json.pagination || null);
+
+      // Use backend-computed KPIs, channels, top posts, etc.
+      if (json.kpis) setBackendKpis(json.kpis);
+      if (json.channels) setBackendChannels(json.channels);
+      if (json.top_posts) setBackendTopPosts(json.top_posts);
+      if (json.top_accounts) setBackendTopAccounts(json.top_accounts);
+      if (json.best_posting_day) setBestPostingDay(json.best_posting_day);
+      setKpis(prev => ({ ...prev, best_posting_day: json.best_posting_day || 'N/A' }));
+
     } catch (err) {
       console.error("Failed to load data", err);
       setError(err.message);
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [selectedPages, startDate, endDate, postType]);
 
+  // Re-fetch when filters change
   useEffect(() => {
-    fetchPosts(1, true);
+    fetchPosts(1);
   }, [fetchPosts]);
 
-  useEffect(() => {
-    const fetchKpis = async () => {
-        try {
-            let url = `${API_BASE_URL}/api/facebook/kpis`;
-            if (selectedPages.length === 1) {
-                url += `?channel_url=${encodeURIComponent(selectedPages[0])}`;
-            }
-            const res = await fetch(url);
-            const data = await res.json();
-            if (data.best_posting_day) {
-                setKpis(prev => ({ ...prev, best_posting_day: data.best_posting_day }));
-            }
-        } catch (e) {
-            console.error(e);
-        }
-    };
-    fetchKpis();
-  }, [selectedPages]);
-
-  const pageUrls = useMemo(() => Array.from(new Set(posts.map(p => p.channel_url).filter(Boolean))), [posts]);
+  // Use backend channels list (all channels in DB), fall back to posts if empty
+  const pageUrls = useMemo(() => {
+    if (backendChannels.length > 0) {
+      return backendChannels.map(c => c._id).filter(Boolean);
+    }
+    return Array.from(new Set(posts.map(p => p.channel_url).filter(Boolean)));
+  }, [backendChannels, posts]);
 
   const handlePageToggle = (url) => {
     setSelectedPages((prev) => {
@@ -468,18 +481,14 @@ export function FacebookTracking() {
       .map((p, i) => ({
         id: p._id || `${p.channel_url}-${i}`,
         caption: p.caption || `Post ${i + 1}`
-    }));
+      }));
   }, [posts, selectedPages]);
 
   // --- Process Data ---
   const processedData = useMemo(() => {
-    let filteredPosts = posts;
-    
-    if (selectedPages.length > 0) {
-      filteredPosts = posts.filter(p => selectedPages.includes(p.channel_url));
-    }
-
-    let allPosts = filteredPosts.map((post, index) => ({
+    // Posts are already filtered by backend (channels, date, post_type)
+    // Only apply client-side sub-filters: post selection within a single channel
+    let allPosts = posts.map((post, index) => ({
       ...post,
       id: post._id || `${post.channel_url}-${index}`,
       page_url: post.channel_url,
@@ -488,62 +497,36 @@ export function FacebookTracking() {
       commentsVal: parseFbNumber(post.comments),
       sharesVal: parseFbNumber(post.shares),
       viewsVal: parseFbNumber(post.views),
-      engagementVal: (parseFbNumber(post.likes) + parseFbNumber(post.comments) + parseFbNumber(post.shares)),
+      engagementVal: parseFbNumber(post.engagement || 0) || (parseFbNumber(post.likes) + parseFbNumber(post.comments) + parseFbNumber(post.shares)),
       mentions: post.mentions || [],
       mentionsVal: (post.mentions || []).length,
       followersVal: parseFbNumber(post.followers),
       label: `Post ${index}`
     }));
 
-    // Filter posts if single page selected and post filter is active
+    // Client-side sub-filter: specific posts within a single selected channel
     if (selectedPages.length === 1 && selectedPostIds.length > 0) {
       allPosts = allPosts.filter(p => selectedPostIds.includes(p.id));
-    }
-
-    // Filter by Post Type (Videos vs Posts)
-    if (postType === "Videos") {
-      allPosts = allPosts.filter(p => p.type === "Video" || p.type === "Reel" || (p.post_url && (p.post_url.includes("/videos/") || p.post_url.includes("/reel/"))));
-    } else if (postType === "Posts") {
-      allPosts = allPosts.filter(p => p.type === "Post" && (!p.post_url || (!p.post_url.includes("/videos/") && !p.post_url.includes("/reel/"))));
-    }
-
-    // Filter by Date Range
-    if (startDate || endDate) {
-      const start = startDate ? new Date(startDate) : null;
-      const end = endDate ? new Date(endDate) : null;
-      allPosts = allPosts.filter(p => {
-        const pDate = parseDate(p.date);
-        if (!pDate) return false;
-        if (start && pDate < start) return false;
-        if (end && pDate > end) return false;
-        return true;
-      });
     }
 
     // Sort by Likes and Slice Top N
     allPosts.sort((a, b) => b.likesVal - a.likesVal);
     const slicedPosts = allPosts.slice(0, topN);
 
-    const uniqueChannels = new Set(filteredPosts.map(p => p.channel_url));
-    let totalFollowers = 0;
-    uniqueChannels.forEach(url => {
-        const p = filteredPosts.find(post => post.channel_url === url);
-        if (p) totalFollowers += parseFbNumber(p.followers);
-    });
-
-    // Calculate Summary
+    // Use backend KPIs (computed from ALL matching data, not just this page)
     const summary = {
-      totalAccounts: uniqueChannels.size,
-      totalFollowers: totalFollowers,
-      totalPosts: allPosts.length,
-      totalLikes: slicedPosts.reduce((acc, p) => acc + p.likesVal, 0),
-      totalComments: slicedPosts.reduce((acc, p) => acc + p.commentsVal, 0),
-      totalShares: slicedPosts.reduce((acc, p) => acc + p.sharesVal, 0),
-      totalEngagement: slicedPosts.reduce((acc, p) => acc + p.engagementVal, 0),
+      totalAccounts: backendKpis.total_accounts || 0,
+      totalFollowers: backendKpis.total_followers || 0,
+      totalPosts: backendKpis.total_posts || 0,
+      totalLikes: backendKpis.total_likes || 0,
+      totalComments: backendKpis.total_comments || 0,
+      totalShares: backendKpis.total_shares || 0,
+      totalViews: backendKpis.total_views || 0,
+      totalEngagement: backendKpis.total_engagement || 0,
     };
 
     return { posts: slicedPosts, summary, allFilteredPosts: allPosts };
-  }, [posts, selectedPages, selectedPostIds, startDate, endDate, topN, postType]);
+  }, [posts, selectedPostIds, topN, backendKpis, selectedPages]);
 
   // --- Display Data (Top N based on selection) ---
   const displayablePosts = useMemo(() => {
@@ -578,29 +561,33 @@ export function FacebookTracking() {
   }, [displayablePosts]);
 
   const insights = useMemo(() => {
-    if (!processedData.posts.length) return { topLikes: null, topComments: null, topShares: null, bestDay: "N/A" };
-    const posts = [...processedData.posts];
-    const topLikes = [...posts].sort((a, b) => b.likesVal - a.likesVal)[0];
-    const topComments = [...posts].sort((a, b) => b.commentsVal - a.commentsVal)[0];
-    const topShares = [...posts].sort((a, b) => b.sharesVal - a.sharesVal)[0];
+    // Use backend top_posts for insights (computed from ALL data, not just paginated subset)
+    const mapPost = (p) => p ? ({
+      ...p,
+      likesVal: parseFbNumber(p.likes),
+      commentsVal: parseFbNumber(p.comments),
+      sharesVal: parseFbNumber(p.shares),
+      viewsVal: parseFbNumber(p.views),
+      post_url: p.url,
+      caption: p.caption || ''
+    }) : null;
 
-    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-    const engagementByDay = {};
-    posts.forEach(p => {
-        const d = parseDate(p.date);
-        if (d) {
-            const dayName = days[d.getDay()];
-            const engagement = p.likesVal + p.commentsVal + p.sharesVal;
-            engagementByDay[dayName] = (engagementByDay[dayName] || 0) + engagement;
-        }
-    });
-    let bestDay = "N/A";
-    let maxEng = -1;
-    Object.entries(engagementByDay).forEach(([day, eng]) => {
-        if (eng > maxEng) { maxEng = eng; bestDay = day; }
-    });
-    return { topLikes, topComments, topShares, bestDay };
-  }, [processedData.posts]);
+    let topLikes = null, topComments = null, topShares = null;
+
+    if (backendTopPosts.length > 0) {
+      const mapped = backendTopPosts.map(mapPost).filter(Boolean);
+      topLikes = [...mapped].sort((a, b) => b.likesVal - a.likesVal)[0] || null;
+      topComments = [...mapped].sort((a, b) => b.commentsVal - a.commentsVal)[0] || null;
+      topShares = [...mapped].sort((a, b) => b.sharesVal - a.sharesVal)[0] || null;
+    } else if (processedData.posts.length > 0) {
+      // Fallback to local posts
+      topLikes = [...processedData.posts].sort((a, b) => b.likesVal - a.likesVal)[0];
+      topComments = [...processedData.posts].sort((a, b) => b.commentsVal - a.commentsVal)[0];
+      topShares = [...processedData.posts].sort((a, b) => b.sharesVal - a.sharesVal)[0];
+    }
+
+    return { topLikes, topComments, topShares, bestDay: bestPostingDay };
+  }, [backendTopPosts, processedData.posts, bestPostingDay]);
 
   const requestSort = (key) => {
     setSortConfig((prev) => ({
@@ -624,11 +611,10 @@ export function FacebookTracking() {
             <button
               key={type}
               onClick={() => setPostType(type)}
-              className={`px-3 py-1 rounded text-xs font-bold transition-all ${
-                postType === type 
-                ? "bg-gradient-to-r from-blue-500 to-cyan-500 text-white shadow-md" 
+              className={`px-3 py-1 rounded text-xs font-bold transition-all ${postType === type
+                ? "bg-gradient-to-r from-blue-500 to-cyan-500 text-white shadow-md"
                 : "text-gray-600 hover:bg-gray-100"
-              }`}
+                }`}
             >
               {type}
             </button>
@@ -639,8 +625,8 @@ export function FacebookTracking() {
       {/* FILTER + KPIs */}
       <div className={`grid grid-cols-1 md:grid-cols-2 ${selectedPages.length === 1 ? 'lg:grid-cols-5' : 'lg:grid-cols-3'} gap-2 md:gap-4 mb-4 md:mb-6`}>
         {/* Custom Dropdown */}
-        <div 
-          className="bg-white rounded-xl p-4 relative flex flex-col justify-center transition-transform hover:-translate-y-1 z-30" 
+        <div
+          className="bg-white rounded-xl p-4 relative flex flex-col justify-center transition-transform hover:-translate-y-1 z-30"
           ref={dropdownRef}
           style={{ boxShadow: "4px 4px 0px 0px #cbd5e1", border: "2px solid #cbd5e1" }}
         >
@@ -657,10 +643,10 @@ export function FacebookTracking() {
             className="w-full flex justify-between items-center bg-gray-50 hover:bg-gray-100 rounded-lg p-2 text-sm font-medium text-gray-700 transition-colors border border-gray-200"
           >
             <span className="truncate text-left flex-1">
-              {selectedPages.length === 0 
-                ? "All Accounts" 
-                : selectedPages.length === 1 
-                  ? selectedPages[0] 
+              {selectedPages.length === 0
+                ? "All Accounts"
+                : selectedPages.length === 1
+                  ? selectedPages[0]
                   : `${selectedPages.length} Channels`}
             </span>
             <ChevronDown size={16} className="ml-2 flex-shrink-0" />
@@ -707,8 +693,8 @@ export function FacebookTracking() {
 
         {/* Post Dropdown (Only if 1 page selected) */}
         {selectedPages.length === 1 && (
-          <div 
-            className="bg-white rounded-xl p-4 relative flex flex-col justify-center transition-transform hover:-translate-y-1 z-30" 
+          <div
+            className="bg-white rounded-xl p-4 relative flex flex-col justify-center transition-transform hover:-translate-y-1 z-30"
             ref={postDropdownRef}
             style={{ boxShadow: "4px 4px 0px 0px #cbd5e1", border: "2px solid #cbd5e1" }}
           >
@@ -789,197 +775,197 @@ export function FacebookTracking() {
       <div className={`grid grid-cols-1 md:grid-cols-2 ${selectedPages.length === 1 ? 'lg:grid-cols-4' : 'lg:grid-cols-3'} gap-4 mb-6`}>
         {/* Top by Likes */}
         <div className="bg-gradient-to-br from-emerald-50 to-teal-100 border border-emerald-100 text-emerald-900 rounded-xl p-4 shadow-sm flex flex-col relative overflow-hidden transition-transform hover:-translate-y-1">
-            <div className="flex justify-between items-start mb-2">
-                <div className="p-2 rounded-lg bg-white text-emerald-600"><ThumbsUp size={20} /></div>
-                <div className="text-xs font-bold uppercase tracking-wider text-emerald-700">Most Liked</div>
+          <div className="flex justify-between items-start mb-2">
+            <div className="p-2 rounded-lg bg-white text-emerald-600"><ThumbsUp size={20} /></div>
+            <div className="text-xs font-bold uppercase tracking-wider text-emerald-700">Most Liked</div>
+          </div>
+          <div className="flex-1">
+            <div className="font-bold text-sm line-clamp-2 mb-1 text-emerald-950" title={insights.topLikes?.caption}>
+              {insights.topLikes?.caption || "No Data"}
             </div>
-            <div className="flex-1">
-                <div className="font-bold text-sm line-clamp-2 mb-1 text-emerald-950" title={insights.topLikes?.caption}>
-                    {insights.topLikes?.caption || "No Data"}
-                </div>
-                <div className="text-3xl font-black text-emerald-800">
-                    {insights.topLikes?.likesVal?.toLocaleString() || 0}
-                </div>
+            <div className="text-3xl font-black text-emerald-800">
+              {insights.topLikes?.likesVal?.toLocaleString() || 0}
             </div>
-             {insights.topLikes?.post_url && (
-                <a href={insights.topLikes.post_url} target="_blank" rel="noreferrer" className="absolute bottom-4 right-4 text-emerald-500 hover:text-emerald-700">
-                    <ExternalLink size={16} />
-                </a>
-            )}
+          </div>
+          {insights.topLikes?.post_url && (
+            <a href={insights.topLikes.post_url} target="_blank" rel="noreferrer" className="absolute bottom-4 right-4 text-emerald-500 hover:text-emerald-700">
+              <ExternalLink size={16} />
+            </a>
+          )}
         </div>
 
         {/* Top by Comments */}
         <div className="bg-gradient-to-br from-amber-50 to-orange-100 border border-orange-100 text-orange-900 rounded-xl p-4 shadow-sm flex flex-col relative overflow-hidden transition-transform hover:-translate-y-1">
-            <div className="flex justify-between items-start mb-2">
-                <div className="p-2 rounded-lg bg-white text-orange-600"><MessageCircle size={20} /></div>
-                <div className="text-xs font-bold uppercase tracking-wider text-orange-700">Most Commented</div>
+          <div className="flex justify-between items-start mb-2">
+            <div className="p-2 rounded-lg bg-white text-orange-600"><MessageCircle size={20} /></div>
+            <div className="text-xs font-bold uppercase tracking-wider text-orange-700">Most Commented</div>
+          </div>
+          <div className="flex-1">
+            <div className="font-bold text-sm line-clamp-2 mb-1 text-orange-950" title={insights.topComments?.caption}>
+              {insights.topComments?.caption || "No Data"}
             </div>
-            <div className="flex-1">
-                <div className="font-bold text-sm line-clamp-2 mb-1 text-orange-950" title={insights.topComments?.caption}>
-                    {insights.topComments?.caption || "No Data"}
-                </div>
-                <div className="text-3xl font-black text-orange-800">
-                    {insights.topComments?.commentsVal?.toLocaleString() || 0}
-                </div>
+            <div className="text-3xl font-black text-orange-800">
+              {insights.topComments?.commentsVal?.toLocaleString() || 0}
             </div>
-             {insights.topComments?.post_url && (
-                <a href={insights.topComments.post_url} target="_blank" rel="noreferrer" className="absolute bottom-4 right-4 text-orange-500 hover:text-orange-700">
-                    <ExternalLink size={16} />
-                </a>
-            )}
+          </div>
+          {insights.topComments?.post_url && (
+            <a href={insights.topComments.post_url} target="_blank" rel="noreferrer" className="absolute bottom-4 right-4 text-orange-500 hover:text-orange-700">
+              <ExternalLink size={16} />
+            </a>
+          )}
         </div>
 
         {/* Top by Shares */}
         <div className="bg-gradient-to-br from-violet-50 to-purple-100 border border-purple-100 text-purple-900 rounded-xl p-4 shadow-sm flex flex-col relative overflow-hidden transition-transform hover:-translate-y-1">
-            <div className="flex justify-between items-start mb-2">
-                <div className="p-2 rounded-lg bg-white text-purple-600"><Share2 size={20} /></div>
-                <div className="text-xs font-bold uppercase tracking-wider text-purple-700">Most Shared</div>
+          <div className="flex justify-between items-start mb-2">
+            <div className="p-2 rounded-lg bg-white text-purple-600"><Share2 size={20} /></div>
+            <div className="text-xs font-bold uppercase tracking-wider text-purple-700">Most Shared</div>
+          </div>
+          <div className="flex-1">
+            <div className="font-bold text-sm line-clamp-2 mb-1 text-purple-950" title={insights.topShares?.caption}>
+              {insights.topShares?.caption || "No Data"}
             </div>
-            <div className="flex-1">
-                <div className="font-bold text-sm line-clamp-2 mb-1 text-purple-950" title={insights.topShares?.caption}>
-                    {insights.topShares?.caption || "No Data"}
-                </div>
-                <div className="text-3xl font-black text-purple-800">
-                    {insights.topShares?.sharesVal?.toLocaleString() || 0}
-                </div>
+            <div className="text-3xl font-black text-purple-800">
+              {insights.topShares?.sharesVal?.toLocaleString() || 0}
             </div>
-             {insights.topShares?.post_url && (
-                <a href={insights.topShares.post_url} target="_blank" rel="noreferrer" className="absolute bottom-4 right-4 text-purple-500 hover:text-purple-700">
-                    <ExternalLink size={16} />
-                </a>
-            )}
+          </div>
+          {insights.topShares?.post_url && (
+            <a href={insights.topShares.post_url} target="_blank" rel="noreferrer" className="absolute bottom-4 right-4 text-purple-500 hover:text-purple-700">
+              <ExternalLink size={16} />
+            </a>
+          )}
         </div>
 
         {/* Best Day */}
         {selectedPages.length === 1 && (
           <div className="bg-gradient-to-br from-pink-50 to-rose-100 border border-pink-100 text-pink-900 rounded-xl p-4 shadow-sm flex flex-col justify-center items-center relative overflow-hidden">
-              <div className="p-3 rounded-full bg-white text-pink-600 mb-3">
-                  <Calendar size={24} />
-              </div>
-              <div className="text-xs font-bold uppercase tracking-wider mb-1 text-pink-700">Best Posting Day</div>
-              <div className="text-2xl font-black text-pink-800">{kpis.best_posting_day}</div>
+            <div className="p-3 rounded-full bg-white text-pink-600 mb-3">
+              <Calendar size={24} />
+            </div>
+            <div className="text-xs font-bold uppercase tracking-wider mb-1 text-pink-700">Best Posting Day</div>
+            <div className="text-2xl font-black text-pink-800">{kpis.best_posting_day}</div>
           </div>
         )}
       </div>
 
       {/* CHARTS & CONTROLS GRID */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8 mb-4 md:mb-6">
-        
+
         {/* 1. CONTROLS CARD */}
         <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm grid lg:grid-cols-2 gap-6 items-center">
-            {/* Col 1: Top Posts Arc Slider */}
-            <ArcSlider 
-              value={topN} 
-              min={5} 
-              max={100} 
-              onChange={setTopN} 
-              label="Top Posts"
-              colors={{ start: "#8A1974", end: "#CC18A8", track: "#fce7f3", text: "#8A1974" }}
-              size={400}
-            />
+          {/* Col 1: Top Posts Arc Slider */}
+          <ArcSlider
+            value={topN}
+            min={5}
+            max={100}
+            onChange={setTopN}
+            label="Top Posts"
+            colors={{ start: "#8A1974", end: "#CC18A8", track: "#fce7f3", text: "#8A1974" }}
+            size={400}
+          />
 
-            {/* Col 2: Date Range Timeline */}
-            <div className="flex flex-col gap-3 items-center">
-              <DateArcSelector 
-                options={PRESET_LABELS.map(l => ({ id: l.toLowerCase().replace(' ', '_'), label: l }))}
-                selected={datePreset}
-                onSelect={setDatePreset}
-              />
-              <div className={`transition-all duration-500 ease-in-out overflow-hidden ${datePreset === 'custom' ? 'max-h-40 opacity-100' : 'max-h-0 opacity-0'}`}>
-                <div className="flex items-center gap-2 pt-3 border-t border-gray-200">
-                  <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full bg-gray-50 hover:bg-gray-100 border border-gray-200 text-gray-700 text-sm rounded-lg focus:ring-2 focus:ring-[#DA7993]/30 focus:border-[#DD2A59] block px-3 py-2 transition-all outline-none" />
-                  <span className="text-[#DD2A59] font-medium">to</span>
-                  <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full bg-gray-50 hover:bg-gray-100 border border-gray-200 text-gray-700 text-sm rounded-lg focus:ring-2 focus:ring-[#DA7993]/30 focus:border-[#DD2A59] block px-3 py-2 transition-all outline-none" />
-                </div>
+          {/* Col 2: Date Range Timeline */}
+          <div className="flex flex-col gap-3 items-center">
+            <DateArcSelector
+              options={PRESET_LABELS.map(l => ({ id: l.toLowerCase().replace(' ', '_'), label: l }))}
+              selected={datePreset}
+              onSelect={setDatePreset}
+            />
+            <div className={`transition-all duration-500 ease-in-out overflow-hidden ${datePreset === 'custom' ? 'max-h-40 opacity-100' : 'max-h-0 opacity-0'}`}>
+              <div className="flex items-center gap-2 pt-3 border-t border-gray-200">
+                <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full bg-gray-50 hover:bg-gray-100 border border-gray-200 text-gray-700 text-sm rounded-lg focus:ring-2 focus:ring-[#DA7993]/30 focus:border-[#DD2A59] block px-3 py-2 transition-all outline-none" />
+                <span className="text-[#DD2A59] font-medium">to</span>
+                <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full bg-gray-50 hover:bg-gray-100 border border-gray-200 text-gray-700 text-sm rounded-lg focus:ring-2 focus:ring-[#DA7993]/30 focus:border-[#DD2A59] block px-3 py-2 transition-all outline-none" />
               </div>
             </div>
+          </div>
         </div>
 
         {/* 2. LIKES CHART */}
-        <TrendChart 
-          title="Likes Trend" 
-          data={chartData} 
-          dataKey="likesVal" 
-          color="#34d399" 
+        <TrendChart
+          title="Likes Trend"
+          data={chartData}
+          dataKey="likesVal"
+          color="#34d399"
           color2="#2dd4bf"
-          icon={ThumbsUp} 
+          icon={ThumbsUp}
         />
 
         {/* 3. COMMENTS CHART */}
-        <TrendChart 
-          title="Comments Trend" 
-          data={chartData} 
-          dataKey="commentsVal" 
-          color="#fbbf24" 
+        <TrendChart
+          title="Comments Trend"
+          data={chartData}
+          dataKey="commentsVal"
+          color="#fbbf24"
           color2="#fb923c"
-          icon={MessageCircle} 
+          icon={MessageCircle}
         />
 
         {/* 4. SHARES CHART */}
-        <TrendChart 
-          title="Shares Trend" 
-          data={chartData} 
-          dataKey="sharesVal" 
-          color="#818cf8" 
+        <TrendChart
+          title="Shares Trend"
+          data={chartData}
+          dataKey="sharesVal"
+          color="#818cf8"
           color2="#c084fc"
-          icon={Share2} 
+          icon={Share2}
         />
 
         {/* 5. ENGAGEMENT CHART */}
-        <TrendChart 
-          title="Engagement Trend" 
-          data={chartData} 
-          dataKey="engagementVal" 
-          color="#facc15" 
+        <TrendChart
+          title="Engagement Trend"
+          data={chartData}
+          dataKey="engagementVal"
+          color="#facc15"
           color2="#fde047"
-          icon={Zap} 
+          icon={Zap}
         />
 
         {/* 6. TOP ACCOUNTS / PROFILE GROWTH */}
         {selectedPages.length === 1 ? (
-           <TrendChart 
-             title="Views Trend" 
-             data={chartData} 
-             dataKey="viewsVal" 
-             color="#ec4899" 
-             color2="#f472b6"
-             icon={Eye} 
-           />
+          <TrendChart
+            title="Views Trend"
+            data={chartData}
+            dataKey="viewsVal"
+            color="#ec4899"
+            color2="#f472b6"
+            icon={Eye}
+          />
         ) : (
-           <TopAccountsChart data={processedData.allFilteredPosts} />
+          <TopAccountsChart data={processedData.allFilteredPosts} />
         )}
       </div>
 
       {/* TABLE */}
       <div className="bg-white border rounded-lg p-2 md:p-4">
-        
+
         <div className="overflow-x-auto max-h-96 w-full">
           <table className="min-w-full text-sm">
             <thead className="bg-sky-200 sticky top-0 z-10">
               <tr>
                 <th className="px-3 py-2 text-left cursor-pointer hover:bg-sky-100" onClick={() => requestSort('caption')}>
-                  Caption {sortConfig.key === 'caption' && (sortConfig.direction === 'asc' ? <ArrowUp size={12}/> : <ArrowDown size={12}/>)}
+                  Caption {sortConfig.key === 'caption' && (sortConfig.direction === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />)}
                 </th>
                 <th className="px-3 py-2 text-left cursor-pointer hover:bg-sky-100" onClick={() => requestSort('likes')}>
-                  Likes {sortConfig.key === 'likes' && (sortConfig.direction === 'asc' ? <ArrowUp size={12}/> : <ArrowDown size={12}/>)}
+                  Likes {sortConfig.key === 'likes' && (sortConfig.direction === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />)}
                 </th>
                 <th className="px-3 py-2 text-left cursor-pointer hover:bg-sky-100" onClick={() => requestSort('comments')}>
-                  Comments {sortConfig.key === 'comments' && (sortConfig.direction === 'asc' ? <ArrowUp size={12}/> : <ArrowDown size={12}/>)}
+                  Comments {sortConfig.key === 'comments' && (sortConfig.direction === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />)}
                 </th>
                 <th className="px-3 py-2 text-left cursor-pointer hover:bg-sky-100" onClick={() => requestSort('shares')}>
-                  Shares {sortConfig.key === 'shares' && (sortConfig.direction === 'asc' ? <ArrowUp size={12}/> : <ArrowDown size={12}/>)}
+                  Shares {sortConfig.key === 'shares' && (sortConfig.direction === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />)}
                 </th>
                 <th className="px-3 py-2 text-left cursor-pointer hover:bg-sky-100" onClick={() => requestSort('views')}>
-                  Views {sortConfig.key === 'views' && (sortConfig.direction === 'asc' ? <ArrowUp size={12}/> : <ArrowDown size={12}/>)}
+                  Views {sortConfig.key === 'views' && (sortConfig.direction === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />)}
                 </th>
                 <th className="px-3 py-2 text-left cursor-pointer hover:bg-sky-100" onClick={() => requestSort('engagement')}>
-                  Engagement {sortConfig.key === 'engagement' && (sortConfig.direction === 'asc' ? <ArrowUp size={12}/> : <ArrowDown size={12}/>)}
+                  Engagement {sortConfig.key === 'engagement' && (sortConfig.direction === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />)}
                 </th>
                 <th className="px-3 py-2 text-left cursor-pointer hover:bg-sky-100" onClick={() => requestSort('mentions')}>
-                  Mentions {sortConfig.key === 'mentions' && (sortConfig.direction === 'asc' ? <ArrowUp size={12}/> : <ArrowDown size={12}/>)}
+                  Mentions {sortConfig.key === 'mentions' && (sortConfig.direction === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />)}
                 </th>
                 <th className="px-3 py-2 text-left cursor-pointer hover:bg-sky-100" onClick={() => requestSort('date')}>
-                  Posted {sortConfig.key === 'date' && (sortConfig.direction === 'asc' ? <ArrowUp size={12}/> : <ArrowDown size={12}/>)}
+                  Posted {sortConfig.key === 'date' && (sortConfig.direction === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />)}
                 </th>
                 <th className="px-3 py-2 text-left">Link</th>
               </tr>
@@ -1002,7 +988,7 @@ export function FacebookTracking() {
                   <td className="px-3 py-2 text-xs text-gray-500">{p.date || "-"}</td>
                   <td className="px-3 py-2">
                     <a href={p.post_url} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline flex items-center gap-1">
-                      Open <ExternalLink size={10}/>
+                      Open <ExternalLink size={10} />
                     </a>
                   </td>
                 </tr>
@@ -1033,7 +1019,7 @@ const TrendChart = ({ title, data, dataKey, color, color2, icon: Icon }) => {
   const gradientId = `gradient-${dataKey}`;
   return (
     <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden flex flex-col min-w-0">
-      <div 
+      <div
         className="p-3 text-white flex items-center gap-2"
         style={{ background: `linear-gradient(to right, ${color}, ${color2 || color + 'dd'})`, boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)' }}
       >
@@ -1045,15 +1031,15 @@ const TrendChart = ({ title, data, dataKey, color, color2, icon: Icon }) => {
           <AreaChart data={data} margin={{ top: 10, right: 0, left: 0, bottom: 0 }}>
             <defs>
               <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor={color} stopOpacity={0.8}/>
-                <stop offset="95%" stopColor={color} stopOpacity={0}/>
+                <stop offset="5%" stopColor={color} stopOpacity={0.8} />
+                <stop offset="95%" stopColor={color} stopOpacity={0} />
               </linearGradient>
             </defs>
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
             <XAxis hide />
-            <YAxis 
-              tick={{ fontSize: 10 }} 
-              width={30} 
+            <YAxis
+              tick={{ fontSize: 10 }}
+              width={30}
               tickFormatter={(value) => new Intl.NumberFormat('en', { notation: "compact", compactDisplay: "short" }).format(value)}
               axisLine={false}
               tickLine={false}

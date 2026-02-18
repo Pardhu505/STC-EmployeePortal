@@ -877,8 +877,8 @@ export function FacebookTracking() {
         <>
           {/* Row 1: Controls + Top 10 Accounts + Engagement Trend (3 cols) */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8 mb-4 md:mb-6">
-            {/* Controls */}
-            <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex flex-col gap-6 items-center justify-center">
+            {/* Controls — compact */}
+            <div className="bg-white p-3 rounded-xl border border-gray-200 shadow-sm grid grid-cols-2 gap-2 items-center">
               <ArcSlider
                 value={topN}
                 min={5}
@@ -886,18 +886,20 @@ export function FacebookTracking() {
                 onChange={setTopN}
                 label="Top Posts"
                 colors={{ start: "#8A1974", end: "#CC18A8", track: "#fce7f3", text: "#8A1974" }}
-                size={300}
+                size={180}
               />
-              <DateArcSelector
-                options={PRESET_LABELS.map(l => ({ id: l.toLowerCase().replace(' ', '_'), label: l }))}
-                selected={datePreset}
-                onSelect={setDatePreset}
-              />
-              <div className={`transition-all duration-500 ease-in-out overflow-hidden w-full ${datePreset === 'custom' ? 'max-h-40 opacity-100' : 'max-h-0 opacity-0'}`}>
-                <div className="flex items-center gap-2 pt-3 border-t border-gray-200">
-                  <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full bg-gray-50 hover:bg-gray-100 border border-gray-200 text-gray-700 text-sm rounded-lg focus:ring-2 focus:ring-[#DA7993]/30 focus:border-[#DD2A59] block px-3 py-2 transition-all outline-none" />
-                  <span className="text-[#DD2A59] font-medium">to</span>
-                  <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full bg-gray-50 hover:bg-gray-100 border border-gray-200 text-gray-700 text-sm rounded-lg focus:ring-2 focus:ring-[#DA7993]/30 focus:border-[#DD2A59] block px-3 py-2 transition-all outline-none" />
+              <div className="flex flex-col items-center">
+                <DateArcSelector
+                  options={PRESET_LABELS.map(l => ({ id: l.toLowerCase().replace(' ', '_'), label: l }))}
+                  selected={datePreset}
+                  onSelect={setDatePreset}
+                />
+                <div className={`transition-all duration-500 ease-in-out overflow-hidden w-full ${datePreset === 'custom' ? 'max-h-40 opacity-100' : 'max-h-0 opacity-0'}`}>
+                  <div className="flex items-center gap-1 pt-2 border-t border-gray-200">
+                    <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full bg-gray-50 border border-gray-200 text-gray-700 text-xs rounded-lg px-2 py-1 outline-none" />
+                    <span className="text-[#DD2A59] text-xs font-medium">to</span>
+                    <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full bg-gray-50 border border-gray-200 text-gray-700 text-xs rounded-lg px-2 py-1 outline-none" />
+                  </div>
                 </div>
               </div>
             </div>

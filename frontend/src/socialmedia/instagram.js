@@ -186,7 +186,7 @@ export const InstagramTracking = () => {
     [accounts, searchTerm]
   );
 
-  const COLORS = ["#E1306C", "#F77737", "#FCAF45", "#833AB4", "#405DE6"];
+
 
   return (
     <div className="p-2 md:p-6 bg-gray-50 min-h-screen text-gray-800 w-full max-w-full overflow-x-hidden">

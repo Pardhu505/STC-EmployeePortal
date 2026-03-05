@@ -18,7 +18,6 @@ import {
   Users,
   Heart,
   MessageCircle,
-  Eye,
   TrendingUp,
   Activity,
   ArrowUp,
@@ -366,11 +365,10 @@ export const InstagramTracking = () => {
             </div>
           );
           const eng = tp.likes + tp.comments;
-          const maxMetric = Math.max(tp.likes, tp.comments, tp.views, 1);
+          const maxMetric = Math.max(tp.likes, tp.comments, 1);
           const metrics = [
             { label: "Likes", val: tp.likes, pct: Math.round((tp.likes / maxMetric) * 100), color: "#E1306C" },
             { label: "Comments", val: tp.comments, pct: Math.round((tp.comments / maxMetric) * 100), color: "#833AB4" },
-            { label: "Views", val: tp.views, pct: Math.round((tp.views / maxMetric) * 100), color: "#F77737" },
           ];
           return (
             <div className="rounded-xl overflow-hidden shadow-sm" style={{ border: "2px solid #E1306C" }}>
@@ -447,10 +445,6 @@ export const InstagramTracking = () => {
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={charts.contentPerformance} layout="vertical" margin={{ left: 20 }}>
                 <defs>
-                  <linearGradient id="contentViewsGradient" x1="0" y1="0" x2="1" y2="0">
-                    <stop offset="5%" stopColor="#F77737" stopOpacity={0.8} />
-                    <stop offset="95%" stopColor="#F77737" stopOpacity={0.3} />
-                  </linearGradient>
                   <linearGradient id="contentEngGradient" x1="0" y1="0" x2="1" y2="0">
                     <stop offset="5%" stopColor="#833AB4" stopOpacity={0.8} />
                     <stop offset="95%" stopColor="#833AB4" stopOpacity={0.3} />
@@ -461,7 +455,6 @@ export const InstagramTracking = () => {
                 <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} width={60} tick={{ fontSize: 12, fontWeight: 500 }} />
                 <Tooltip cursor={{ fill: "transparent" }} contentStyle={{ borderRadius: "8px", border: "none", boxShadow: "0 2px 8px rgba(0,0,0,0.1)" }} />
                 <Legend />
-                <Bar dataKey="views" name="Views" fill="url(#contentViewsGradient)" radius={[0, 4, 4, 0]} barSize={20} />
                 <Bar dataKey="engagement" name="Engagement" fill="url(#contentEngGradient)" radius={[0, 4, 4, 0]} barSize={20} />
               </BarChart>
             </ResponsiveContainer>
@@ -486,7 +479,7 @@ export const InstagramTracking = () => {
                   <Tooltip />
                   <Legend />
                   <Line yAxisId="left" type="monotone" dataKey="posts" name="Posts/Day" stroke="#E1306C" strokeWidth={2} dot={{ r: 3 }} />
-                  <Line yAxisId="right" type="monotone" dataKey="engagementRate" name="Eng. Rate (%)" stroke="#FCAF45" strokeWidth={2} dot={{ r: 3 }} />
+                  <Line yAxisId="right" type="monotone" dataKey="engagementRate" name="Eng./Post" stroke="#FCAF45" strokeWidth={2} dot={{ r: 3 }} />
                 </LineChart>
               </ResponsiveContainer>
             </div>
@@ -551,48 +544,7 @@ export const InstagramTracking = () => {
       </div>
 
       {/* TREND CHARTS ROW */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-
-        {/* Views Trend */}
-        <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-bold text-gray-700 flex items-center gap-2">
-              <Eye size={18} className="text-[#833AB4]" /> Views Trend
-            </h3>
-          </div>
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={charts.activityData}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                <XAxis dataKey="name" tick={{ fontSize: 10 }} interval={0} angle={-45} textAnchor="end" height={60} />
-                <YAxis tick={{ fontSize: 10 }} />
-                <Tooltip
-                  cursor={{ fill: "transparent" }}
-                  content={({ active, payload }) => {
-                    if (active && payload && payload.length) {
-                      const d = payload[0].payload;
-                      return (
-                        <div className="bg-white p-2 border border-gray-200 shadow-lg rounded-lg text-xs">
-                          <div className="font-bold text-gray-700 mb-1">{d.handle}</div>
-                          <div className="text-gray-500 mb-1 truncate max-w-[200px]">{d.fullCaption}</div>
-                          <div>Views: <span className="font-semibold">{d.views.toLocaleString()}</span></div>
-                        </div>
-                      );
-                    }
-                    return null;
-                  }}
-                />
-                <defs>
-                  <linearGradient id="viewsGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#833AB4" stopOpacity={0.8} />
-                    <stop offset="95%" stopColor="#833AB4" stopOpacity={0.2} />
-                  </linearGradient>
-                </defs>
-                <Bar dataKey="views" fill="url(#viewsGradient)" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
 
         {/* Likes Trend */}
         <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
@@ -738,21 +690,20 @@ export const InstagramTracking = () => {
                 <th className="px-4 py-3 font-semibold">Type</th>
                 <th className="px-4 py-3 font-semibold text-right">Likes</th>
                 <th className="px-4 py-3 font-semibold text-right">Comments</th>
-                <th className="px-4 py-3 font-semibold text-right">Views</th>
                 <th className="px-4 py-3 font-semibold text-right">Date</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {loading && (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-gray-400">
+                  <td colSpan={6} className="px-4 py-8 text-center text-gray-400">
                     <RefreshCw size={18} className="animate-spin inline mr-2" /> Loading data…
                   </td>
                 </tr>
               )}
               {!loading && topPosts.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-gray-400">
+                  <td colSpan={6} className="px-4 py-8 text-center text-gray-400">
                     No posts found for the selected filters.
                   </td>
                 </tr>
@@ -772,7 +723,6 @@ export const InstagramTracking = () => {
                   </td>
                   <td className="px-4 py-3 text-right font-medium">{post.likes.toLocaleString()}</td>
                   <td className="px-4 py-3 text-right text-gray-600">{post.comments.toLocaleString()}</td>
-                  <td className="px-4 py-3 text-right text-gray-600">{post.views.toLocaleString()}</td>
                   <td className="px-4 py-3 text-right text-gray-400 text-xs">{post.date}</td>
                 </tr>
               ))}

@@ -10,7 +10,7 @@ import {
 } from "recharts";
 import { ChevronDown, ArrowUp, ArrowDown, Trophy, Eye, ThumbsUp, MessageCircle, ExternalLink, Video, MonitorPlay, TrendingUp, Zap, Calendar, Filter } from "lucide-react";
 
-const API_BASE_URL = "https://antiques-dakota-remedy-sean.trycloudflare.com";
+const API_BASE_URL = "https://healthy-released-bucks-grades.trycloudflare.com";
 
 
 const toNumber = (v) => {

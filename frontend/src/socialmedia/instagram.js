@@ -551,7 +551,7 @@ export const InstagramTracking = () => {
       </div>
 
       {/* TREND CHARTS ROW */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
 
         {/* Views Trend */}
         <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
@@ -590,6 +590,47 @@ export const InstagramTracking = () => {
                 </defs>
                 <Bar dataKey="views" fill="url(#viewsGradient)" radius={[4, 4, 0, 0]} />
               </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Likes Trend */}
+        <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-bold text-gray-700 flex items-center gap-2">
+              <Heart size={18} className="text-[#E1306C]" /> Likes Trend
+            </h3>
+          </div>
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={charts.activityData}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                <XAxis dataKey="name" tick={{ fontSize: 10 }} interval={0} angle={-45} textAnchor="end" height={60} />
+                <YAxis tick={{ fontSize: 10 }} />
+                <Tooltip
+                  cursor={{ fill: "transparent" }}
+                  content={({ active, payload }) => {
+                    if (active && payload && payload.length) {
+                      const d = payload[0].payload;
+                      return (
+                        <div className="bg-white p-2 border border-gray-200 shadow-lg rounded-lg text-xs">
+                          <div className="font-bold text-gray-700 mb-1">{d.handle}</div>
+                          <div className="text-gray-500 mb-1 truncate max-w-[200px]">{d.fullCaption}</div>
+                          <div>Likes: <span className="font-semibold">{d.likes ? d.likes.toLocaleString() : "0"}</span></div>
+                        </div>
+                      );
+                    }
+                    return null;
+                  }}
+                />
+                <defs>
+                  <linearGradient id="likesGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#E1306C" stopOpacity={0.8} />
+                    <stop offset="95%" stopColor="#E1306C" stopOpacity={0.2} />
+                  </linearGradient>
+                </defs>
+                <Area type="monotone" dataKey="likes" stroke="#E1306C" fill="url(#likesGradient)" fillOpacity={1} />
+              </AreaChart>
             </ResponsiveContainer>
           </div>
         </div>

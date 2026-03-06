@@ -25,7 +25,6 @@ import {
   Filter,
   ChevronDown,
   Search,
-  Check,
   Calendar,
   Layers,
   ListFilter,

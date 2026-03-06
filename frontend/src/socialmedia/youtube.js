@@ -8,7 +8,9 @@ import {
   BarChart,
   Bar,
 } from "recharts";
-import { ChevronDown, ArrowUp, ArrowDown, Trophy, Eye, ThumbsUp, MessageCircle, ExternalLink, Video, MonitorPlay, TrendingUp, Zap, Calendar, Filter } from "lucide-react";
+import { ChevronDown, ArrowUp, ArrowDown, Trophy, Eye, ThumbsUp, MessageCircle, ExternalLink, Video, MonitorPlay, TrendingUp, Zap, Calendar, Filter, RefreshCw, Download } from "lucide-react";
+import html2canvas from "html2canvas";
+import jsPDF from "jspdf";
 
 const API_BASE_URL = "https://healthy-released-bucks-grades.trycloudflare.com";
 
@@ -23,9 +25,9 @@ const toNumber = (v) => {
    KPI CARD
 ------------------------- */
 const KPI = ({ label, value, color, icon: Icon }) => (
-  <div 
+  <div
     className="bg-white rounded-xl p-4 flex items-center justify-between relative overflow-hidden transition-transform hover:-translate-y-1"
-    style={{ 
+    style={{
       boxShadow: `4px 4px 0px 0px ${color}`,
       border: `2px solid ${color}`
     }}
@@ -37,14 +39,14 @@ const KPI = ({ label, value, color, icon: Icon }) => (
       </div>
     </div>
     {Icon && (
-      <div 
+      <div
         className="p-2 rounded-lg z-10"
         style={{ background: `linear-gradient(135deg, ${color}20, ${color}40)`, color: color }}
       >
         <Icon size={20} />
       </div>
     )}
-    <div 
+    <div
       className="absolute -right-4 -bottom-4 w-20 h-20 rounded-full opacity-10 z-0"
       style={{ backgroundColor: color }}
     />
@@ -74,8 +76,9 @@ export function YoutubeTracking() {
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [sortConfig, setSortConfig] = useState({ key: null, direction: "asc" });
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
+  const dashboardRef = useRef(null);
+  const [downloading, setDownloading] = useState(false);
   const [allChannels, setAllChannels] = useState([]);
 
   useEffect(() => {
@@ -118,15 +121,15 @@ export function YoutubeTracking() {
       const data = await res.json();
 
       const newItems = data.items.map(v => ({
-          id: v.video_id,
-          title: v.video_title,
-          views: v.viewCount,
-          likes: v.likeCount,
-          comments: v.commentCount,
-          channel: v.channel_handle,
-          channel_id: v.channel_id,
-          upload_date: v.publishedAt || v.retrieved_at,
-          thumbnail: v.thumbnail_url
+        id: v.video_id,
+        title: v.video_title,
+        views: v.viewCount,
+        likes: v.likeCount,
+        comments: v.commentCount,
+        channel: v.channel_handle,
+        channel_id: v.channel_id,
+        upload_date: v.publishedAt || v.retrieved_at,
+        thumbnail: v.thumbnail_url
       }));
 
       setVideos(prev => isReset ? newItems : [...prev, ...newItems]);
@@ -162,15 +165,15 @@ export function YoutubeTracking() {
       ]);
 
       const transform = (v) => ({
-          id: v.video_id,
-          title: v.video_title,
-          views: v.viewCount,
-          likes: v.likeCount,
-          comments: v.commentCount,
-          channel: v.channel_handle,
-          channel_id: v.channel_id,
-          upload_date: v.publishedAt || v.retrieved_at,
-          thumbnail: v.thumbnail_url
+        id: v.video_id,
+        title: v.video_title,
+        views: v.viewCount,
+        likes: v.likeCount,
+        comments: v.commentCount,
+        channel: v.channel_handle,
+        channel_id: v.channel_id,
+        upload_date: v.publishedAt || v.retrieved_at,
+        thumbnail: v.thumbnail_url
       });
 
       setTopVideos({
@@ -222,26 +225,26 @@ export function YoutubeTracking() {
     if (sortConfig.key) {
       filtered.sort((a, b) => {
         const { key, direction } = sortConfig;
-        
+
         if (key === 'engagement') {
-           const engA = toNumber(a.likes) + toNumber(a.comments);
-           const engB = toNumber(b.likes) + toNumber(b.comments);
-           return direction === 'asc' ? engA - engB : engB - engA;
+          const engA = toNumber(a.likes) + toNumber(a.comments);
+          const engB = toNumber(b.likes) + toNumber(b.comments);
+          return direction === 'asc' ? engA - engB : engB - engA;
         }
 
         const valA = a[key];
         const valB = b[key];
 
         if (['views', 'likes', 'comments'].includes(key)) {
-           const numA = toNumber(valA);
-           const numB = toNumber(valB);
-           return direction === 'asc' ? numA - numB : numB - numA;
+          const numA = toNumber(valA);
+          const numB = toNumber(valB);
+          return direction === 'asc' ? numA - numB : numB - numA;
         }
-        
+
         if (key === 'upload_date') {
-            const dateA = new Date(valA || 0);
-            const dateB = new Date(valB || 0);
-            return direction === 'asc' ? dateA - dateB : dateB - dateA;
+          const dateA = new Date(valA || 0);
+          const dateB = new Date(valB || 0);
+          return direction === 'asc' ? dateA - dateB : dateB - dateA;
         }
 
         // Strings
@@ -255,15 +258,83 @@ export function YoutubeTracking() {
     return filtered;
   }, [videos, sortConfig]);
 
+  const downloadPDF = async () => {
+    if (!dashboardRef.current) return;
+    setDownloading(true);
+    try {
+      const element = dashboardRef.current;
+
+      // 1. Force a fixed width and style for the capture to prevent responsive shifts
+      const originalStyle = element.style.cssText;
+      element.style.width = "1200px";
+      element.style.maxWidth = "none";
+      element.style.overflow = "visible";
+
+      // 2. Hide buttons and filter bar for a clean report
+      const toHide = element.querySelectorAll("button, .pdf-hide, input[type='date']");
+      toHide.forEach(el => el.style.visibility = "hidden");
+
+      // 3. Small delay to let charts re-adjust to the new width
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      const canvas = await html2canvas(element, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: "#f9fafb",
+        width: 1200,
+        height: element.scrollHeight,
+        windowWidth: 1200,
+        y: 0,
+        scrollX: 0,
+        scrollY: 0
+      });
+
+      // 4. Restore original styles and visibility
+      element.style.cssText = originalStyle;
+      toHide.forEach(el => el.style.visibility = "visible");
+
+      const imgData = canvas.toDataURL("image/jpeg", 0.95);
+      const pdf = new jsPDF("p", "mm", "a4");
+
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+
+      const imgProps = pdf.getImageProperties(imgData);
+      const canvasImgHeight = (imgProps.height * pdfWidth) / imgProps.width;
+
+      let heightLeft = canvasImgHeight;
+      let position = 0;
+
+      // Add pages correctly
+      pdf.addImage(imgData, "JPEG", 0, position, pdfWidth, canvasImgHeight);
+      heightLeft -= pdfHeight;
+
+      while (heightLeft > 0) {
+        position = heightLeft - canvasImgHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, "JPEG", 0, position, pdfWidth, canvasImgHeight);
+        heightLeft -= pdfHeight;
+      }
+
+      pdf.save(`YouTube_Performance_Report_${new Date().toISOString().split("T")[0]}.pdf`);
+    } catch (err) {
+      console.error("PDF generation failed:", err);
+      alert("Failed to generate PDF. Check console for details.");
+    } finally {
+      setDownloading(false);
+    }
+  };
+
   const top10ByViews = topVideos.byViews;
   const top10ByLikes = topVideos.byLikes;
   const top10ByComments = topVideos.byComments;
 
   const insights = React.useMemo(() => {
     return [
-        { icon: Zap, color: "#facc15", label: "Avg Engagement", value: (kpiData.avg_engagement * 100).toFixed(2) + "%", sub: "Rate per view" },
-        { icon: Calendar, color: "#60a5fa", label: "Best Posting Day", value: kpiData.best_posting_day, sub: "Highest Views" },
-        { icon: TrendingUp, color: "#34d399", label: "Active Videos", value: kpiData.total_videos.toLocaleString(), sub: "In selection" }
+      { icon: Zap, color: "#facc15", label: "Avg Engagement", value: (kpiData.avg_engagement * 100).toFixed(2) + "%", sub: "Rate per view" },
+      { icon: Calendar, color: "#60a5fa", label: "Best Posting Day", value: kpiData.best_posting_day, sub: "Highest Views" },
+      { icon: TrendingUp, color: "#34d399", label: "Active Videos", value: kpiData.total_videos.toLocaleString(), sub: "In selection" }
     ];
   }, [kpiData]);
 
@@ -288,36 +359,61 @@ export function YoutubeTracking() {
   }
 
   return (
-    <div className="p-2 md:p-6 bg-gray-50 min-h-screen text-gray-800 w-full max-w-full overflow-x-hidden">
+    <div ref={dashboardRef} className="p-2 md:p-6 bg-gray-50 min-h-screen text-gray-800 w-full max-w-full overflow-x-hidden">
       {/* HEADER */}
       <div className="flex flex-col md:flex-row items-center justify-between mb-4 md:mb-6 gap-4">
         <h1 className="text-xl md:text-3xl font-bold text-[#225F8B] text-center md:text-left">
           Youtube Live Dashboard Of Party In-House Channels
         </h1>
-        <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-lg p-2 shadow-sm">
-          <div className="text-xs text-gray-500 uppercase tracking-wide">Date Range</div>
-          <input
-            type="date"
-            value={fromDate}
-            onChange={(e) => setFromDate(e.target.value)}
-            className="border rounded px-2 py-1 text-sm"
-          />
-          <span className="text-gray-400">-</span>
-          <input
-            type="date"
-            value={toDate}
-            onChange={(e) => setToDate(e.target.value)}
-            className="border rounded px-2 py-1 text-sm"
-          />
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-lg p-2 shadow-sm pdf-hide">
+            <div className="text-xs text-gray-500 uppercase tracking-wide">Date Range</div>
+            <input
+              type="date"
+              value={fromDate}
+              onChange={(e) => setFromDate(e.target.value)}
+              className="border rounded px-2 py-1 text-sm"
+            />
+            <span className="text-gray-400">-</span>
+            <input
+              type="date"
+              value={toDate}
+              onChange={(e) => setToDate(e.target.value)}
+              className="border rounded px-2 py-1 text-sm"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => {
+                setCursor(null);
+                fetchVideos(true);
+                fetchTopVideos();
+                fetchKPIs();
+              }}
+              disabled={isLoading}
+              className="flex items-center gap-1 text-xs text-gray-500 hover:text-[#225F8B] transition-colors pdf-hide"
+            >
+              <RefreshCw size={14} className={isLoading ? "animate-spin" : ""} />
+              {isLoading ? "Loading…" : "Refresh"}
+            </button>
+            <button
+              onClick={downloadPDF}
+              disabled={downloading || isLoading}
+              className="flex items-center gap-1 text-xs text-gray-500 hover:text-[#225F8B] transition-colors bg-white border border-gray-200 px-3 py-1.5 rounded-lg shadow-sm"
+            >
+              <Download size={14} className={downloading ? "animate-pulse" : ""} />
+              {downloading ? "Generating PDF..." : "Download Report"}
+            </button>
+          </div>
         </div>
       </div>
 
       {/* FILTER + KPIs */}
-      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-3 gap-2 md:gap-4 mb-4 md:mb-6">
-        <div 
-          className="bg-white rounded-xl p-4 relative flex flex-col justify-center transition-transform hover:-translate-y-1 z-30" 
+      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-3 gap-2 md:gap-4 mb-4 md:mb-6 pdf-hide">
+        <div
+          className="bg-white rounded-xl p-4 relative flex flex-col justify-center transition-transform hover:-translate-y-1 z-30"
           ref={dropdownRef}
-          style={{ 
+          style={{
             boxShadow: "4px 4px 0px 0px #cbd5e1",
             border: "2px solid #cbd5e1"
           }}
@@ -417,64 +513,64 @@ export function YoutubeTracking() {
               <p className="text-indigo-100 text-[10px] mt-0.5">{top10ByViews[0]?.channel}</p>
             </div>
             {top10ByViews[0] && (
-               <a 
-                 href={`https://www.youtube.com/watch?v=${top10ByViews[0].id}`} 
-                 target="_blank" 
-                 rel="noreferrer"
-                 className="bg-white/20 hover:bg-white/30 p-1.5 rounded-full transition-colors"
-               >
-                 <ExternalLink size={14} className="text-white" />
-               </a>
+              <a
+                href={`https://www.youtube.com/watch?v=${top10ByViews[0].id}`}
+                target="_blank"
+                rel="noreferrer"
+                className="bg-white/20 hover:bg-white/30 p-1.5 rounded-full transition-colors"
+              >
+                <ExternalLink size={14} className="text-white" />
+              </a>
             )}
           </div>
 
           {top10ByViews[0] ? (
             <div className="p-3 flex flex-col h-full">
               <div className="flex items-center justify-between mb-2">
-                 <div className="flex gap-2 w-full justify-between">
-                    <div className="flex flex-col">
-                       <span className="text-[10px] text-gray-500 flex items-center gap-1"><Eye size={10}/> Views</span>
-                       <span className="font-bold text-gray-800 text-sm">{top10ByViews[0].views?.toLocaleString()}</span>
-                    </div>
-                    <div className="flex flex-col">
-                       <span className="text-[10px] text-gray-500 flex items-center gap-1"><ThumbsUp size={10}/> Likes</span>
-                       <span className="font-bold text-gray-800 text-sm">{top10ByViews[0].likes?.toLocaleString()}</span>
-                    </div>
-                    <div className="flex flex-col">
-                       <span className="text-[10px] text-gray-500 flex items-center gap-1"><MessageCircle size={10}/> Comments</span>
-                       <span className="font-bold text-gray-800 text-sm">{top10ByViews[0].comments?.toLocaleString()}</span>
-                    </div>
-                 </div>
+                <div className="flex gap-2 w-full justify-between">
+                  <div className="flex flex-col">
+                    <span className="text-[10px] text-gray-500 flex items-center gap-1"><Eye size={10} /> Views</span>
+                    <span className="font-bold text-gray-800 text-sm">{top10ByViews[0].views?.toLocaleString()}</span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[10px] text-gray-500 flex items-center gap-1"><ThumbsUp size={10} /> Likes</span>
+                    <span className="font-bold text-gray-800 text-sm">{top10ByViews[0].likes?.toLocaleString()}</span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[10px] text-gray-500 flex items-center gap-1"><MessageCircle size={10} /> Comments</span>
+                    <span className="font-bold text-gray-800 text-sm">{top10ByViews[0].comments?.toLocaleString()}</span>
+                  </div>
+                </div>
               </div>
-              
+
               <div className="flex-1 h-24 relative">
-                 <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={[{ name: 'Views', views: top10ByViews[0].views }]} margin={{ top: 5, right: 5, left: 0, bottom: 5 }}>
-                       <defs>
-                          <linearGradient id="viewGradient" x1="0" y1="0" x2="0" y2="1">
-                             <stop offset="0%" stopColor="#818cf8" stopOpacity={1}/>
-                             <stop offset="100%" stopColor="#c084fc" stopOpacity={1}/>
-                          </linearGradient>
-                       </defs>
-                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
-                       <XAxis dataKey="name" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
-                       <YAxis tick={{ fontSize: 10 }} tickFormatter={(value) => new Intl.NumberFormat('en', { notation: "compact", compactDisplay: "short" }).format(value)} axisLine={false} tickLine={false} />
-                       <Tooltip 
-                          cursor={{fill: 'transparent'}}
-                          content={({ active, payload }) => {
-                            if (active && payload && payload.length) {
-                              return (
-                                <div className="bg-gray-800 text-white text-[10px] p-1 rounded shadow">
-                                  {payload[0].value.toLocaleString()}
-                                </div>
-                              );
-                            }
-                            return null;
-                          }}
-                       />
-                       <Bar dataKey="views" fill="url(#viewGradient)" radius={[4, 4, 0, 0]} barSize={40} />
-                    </BarChart>
-                 </ResponsiveContainer>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={[{ name: 'Views', views: top10ByViews[0].views }]} margin={{ top: 5, right: 5, left: 0, bottom: 5 }}>
+                    <defs>
+                      <linearGradient id="viewGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#818cf8" stopOpacity={1} />
+                        <stop offset="100%" stopColor="#c084fc" stopOpacity={1} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
+                    <XAxis dataKey="name" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fontSize: 10 }} tickFormatter={(value) => new Intl.NumberFormat('en', { notation: "compact", compactDisplay: "short" }).format(value)} axisLine={false} tickLine={false} />
+                    <Tooltip
+                      cursor={{ fill: 'transparent' }}
+                      content={({ active, payload }) => {
+                        if (active && payload && payload.length) {
+                          return (
+                            <div className="bg-gray-800 text-white text-[10px] p-1 rounded shadow">
+                              {payload[0].value.toLocaleString()}
+                            </div>
+                          );
+                        }
+                        return null;
+                      }}
+                    />
+                    <Bar dataKey="views" fill="url(#viewGradient)" radius={[4, 4, 0, 0]} barSize={40} />
+                  </BarChart>
+                </ResponsiveContainer>
               </div>
             </div>
           ) : (
@@ -568,7 +664,7 @@ export function YoutubeTracking() {
               {finalVideos.map((v) => {
                 const url = `https://www.youtube.com/watch?v=${v.id}`;
                 const engagementCount = toNumber(v.likes) + toNumber(v.comments);
-                
+
                 return (
                   <tr key={v.id} className="border-t hover:bg-gray-50">
                     <td className="px-3 py-2">
@@ -604,7 +700,7 @@ export function YoutubeTracking() {
       </div>
 
       {/* LOAD MORE */}
-      <div className="flex justify-center mt-6 mb-10">
+      <div className="flex justify-center mt-6 mb-10 pdf-hide">
         <button
           onClick={() => fetchVideos(false)}
           disabled={!hasNext || isLoading}
@@ -624,7 +720,7 @@ const ChartBox = ({ title, data, dataKey, color1, color2, icon: Icon }) => {
   const gradientId = `gradient-${dataKey}`;
   return (
     <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden flex flex-col min-w-0">
-      <div 
+      <div
         className="p-3 text-white flex items-center gap-2"
         style={{ background: `linear-gradient(to right, ${color1}, ${color2})` }}
       >
@@ -655,9 +751,9 @@ const ChartBox = ({ title, data, dataKey, color1, color2, icon: Icon }) => {
               axisLine={false}
               tickLine={false}
             />
-            <YAxis 
-              tick={{ fontSize: 10 }} 
-              width={30} 
+            <YAxis
+              tick={{ fontSize: 10 }}
+              width={30}
               tickFormatter={(value) => new Intl.NumberFormat('en', { notation: "compact", compactDisplay: "short" }).format(value)}
               axisLine={false}
               tickLine={false}

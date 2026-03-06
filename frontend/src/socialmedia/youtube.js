@@ -12,7 +12,7 @@ import { ChevronDown, ArrowUp, ArrowDown, Trophy, Eye, ThumbsUp, MessageCircle, 
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 
-const API_BASE_URL = "https://healthy-released-bucks-grades.trycloudflare.com";
+const API_BASE_URL = "https://los-layers-hospital-blond.trycloudflare.com";
 
 
 const toNumber = (v) => {
@@ -80,6 +80,7 @@ export function YoutubeTracking() {
   const dashboardRef = useRef(null);
   const [downloading, setDownloading] = useState(false);
   const [allChannels, setAllChannels] = useState([]);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
   useEffect(() => {
     function handleClickOutside(event) {

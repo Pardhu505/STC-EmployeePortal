@@ -12,7 +12,7 @@ import { ChevronDown, ArrowUp, ArrowDown, Trophy, Eye, ThumbsUp, MessageCircle, 
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 
-const API_BASE_URL = "https://los-layers-hospital-blond.trycloudflare.com";
+const API_BASE_URL = "https://cool-investigate-screensavers-gray.trycloudflare.com";
 
 
 const toNumber = (v) => {

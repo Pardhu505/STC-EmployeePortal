@@ -271,8 +271,8 @@ export function YoutubeTracking() {
       element.style.maxWidth = "none";
       element.style.overflow = "visible";
 
-      // 2. Hide buttons and filter bar for a clean report
-      const toHide = element.querySelectorAll("button, .pdf-hide, input[type='date']");
+      // 2. Hide specific action buttons but keep KPI keys/filters visible
+      const toHide = element.querySelectorAll("button:not(.kpi-key), .action-btn, input[type='date']");
       toHide.forEach(el => el.style.visibility = "hidden");
 
       // 3. Small delay to let charts re-adjust to the new width
@@ -367,8 +367,8 @@ export function YoutubeTracking() {
           Youtube Live Dashboard Of Party In-House Channels
         </h1>
         <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-lg p-2 shadow-sm pdf-hide">
-            <div className="text-xs text-gray-500 uppercase tracking-wide">Date Range</div>
+          <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-lg p-2 shadow-sm">
+            <div className="text-xs text-gray-500 uppercase tracking-wide kpi-key">Date Range</div>
             <input
               type="date"
               value={fromDate}
@@ -392,7 +392,7 @@ export function YoutubeTracking() {
                 fetchKPIs();
               }}
               disabled={isLoading}
-              className="flex items-center gap-1 text-xs text-gray-500 hover:text-[#225F8B] transition-colors pdf-hide"
+              className="flex items-center gap-1 text-xs text-gray-500 hover:text-[#225F8B] transition-colors action-btn"
             >
               <RefreshCw size={14} className={isLoading ? "animate-spin" : ""} />
               {isLoading ? "Loading…" : "Refresh"}
@@ -400,7 +400,7 @@ export function YoutubeTracking() {
             <button
               onClick={downloadPDF}
               disabled={downloading || isLoading}
-              className="flex items-center gap-1 text-xs text-gray-500 hover:text-[#225F8B] transition-colors bg-white border border-gray-200 px-3 py-1.5 rounded-lg shadow-sm"
+              className="flex items-center gap-1 text-xs text-gray-500 hover:text-[#225F8B] transition-colors bg-white border border-gray-200 px-3 py-1.5 rounded-lg shadow-sm action-btn"
             >
               <Download size={14} className={downloading ? "animate-pulse" : ""} />
               {downloading ? "Generating PDF..." : "Download Report"}
@@ -410,9 +410,9 @@ export function YoutubeTracking() {
       </div>
 
       {/* FILTER + KPIs */}
-      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-3 gap-2 md:gap-4 mb-4 md:mb-6 pdf-hide">
+      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-3 gap-2 md:gap-4 mb-4 md:mb-6">
         <div
-          className="bg-white rounded-xl p-4 relative flex flex-col justify-center transition-transform hover:-translate-y-1 z-30"
+          className="bg-white rounded-xl p-4 relative flex flex-col justify-center transition-transform hover:-translate-y-1 z-30 kpi-key"
           ref={dropdownRef}
           style={{
             boxShadow: "4px 4px 0px 0px #cbd5e1",

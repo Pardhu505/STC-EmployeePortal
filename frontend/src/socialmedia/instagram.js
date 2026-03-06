@@ -31,15 +31,18 @@ import {
   ListFilter,
   Trophy,
   RefreshCw,
+  Download,
 } from "lucide-react";
+import html2canvas from "html2canvas";
+import jsPDF from "jspdf";
 
 // ─── Change this to your live backend URL ──────────────────────────────────
-const API_BASE = "https://robert-notify-his-processing.trycloudflare.com";
+const API_BASE = "http://localhost:8000";
 
 /* -------------------------
    KPI CARD
 ------------------------- */
-const KPI = ({ label, value, color, icon: Icon, trend, caption }) => (
+const KPI = ({ label, value, color, icon: Icon, trend, caption, link }) => (
   <div
     className="bg-white rounded-xl p-4 flex items-center justify-between relative overflow-hidden transition-transform hover:-translate-y-1"
     style={{
@@ -53,7 +56,7 @@ const KPI = ({ label, value, color, icon: Icon, trend, caption }) => (
       </div>
       <div className="text-2xl font-black text-gray-800">{value}</div>
       {caption && (
-        <div className="text-xs text-gray-500 mt-1 truncate font-medium pr-2" title={caption}>
+        <div className="text-[9px] leading-tight text-gray-500 mt-1 line-clamp-2 font-medium pr-2 h-6" title={caption}>
           {caption}
         </div>
       )}
@@ -62,6 +65,16 @@ const KPI = ({ label, value, color, icon: Icon, trend, caption }) => (
           {trend > 0 ? <ArrowUp size={12} /> : <ArrowDown size={12} />}
           {Math.abs(trend)}%
         </div>
+      )}
+      {link && (
+        <a
+          href={link}
+          target="_blank"
+          rel="noreferrer"
+          className="text-[9px] text-[#E1306C] hover:underline mt-1 block font-bold pdf-hide"
+        >
+          View Post →
+        </a>
       )}
     </div>
     {Icon && (
@@ -101,15 +114,18 @@ const EMPTY = {
 
 export const InstagramTracking = () => {
   /* ── filter state ────────────────────────────────────────────────────────── */
-  const [selectedHandle, setSelectedHandle] = useState("All");
-  const [timeRange, setTimeRange] = useState("Last 30 Days");
+  const [selectedHandles, setSelectedHandles] = useState([]);
+  const [timeRange, setTimeRange] = useState("All Time");
   const [customStartDate, setCustomStartDate] = useState("");
   const [customEndDate, setCustomEndDate] = useState("");
   const [topN, setTopN] = useState(20);
   const [postType, setPostType] = useState("All");
   const [searchTerm, setSearchTerm] = useState("");
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [sortConfig, setSortConfig] = useState({ key: "likes", direction: "desc" });
   const dropdownRef = useRef(null);
+  const dashboardRef = useRef(null);
+  const [downloading, setDownloading] = useState(false);
 
   /* ── data state ──────────────────────────────────────────────────────────── */
   const [data, setData] = useState(EMPTY);
@@ -146,6 +162,7 @@ export const InstagramTracking = () => {
     if (timeRange === "Custom") {
       return { fromDate: customStartDate, toDate: customEndDate };
     }
+    // All Time (All or Normal)
     return { fromDate: "", toDate: "" };
   }, [timeRange, customStartDate, customEndDate]);
 
@@ -155,7 +172,9 @@ export const InstagramTracking = () => {
     setError(null);
     try {
       const params = new URLSearchParams();
-      if (selectedHandle && selectedHandle !== "All") params.set("handle", selectedHandle);
+      if (selectedHandles.length > 0) {
+        params.set("handle", selectedHandles.join(","));
+      }
       if (fromDate) params.set("fromDate", fromDate);
       if (toDate) params.set("toDate", toDate);
       if (postType !== "All") params.set("postType", postType);
@@ -172,7 +191,7 @@ export const InstagramTracking = () => {
     } finally {
       setLoading(false);
     }
-  }, [selectedHandle, fromDate, toDate, postType, topN]);
+  }, [selectedHandles, fromDate, toDate, postType, topN]);
 
   useEffect(() => { fetchDashboard(); }, [fetchDashboard]);
 
@@ -185,24 +204,129 @@ export const InstagramTracking = () => {
     [accounts, searchTerm]
   );
 
+  const handleAccountToggle = (handle) => {
+    setSelectedHandles((prev) => {
+      if (prev.includes(handle)) return prev.filter((h) => h !== handle);
+      return [...prev, handle];
+    });
+  };
 
+  const requestSort = (key) => {
+    let direction = "asc";
+    if (sortConfig.key === key && sortConfig.direction === "asc") {
+      direction = "desc";
+    }
+    setSortConfig({ key, direction });
+  };
+
+  const sortedPosts = useMemo(() => {
+    let sortableItems = [...topPosts];
+    if (sortConfig.key) {
+      sortableItems.sort((a, b) => {
+        const valA = a[sortConfig.key];
+        const valB = b[sortConfig.key];
+        if (typeof valA === "string") {
+          return sortConfig.direction === "asc" ? valA.localeCompare(valB) : valB.localeCompare(valA);
+        }
+        return sortConfig.direction === "asc" ? valA - valB : valB - valA;
+      });
+    }
+    return sortableItems;
+  }, [topPosts, sortConfig]);
+  const downloadPDF = async () => {
+    if (!dashboardRef.current) return;
+    setDownloading(true);
+    try {
+      const element = dashboardRef.current;
+
+      // 1. Force a fixed width and style for the capture to prevent responsive shifts
+      const originalStyle = element.style.cssText;
+      element.style.width = "1200px";
+      element.style.maxWidth = "none";
+      element.style.overflow = "visible";
+
+      // 2. Hide buttons and filter bar for a clean report
+      const toHide = element.querySelectorAll("button, .pdf-hide");
+      toHide.forEach(el => el.style.visibility = "hidden");
+
+      // 3. Small delay to let charts re-adjust to the new width
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      const canvas = await html2canvas(element, {
+        scale: 2, // 2 is usually plenty for fixed-width 1200px
+        useCORS: true,
+        logging: false,
+        backgroundColor: "#f9fafb",
+        width: 1200,
+        height: element.scrollHeight,
+        windowWidth: 1200,
+        y: 0,
+        scrollX: 0,
+        scrollY: 0
+      });
+
+      // 4. Restore original styles and visibility
+      element.style.cssText = originalStyle;
+      toHide.forEach(el => el.style.visibility = "visible");
+
+      const imgData = canvas.toDataURL("image/jpeg", 0.95);
+      const pdf = new jsPDF("p", "mm", "a4");
+
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+
+      const imgProps = pdf.getImageProperties(imgData);
+      const canvasImgHeight = (imgProps.height * pdfWidth) / imgProps.width;
+
+      let heightLeft = canvasImgHeight;
+      let position = 0;
+
+      // Add pages correctly
+      pdf.addImage(imgData, "JPEG", 0, position, pdfWidth, canvasImgHeight);
+      heightLeft -= pdfHeight;
+
+      while (heightLeft > 0) {
+        position = heightLeft - canvasImgHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, "JPEG", 0, position, pdfWidth, canvasImgHeight);
+        heightLeft -= pdfHeight;
+      }
+
+      pdf.save(`Instagram_Performance_Report_${new Date().toISOString().split("T")[0]}.pdf`);
+    } catch (err) {
+      console.error("PDF generation failed:", err);
+      alert("Failed to generate PDF. Check console for details.");
+    } finally {
+      setDownloading(false);
+    }
+  };
 
   return (
-    <div className="p-2 md:p-6 bg-gray-50 min-h-screen text-gray-800 w-full max-w-full overflow-x-hidden">
+    <div ref={dashboardRef} className="p-2 md:p-6 bg-gray-50 min-h-screen text-gray-800 w-full max-w-full overflow-x-hidden">
       {/* HEADER */}
       <div className="mb-6">
         <div className="flex items-center justify-between mb-4">
           <h1 className="text-xl md:text-3xl font-bold text-[#E1306C] flex items-center gap-2">
             <Instagram /> Instagram Party In-House Tracking Tool
           </h1>
-          <button
-            onClick={fetchDashboard}
-            disabled={loading}
-            className="flex items-center gap-1 text-xs text-gray-500 hover:text-[#E1306C] transition-colors"
-          >
-            <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
-            {loading ? "Loading…" : "Refresh"}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={fetchDashboard}
+              disabled={loading}
+              className="flex items-center gap-1 text-xs text-gray-500 hover:text-[#E1306C] transition-colors"
+            >
+              <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
+              {loading ? "Loading…" : "Refresh"}
+            </button>
+            <button
+              onClick={downloadPDF}
+              disabled={downloading || loading}
+              className="flex items-center gap-1 text-xs text-gray-500 hover:text-[#E1306C] transition-colors bg-white border border-gray-200 px-3 py-1.5 rounded-lg shadow-sm"
+            >
+              <Download size={14} className={downloading ? "animate-pulse" : ""} />
+              {downloading ? "Generating PDF..." : "Download Report"}
+            </button>
+          </div>
         </div>
 
         {error && (
@@ -212,7 +336,7 @@ export const InstagramTracking = () => {
         )}
 
         {/* FILTERS BAR */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 pdf-hide">
 
           {/* 1. Account Filter */}
           <div className="relative z-30" ref={dropdownRef}>
@@ -225,9 +349,9 @@ export const InstagramTracking = () => {
                   className="w-full flex items-center justify-between text-sm font-medium text-gray-700 bg-transparent outline-none"
                 >
                   <span className="truncate">
-                    {selectedHandle === "All"
+                    {selectedHandles.length === 0
                       ? `All Accounts (${accounts.length})`
-                      : selectedHandle}
+                      : `${selectedHandles.length} Selected`}
                   </span>
                   <ChevronDown size={16} />
                 </button>
@@ -237,7 +361,7 @@ export const InstagramTracking = () => {
             {isDropdownOpen && (
               <div className="absolute top-full left-0 w-full mt-2 bg-white border border-gray-200 rounded-xl shadow-xl max-h-80 overflow-hidden flex flex-col z-40">
                 <div className="p-2 border-b border-gray-100 bg-gray-50">
-                  <div className="flex items-center bg-white border border-gray-200 rounded-lg px-2 py-1.5">
+                  <div className="flex items-center bg-white border border-gray-200 rounded-lg px-2 py-1.5 mb-2">
                     <Search size={14} className="text-gray-400 mr-2" />
                     <input
                       type="text"
@@ -247,23 +371,35 @@ export const InstagramTracking = () => {
                       onChange={(e) => setSearchTerm(e.target.value)}
                     />
                   </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setSelectedHandles(accounts.map(a => a.handle))}
+                      className="text-xs text-blue-600 hover:underline font-medium"
+                    >
+                      Select All
+                    </button>
+                    <button
+                      onClick={() => setSelectedHandles([])}
+                      className="text-xs text-red-600 hover:underline font-medium"
+                    >
+                      Clear
+                    </button>
+                  </div>
                 </div>
                 <div className="overflow-y-auto flex-1 p-1">
-                  <div
-                    onClick={() => { setSelectedHandle("All"); setIsDropdownOpen(false); }}
-                    className={`flex items-center justify-between px-3 py-2 rounded-lg cursor-pointer text-sm mb-1 ${selectedHandle === "All" ? "bg-pink-50 text-[#E1306C] font-medium" : "hover:bg-gray-50 text-gray-700"}`}
-                  >
-                    <span>All Accounts</span>
-                    {selectedHandle === "All" && <Check size={14} />}
-                  </div>
                   {filteredAccounts.map((acc) => (
                     <div
                       key={acc.handle}
-                      onClick={() => { setSelectedHandle(acc.handle); setIsDropdownOpen(false); }}
-                      className={`flex items-center justify-between px-3 py-2 rounded-lg cursor-pointer text-sm mb-1 ${selectedHandle === acc.handle ? "bg-pink-50 text-[#E1306C] font-medium" : "hover:bg-gray-50 text-gray-700"}`}
+                      onClick={() => handleAccountToggle(acc.handle)}
+                      className="flex items-center px-3 py-2 hover:bg-gray-50 rounded-lg cursor-pointer text-sm mb-1"
                     >
-                      <span>{acc.handle}</span>
-                      {selectedHandle === acc.handle && <Check size={14} />}
+                      <input
+                        type="checkbox"
+                        checked={selectedHandles.includes(acc.handle)}
+                        readOnly
+                        className="mr-2 h-4 w-4 text-[#E1306C] rounded border-gray-300 focus:ring-[#E1306C]"
+                      />
+                      <span className="truncate">{acc.handle}</span>
                     </div>
                   ))}
                   {filteredAccounts.length === 0 && (
@@ -285,6 +421,7 @@ export const InstagramTracking = () => {
                   onChange={(e) => setTimeRange(e.target.value)}
                   className="w-full text-sm font-medium text-gray-700 bg-transparent outline-none cursor-pointer"
                 >
+                  <option>All Time</option>
                   <option>Last 7 Days</option>
                   <option>Last 30 Days</option>
                   <option>This Month</option>
@@ -349,8 +486,8 @@ export const InstagramTracking = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <KPI label="Active Accounts" value={kpi.totalAccounts.toLocaleString()} color="#E1306C" icon={Users} caption="Accounts that posted in selected range" />
         <KPI label="Total Posts" value={kpi.totalPosts.toLocaleString()} color="#F77737" icon={Activity} />
-        <KPI label="Most Liked Post" value={kpi.mostLiked.likes.toLocaleString()} color="#FCAF45" icon={Heart} caption={kpi.mostLiked.caption} />
-        <KPI label="Most Commented Post" value={kpi.mostCommented.comments.toLocaleString()} color="#833AB4" icon={MessageCircle} caption={kpi.mostCommented.caption} />
+        <KPI label="Most Liked Post" value={kpi.mostLiked.likes.toLocaleString()} color="#FCAF45" icon={Heart} caption={kpi.mostLiked.caption} link={kpi.mostLiked.post_url} />
+        <KPI label="Most Commented Post" value={kpi.mostCommented.comments.toLocaleString()} color="#833AB4" icon={MessageCircle} caption={kpi.mostCommented.caption} link={kpi.mostCommented.post_url} />
       </div>
 
       {/* CHARTS GRID */}
@@ -462,7 +599,7 @@ export const InstagramTracking = () => {
         </div>
 
         {/* Profile Rate (single account) */}
-        {selectedHandle !== "All" && (
+        {selectedHandles.length === 1 && (
           <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-4 lg:col-span-2">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-bold text-gray-700 flex items-center gap-2">
@@ -473,13 +610,55 @@ export const InstagramTracking = () => {
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={charts.dailyStats}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                  <XAxis dataKey="date" tick={{ fontSize: 10 }} interval={0} angle={-45} textAnchor="end" height={60} />
+                  <XAxis dataKey="date" tick={{ fontSize: 10 }} interval="preserveStartEnd" angle={-45} textAnchor="end" height={60} />
                   <YAxis yAxisId="left" tick={{ fontSize: 10 }} />
                   <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10 }} />
-                  <Tooltip />
-                  <Legend />
-                  <Line yAxisId="left" type="monotone" dataKey="posts" name="Posts/Day" stroke="#E1306C" strokeWidth={2} dot={{ r: 3 }} />
-                  <Line yAxisId="right" type="monotone" dataKey="engagementRate" name="Eng./Post" stroke="#FCAF45" strokeWidth={2} dot={{ r: 3 }} />
+                  <Tooltip
+                    content={({ active, payload, label }) => {
+                      if (active && payload && payload.length) {
+                        const d = payload[0].payload;
+                        if (!d) return null;
+
+                        let periodLabel = "Period: " + (label || "N/A");
+                        if (String(label).length === 4) periodLabel = "Year: " + label;
+                        else if (String(label).length === 7) periodLabel = "Month: " + label;
+                        else if (String(label).includes("-") && (d.posts || 0) > 1) {
+                          periodLabel = "Week Starting: " + label;
+                        }
+
+                        return (
+                          <div className="bg-white p-3 border border-gray-100 shadow-xl rounded-xl text-xs">
+                            <div className="font-bold text-gray-800 mb-2 border-b border-gray-50 pb-1">{periodLabel}</div>
+                            <div className="space-y-1">
+                              <div className="flex justify-between gap-4">
+                                <span className="text-gray-500 font-medium flex items-center gap-1">
+                                  <div className="w-2 h-2 rounded-full bg-[#E1306C]" /> Total Posts:
+                                </span>
+                                <span className="font-bold text-gray-900">{(d.posts || 0).toLocaleString()}</span>
+                              </div>
+                              <div className="flex justify-between gap-4">
+                                <span className="text-gray-500 font-medium flex items-center gap-1">
+                                  <div className="w-2 h-2 rounded-full bg-[#FCAF45]" /> Avg. Eng.:
+                                </span>
+                                <span className="font-bold text-gray-900">{(d.engagementRate || 0).toLocaleString()}</span>
+                              </div>
+                              <div className="flex justify-between gap-4">
+                                <span className="text-gray-500 font-medium flex items-center gap-1">
+                                  <div className="w-2 h-2 rounded-full bg-[#833AB4]" /> Best Post:
+                                </span>
+                                <span className="font-bold text-[#833AB4]">{(d.topPostEng || 0).toLocaleString()}</span>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      }
+                      return null;
+                    }}
+                  />
+                  <Legend verticalAlign="top" height={36} />
+                  <Line yAxisId="left" type="monotone" dataKey="posts" name="Total Posts" stroke="#E1306C" strokeWidth={3} dot={{ r: 4, strokeWidth: 2, fill: "white" }} activeDot={{ r: 6 }} />
+                  <Line yAxisId="right" type="monotone" dataKey="engagementRate" name="Avg. Engagement" stroke="#FCAF45" strokeWidth={3} dot={{ r: 4, strokeWidth: 2, fill: "white" }} activeDot={{ r: 6 }} />
+                  <Line yAxisId="right" type="stepAfter" dataKey="topPostEng" name="Top Post Performance" stroke="#833AB4" strokeWidth={2} strokeDasharray="5 5" dot={false} />
                 </LineChart>
               </ResponsiveContainer>
             </div>
@@ -487,7 +666,7 @@ export const InstagramTracking = () => {
         )}
 
         {/* Top Accounts by Engagement (all accounts) */}
-        {selectedHandle === "All" && (
+        {selectedHandles.length !== 1 && (
           <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-bold text-gray-700 flex items-center gap-2">
@@ -515,7 +694,7 @@ export const InstagramTracking = () => {
         )}
 
         {/* Top Accounts by Posts (all accounts) */}
-        {selectedHandle === "All" && (
+        {selectedHandles.length !== 1 && (
           <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-bold text-gray-700 flex items-center gap-2">
@@ -557,7 +736,7 @@ export const InstagramTracking = () => {
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={charts.activityData}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                <XAxis dataKey="name" tick={{ fontSize: 10 }} interval={0} angle={-45} textAnchor="end" height={60} />
+                <XAxis dataKey="name" tick={{ fontSize: 9 }} interval="auto" angle={-45} textAnchor="end" height={70} />
                 <YAxis tick={{ fontSize: 10 }} />
                 <Tooltip
                   cursor={{ fill: "transparent" }}
@@ -598,7 +777,7 @@ export const InstagramTracking = () => {
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={charts.activityData}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                <XAxis dataKey="name" tick={{ fontSize: 10 }} interval={0} angle={-45} textAnchor="end" height={60} />
+                <XAxis dataKey="name" tick={{ fontSize: 9 }} interval="auto" angle={-45} textAnchor="end" height={70} />
                 <YAxis tick={{ fontSize: 10 }} />
                 <Tooltip
                   cursor={{ fill: "transparent" }}
@@ -639,7 +818,7 @@ export const InstagramTracking = () => {
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={charts.activityData}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                <XAxis dataKey="name" tick={{ fontSize: 10 }} interval={0} angle={-45} textAnchor="end" height={60} />
+                <XAxis dataKey="name" tick={{ fontSize: 9 }} interval="auto" angle={-45} textAnchor="end" height={70} />
                 <YAxis tick={{ fontSize: 10 }} />
                 <Tooltip
                   cursor={{ fill: "transparent" }}
@@ -685,30 +864,59 @@ export const InstagramTracking = () => {
           <table className="w-full text-sm text-left">
             <thead className="text-xs text-gray-500 uppercase bg-gray-50 border-b border-gray-100">
               <tr>
-                <th className="px-4 py-3 font-semibold">Post Content</th>
-                <th className="px-4 py-3 font-semibold">Account</th>
-                <th className="px-4 py-3 font-semibold">Type</th>
-                <th className="px-4 py-3 font-semibold text-right">Likes</th>
-                <th className="px-4 py-3 font-semibold text-right">Comments</th>
-                <th className="px-4 py-3 font-semibold text-right">Date</th>
+                <th className="px-4 py-3 font-semibold cursor-pointer hover:bg-gray-100" onClick={() => requestSort('caption')}>
+                  <div className="flex items-center gap-1">
+                    Post Content {sortConfig.key === 'caption' && (sortConfig.direction === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />)}
+                  </div>
+                </th>
+                <th className="px-4 py-3 font-semibold cursor-pointer hover:bg-gray-100" onClick={() => requestSort('handle')}>
+                  <div className="flex items-center gap-1">
+                    Account {sortConfig.key === 'handle' && (sortConfig.direction === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />)}
+                  </div>
+                </th>
+                <th className="px-4 py-3 font-semibold cursor-pointer hover:bg-gray-100" onClick={() => requestSort('type')}>
+                  <div className="flex items-center gap-1">
+                    Type {sortConfig.key === 'type' && (sortConfig.direction === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />)}
+                  </div>
+                </th>
+                <th className="px-4 py-3 font-semibold text-right cursor-pointer hover:bg-gray-100" onClick={() => requestSort('likes')}>
+                  <div className="flex items-center justify-end gap-1">
+                    Likes {sortConfig.key === 'likes' && (sortConfig.direction === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />)}
+                  </div>
+                </th>
+                <th className="px-4 py-3 font-semibold text-right cursor-pointer hover:bg-gray-100" onClick={() => requestSort('comments')}>
+                  <div className="flex items-center justify-end gap-1">
+                    Comments {sortConfig.key === 'comments' && (sortConfig.direction === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />)}
+                  </div>
+                </th>
+                <th className="px-4 py-3 font-semibold text-right cursor-pointer hover:bg-gray-100" onClick={() => requestSort('engagement')}>
+                  <div className="flex items-center justify-end gap-1">
+                    Eng {sortConfig.key === 'engagement' && (sortConfig.direction === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />)}
+                  </div>
+                </th>
+                <th className="px-4 py-3 font-semibold text-right cursor-pointer hover:bg-gray-100" onClick={() => requestSort('date')}>
+                  <div className="flex items-center justify-end gap-1">
+                    Date {sortConfig.key === 'date' && (sortConfig.direction === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />)}
+                  </div>
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {loading && (
                 <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-gray-400">
+                  <td colSpan={7} className="px-4 py-8 text-center text-gray-400">
                     <RefreshCw size={18} className="animate-spin inline mr-2" /> Loading data…
                   </td>
                 </tr>
               )}
               {!loading && topPosts.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-gray-400">
+                  <td colSpan={7} className="px-4 py-8 text-center text-gray-400">
                     No posts found for the selected filters.
                   </td>
                 </tr>
               )}
-              {!loading && topPosts.map((post) => (
+              {!loading && sortedPosts.map((post) => (
                 <tr key={post.id || post.post_url} className="hover:bg-gray-50 transition-colors">
                   <td className="px-4 py-3 font-medium text-gray-800 truncate max-w-xs">
                     {post.post_url
@@ -723,6 +931,7 @@ export const InstagramTracking = () => {
                   </td>
                   <td className="px-4 py-3 text-right font-medium">{post.likes.toLocaleString()}</td>
                   <td className="px-4 py-3 text-right text-gray-600">{post.comments.toLocaleString()}</td>
+                  <td className="px-4 py-3 text-right text-[#FCAF45] font-bold">{(post.likes + post.comments).toLocaleString()}</td>
                   <td className="px-4 py-3 text-right text-gray-400 text-xs">{post.date}</td>
                 </tr>
               ))}

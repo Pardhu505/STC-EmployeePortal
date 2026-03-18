@@ -29,7 +29,7 @@ import {
   Eye,
 } from "lucide-react";
 
-const API_BASE_URL = "https://training-eval-cho-genetics.trycloudflare.com";
+const API_BASE_URL = "https://mic-pricing-nose-smoke.trycloudflare.com";
 
 /* -------------------------
    HELPERS
@@ -333,6 +333,7 @@ export function FacebookTracking() {
   // Backend-provided aggregated data
   const [backendKpis, setBackendKpis] = useState({});
   const [backendChannels, setBackendChannels] = useState([]);
+  const [backendAccounts, setBackendAccounts] = useState([]);
   const [backendTopPosts, setBackendTopPosts] = useState([]);
   const [bestPostingDay, setBestPostingDay] = useState("N/A");
 
@@ -419,6 +420,7 @@ export function FacebookTracking() {
       // Use backend-computed KPIs, channels, top posts, etc.
       if (json.kpis) setBackendKpis(json.kpis);
       if (json.channels) setBackendChannels(json.channels);
+      if (json.accounts) setBackendAccounts(json.accounts);
       if (json.top_posts) setBackendTopPosts(json.top_posts);
       if (json.best_posting_day) setBestPostingDay(json.best_posting_day);
       setKpis(prev => ({ ...prev, best_posting_day: json.best_posting_day || 'N/A' }));
@@ -502,7 +504,7 @@ export function FacebookTracking() {
 
     // Use backend KPIs (computed from ALL matching data, not just this page)
     const summary = {
-      totalAccounts: backendKpis.total_accounts || 0,
+      totalAccounts: backendAccounts.length || 0,
       totalFollowers: backendKpis.total_followers || 0,
       totalPosts: backendKpis.total_posts || 0,
       totalLikes: backendKpis.total_likes || 0,
@@ -513,7 +515,7 @@ export function FacebookTracking() {
     };
 
     return { posts: slicedPosts, summary, allFilteredPosts: allPosts };
-  }, [posts, selectedPostIds, topN, backendKpis, selectedPages]);
+  }, [posts, selectedPostIds, topN, backendKpis, backendAccounts, selectedPages]);
 
   // --- Display Data (Top N based on selection) ---
   const displayablePosts = useMemo(() => {
@@ -950,9 +952,6 @@ export function FacebookTracking() {
                 <th className="px-3 py-2 text-left cursor-pointer hover:bg-sky-100" onClick={() => requestSort('engagement')}>
                   Engagement {sortConfig.key === 'engagement' && (sortConfig.direction === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />)}
                 </th>
-                <th className="px-3 py-2 text-left cursor-pointer hover:bg-sky-100" onClick={() => requestSort('mentions')}>
-                  Mentions {sortConfig.key === 'mentions' && (sortConfig.direction === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />)}
-                </th>
                 <th className="px-3 py-2 text-left cursor-pointer hover:bg-sky-100" onClick={() => requestSort('date')}>
                   Posted {sortConfig.key === 'date' && (sortConfig.direction === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />)}
                 </th>
@@ -971,9 +970,6 @@ export function FacebookTracking() {
                   <td className="px-3 py-2">{p.sharesVal.toLocaleString()}</td>
                   <td className="px-3 py-2">{p.viewsVal > 0 ? p.viewsVal.toLocaleString() : "-"}</td>
                   <td className="px-3 py-2 font-semibold text-gray-700">{p.engagementVal.toLocaleString()}</td>
-                  <td className="px-3 py-2 max-w-[200px]">
-                    <div className="truncate text-xs text-gray-600" title={p.mentions.join(", ")}>{p.mentions.length > 0 ? p.mentions.join(", ") : "-"}</div>
-                  </td>
                   <td className="px-3 py-2 text-xs text-gray-500">{p.date || "-"}</td>
                   <td className="px-3 py-2">
                     <a href={p.post_url} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline flex items-center gap-1">

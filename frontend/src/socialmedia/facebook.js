@@ -29,7 +29,7 @@ import {
   Eye,
 } from "lucide-react";
 
-const API_BASE_URL = "https://mic-pricing-nose-smoke.trycloudflare.com";
+const API_BASE_URL = "https://billion-requiring-applicants-encyclopedia.trycloudflare.com";
 
 /* -------------------------
    HELPERS

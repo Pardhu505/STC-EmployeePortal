@@ -36,7 +36,7 @@ import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 
 // ─── Change this to your live backend URL ──────────────────────────────────
-const API_BASE = "https://marking-avi-islands-atmosphere.trycloudflare.com";
+const API_BASE = "https://six-analysis-lines-purple.trycloudflare.com";
 
 /* -------------------------
    KPI CARD

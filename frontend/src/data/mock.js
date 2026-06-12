@@ -1041,6 +1041,15 @@ export const PORTAL_DATA = [
     category: "Data Management",
     managerOnly: true
   },
+  {
+    id: 8,
+    title: "Indian Election Dashboard",
+    description: "Comprehensive Indian Election data across all states and constituencies, featuring an integrated AI Bot for intelligent data summarization and insights.",
+    url: "https://showtime-election-dashboard.vercel.app",
+    icon: "🗳️",
+    gradient: "from-orange-400 to-green-500",
+    category: "Analytics • AI"
+  },
 ];
 
 

@@ -22,9 +22,148 @@ const formatMinutesToTime = (totalMinutes) => {
   return `${pad(hours)}:${pad(minutes)}`;
 };
 
+// Parse Daily Block Format (New Format)
+const parseDailyBlockFormat = (lines) => {
+  const allEmployees = {};
+  let currentDate = null;
+  let year = new Date().getFullYear();
+
+  // Try to find month/year from top of file
+  const monthYearLine = lines.find(line => line.join(',').includes('To'));
+  if (monthYearLine) {
+    const monthYearMatch = monthYearLine.join(',').match(/(\w{3})\s+\d{1,2}\s+(\d{4})/);
+    if (monthYearMatch) {
+      year = monthYearMatch[2];
+    }
+  }
+
+  let holidaysForYear = getHolidaysForYear(year);
+
+  let empCodeIdx = -1;
+  let nameIdx = -1;
+  let punchRecordsIdx = -1;
+  let totalHoursIdx = -1;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const lineStr = line.join(',');
+
+    if (lineStr.includes('Attendance Date')) {
+      // Find date. It's usually in the same row or next few cells.
+      const dateCell = line.find(cell => cell.match(/\d{1,2}-\w{3}-\d{2,4}/));
+      if (dateCell) {
+        const parts = dateCell.split('-');
+        const day = parts[0];
+        const monthStr = parts[1];
+        const yearPart = parts[2];
+        const monthMap = { 'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3, 'May': 4, 'Jun': 5, 'Jul': 6, 'Aug': 7, 'Sep': 8, 'Oct': 9, 'Nov': 10, 'Dec': 11 };
+        const month = monthMap[monthStr];
+        const fullYear = yearPart.length === 2 ? 2000 + parseInt(yearPart) : parseInt(yearPart);
+        currentDate = new Date(Date.UTC(fullYear, month, parseInt(day)));
+
+        // Update holidays if year changes
+        if (fullYear !== parseInt(year)) {
+          year = fullYear.toString();
+          holidaysForYear = getHolidaysForYear(year);
+        }
+      }
+      continue;
+    }
+
+    if (lineStr.includes('Emp Code') && lineStr.includes('Punch Records')) {
+      empCodeIdx = line.findIndex(cell => cell.trim() === 'Emp Code');
+      nameIdx = line.findIndex(cell => cell.trim() === 'Name');
+      punchRecordsIdx = line.findIndex(cell => cell.trim() === 'Punch Records');
+      totalHoursIdx = line.findIndex(cell => cell.includes('In Duration'));
+      continue;
+    }
+
+    // Try to find indices if they weren't found exactly
+    if (lineStr.includes('Emp Code') && empCodeIdx === -1) {
+        empCodeIdx = line.findIndex(cell => cell.toLowerCase().includes('emp code'));
+    }
+    if (lineStr.includes('Punch Records') && punchRecordsIdx === -1) {
+        punchRecordsIdx = line.findIndex(cell => cell.toLowerCase().includes('punch records'));
+    }
+
+    if (currentDate && empCodeIdx !== -1 && line[empCodeIdx]) {
+      const empCode = line[empCodeIdx].trim();
+      if (!empCode || empCode === 'SNo.' || empCode === 'Emp Code') continue;
+
+      // Basic validation that it's a record (usually Emp Code is numeric or STC...)
+      if (!empCode.match(/^[a-zA-Z0-9]+$/)) continue;
+
+      const empName = nameIdx !== -1 ? line[nameIdx]?.trim() || '-' : '-';
+      const punchRecords = punchRecordsIdx !== -1 ? line.slice(punchRecordsIdx).join(',') : '';
+      const totalHours = totalHoursIdx !== -1 ? line[totalHoursIdx]?.trim() || '00:00' : '00:00';
+
+      // Parse punch records for inTime and outTime
+      let inTime = '-';
+      let outTime = '-';
+      const timeMatches = punchRecords.match(/\d{2}:\d{2}/g);
+      if (timeMatches && timeMatches.length > 0) {
+        inTime = timeMatches[0];
+        outTime = timeMatches[timeMatches.length - 1];
+      }
+
+      let status = 'A';
+      if (timeMatches && timeMatches.length > 0) {
+        status = 'P';
+      }
+
+      // Check for holiday/weekoff
+      const dateString = currentDate.toISOString().split('T')[0];
+      const isHoliday = holidaysForYear.some(h => h.date === dateString);
+      const isSunday = currentDate.getUTCDay() === 0;
+
+      if (isHoliday && status === 'A') status = 'H';
+      else if (isSunday && status === 'A') status = 'WO';
+
+      let lateBy = '00:00';
+      if (status === 'P') {
+        const inMinutes = parseTime(inTime);
+        const lateThreshold = 10 * 60 + 35; // 10:35 AM
+        if (inMinutes > lateThreshold) {
+          lateBy = formatMinutesToTime(inMinutes - lateThreshold);
+        }
+      }
+
+      if (!allEmployees[empCode]) {
+        allEmployees[empCode] = { empCode, empName, dailyRecords: [] };
+      }
+
+      // Update name if we found a better one
+      if (empName !== '-' && (allEmployees[empCode].empName === '-' || allEmployees[empCode].empName === empCode)) {
+        allEmployees[empCode].empName = empName;
+      }
+
+      // Check if record for this date already exists
+      const dateISO = currentDate.toISOString().split('.')[0];
+      if (!allEmployees[empCode].dailyRecords.some(r => r.date === dateISO)) {
+          allEmployees[empCode].dailyRecords.push({
+            date: dateISO,
+            status,
+            inTime,
+            outTime,
+            lateBy,
+            totalWorkingHours: totalHours,
+          });
+      }
+    }
+  }
+  return allEmployees;
+};
+
 // Parse CSV Data
 const parseCsvData = (csvData) => {
   const lines = csvData.split('\n');
+
+  // Detect Format
+  const isNewFormat = lines.some(line => line.includes('Attendance Date'));
+  if (isNewFormat) {
+      return parseDailyBlockFormat(lines.map(line => line.split(',')));
+  }
+
   const allEmployees = {};
   const dates = [];
   

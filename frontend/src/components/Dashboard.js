@@ -21,8 +21,6 @@ import { Button } from './ui/button';
 
 import { Users, BarChart3, Bell, MessageSquare, Gift, Shield, CalendarCheck, Map as MapIcon, Video, Fingerprint } from 'lucide-react';
 
-import EAttendance from './EMPAttedence';
-import ManagerReport from './Manger Attendence';
 import AttendanceReport from './AdminAttedenceReport';
 import HRAttendance from './HRAttendance';
 import BiometricPanel from './BiometricPanel';

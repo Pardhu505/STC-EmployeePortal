@@ -25,7 +25,7 @@ const Login = () => {
   const [password, setPassword] = useState('');
   const { login } = useAuth();
   const navigate = useNavigate();
-  const { addToast } = useToast();
+  const { toast } = useToast();
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -38,11 +38,11 @@ const Login = () => {
     e.preventDefault();
     try {
       await login(email, password);
-      addToast('Login successful!', { appearance: 'success' });
+      toast({ title: 'Login successful!' });
       navigate('/dashboard');
     } catch (error) {
       const errorMessage = error.message || 'An unexpected error occurred.';
-      addToast(errorMessage, { appearance: 'error' });
+      toast({ title: errorMessage, variant: 'destructive' });
     }
   };
 

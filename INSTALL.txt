@@ -1,0 +1,62 @@
+eSSL biometric integration — files for STC-EmployeePortal
+==========================================================
+
+WHAT'S IN HERE (copy these over your repo, same paths):
+  backend/essl_service.py                      NEW  - SOAP client + parser
+  backend/biometric.py                         NEW  - admin-only /api/biometric/* routes
+  backend/server.py                            EDITED - registers the router (3 lines)
+  frontend/src/components/BiometricLiveLogs.js NEW  - admin live attendance page
+  frontend/src/App.js                          EDITED - adds /biometric route (2 spots)
+
+----------------------------------------------------------
+1) BACKEND .env  (add these 5 lines to backend/.env)
+----------------------------------------------------------
+ESSL_API_URL=http://192.168.8.251:85/iclock/webapiservice.asmx
+ESSL_SERIAL=CEXJ232860602
+ESSL_USERNAME=Showtime
+ESSL_PASSWORD=__your_rotated_password__
+# (ATTENDANCE_MONGO_URL etc. must already be set for the portal to run)
+
+'requests' is already in requirements.txt, so no new install.
+
+----------------------------------------------------------
+2) FRONTEND base URL for LOCAL testing
+----------------------------------------------------------
+frontend/src/config/api.js currently points at the Render URL.
+For local testing, set it to your local backend:
+    export const API_BASE_URL = 'http://localhost:8000'
+(switch it back to the Render URL before deploying)
+
+----------------------------------------------------------
+3) RUN LOCALLY  (two terminals)
+----------------------------------------------------------
+BACKEND (Windows cmd, from backend\ folder):
+    venv\Scripts\activate
+    python -m pip install -r requirements.txt
+    python -m uvicorn server:app --reload --port 8000
+
+FRONTEND (from frontend\ folder):
+    npm install
+    npm start            (opens http://localhost:3000)
+
+Log in with your ADMIN account, then go to:
+    http://localhost:3000/biometric
+
+----------------------------------------------------------
+4) Optional: add a nav link
+----------------------------------------------------------
+In your sidebar/Dashboard nav, add a link to "/biometric", e.g.:
+    <button onClick={() => navigate('/biometric')}>Biometric Attendance</button>
+
+----------------------------------------------------------
+NOTES
+----------------------------------------------------------
+- The page is ADMIN-ONLY. It uses the portal's get_current_admin_user, so your
+  real admin login gates it. Non-admins get "administrators only".
+- LAN reachability: the machine running the backend must be able to reach
+  192.168.8.251 (i.e. on the office network / VPN). Your Postman test worked,
+  so your dev machine already can. A cloud host (Render) cannot reach a LAN IP.
+- Device user_id is assumed to equal empCode. If your enrollment IDs differ,
+  map them in biometric.py before the Attendance roll-up.
+- SECURITY: the Postman screenshot exposed the device password (Essl@123),
+  serial and IP. Rotate the password and keep these only in .env.

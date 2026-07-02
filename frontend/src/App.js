@@ -14,6 +14,7 @@ import TermsAndConditions from "./components/TermsAndConditions";
 import APMapping from "@/components/APMapping";
 import ExcelDataViewer from "@/pages/ExcelDataViewer";
 import InhouseTracking from "@/components/InhouseTracking";
+import BiometricLiveLogs from "./components/BiometricLiveLogs";
 
 
 const ProtectedRoute = ({ children }) => {
@@ -77,6 +78,11 @@ function App() {
               <Route path="/InhouseTracking" element={
                 <ProtectedRoute>
                   <InhouseTracking />
+                </ProtectedRoute>
+              } />
+              <Route path="/biometric" element={
+                <ProtectedRoute>
+                  <BiometricLiveLogs />
                 </ProtectedRoute>
               } />
               <Route path="/" element={<Navigate to="/dashboard" />} />

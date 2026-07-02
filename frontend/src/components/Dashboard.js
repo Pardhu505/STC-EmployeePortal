@@ -19,12 +19,14 @@ import Meetings from './Meetings'; // Import the new Meetings component
 import { Card, CardContent } from './ui/card';
 import { Button } from './ui/button';
 
-import { Users, BarChart3, Bell, MessageSquare, Gift, Shield, CalendarCheck, Map as MapIcon, Video } from 'lucide-react';
+import { Users, BarChart3, Bell, MessageSquare, Gift, Shield, CalendarCheck, Map as MapIcon, Video, Fingerprint } from 'lucide-react';
 
 import EAttendance from './EMPAttedence';
 import ManagerReport from './Manger Attendence';
 import AttendanceReport from './AdminAttedenceReport';
 import HRAttendance from './HRAttendance';
+import BiometricPanel from './BiometricPanel';
+import BiometricMyTeam from './BiometricMyTeam';
 
 import { fetchEmployeesWorkDetails } from '../api'; // Import the centralized fetch function
 
@@ -276,6 +278,9 @@ const Dashboard = () => {
         return isAdmin ? <AdminPanel /> : <PortalCards />;
       // case 'payslips': return <PayslipManagement />;
 
+      case 'biometric':
+        return <BiometricPanel />;
+
       case 'attendance':
         // Use the new isAdmin check from AuthContext
         if (isAdmin) return <AttendanceReport />;
@@ -283,8 +288,8 @@ const Dashboard = () => {
           user?.email === 'tejaswini@showtimeconsulting.in' ||
           user?.email === 'shashidhar.kumar@showtimeconsulting.in'
         ) return <HRAttendance />;
-        if (user?.designation === 'Reporting manager') return <ManagerReport />;
-        return <EAttendance />;
+        // Managers -> biometric team report; employees -> own biometric records
+        return <BiometricMyTeam />;
       default: return <PortalCards />;
     }
   };
@@ -298,6 +303,8 @@ const Dashboard = () => {
     { id: 'meetings', label: 'Meetings', icon: Video },
 
     { id: 'attendance', label: user?.isAdmin ? 'Attendance Report' : 'Attendance', icon: CalendarCheck },
+    ...((isAdmin || (user?.email || '').toLowerCase() === 'pardhasaradhi@showtimeconsulting.in')
+        ? [{ id: 'biometric', label: 'Live Attendance', icon: Fingerprint }] : []),
     // { id: 'payslips', label: 'Payslips', icon: FileText },
     // Use the new isAdmin check from AuthContext to show/hide the Admin Panel button
     ...(isAdmin ? [{ id: 'admin', label: 'Admin Panel', icon: Shield }] : []),

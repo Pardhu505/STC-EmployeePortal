@@ -124,11 +124,12 @@ export default function BiometricLiveLogs() {
             <th style={th}>Last Punch-out</th>
             <th style={th}>Breaks (other punches)</th>
             <th style={th}>Total Break Time</th>
+            <th style={th}>Total Working Hours</th>
           </tr>
         </thead>
         <tbody>
           {summary.length === 0 && (
-            <tr><td colSpan={6} style={empty}>No records for this date.</td></tr>
+            <tr><td colSpan={7} style={empty}>No records for this date.</td></tr>
           )}
           {summary.map((e, i) => (
             <tr key={i} style={{ ...trow, background: i % 2 ? '#fafbfc' : '#fff' }}>
@@ -160,6 +161,9 @@ export default function BiometricLiveLogs() {
                            color: breakMinutes(e.break_time) > 60 ? '#c62828'
                                 : breakMinutes(e.break_time) > 0 ? '#b26a00' : '#999' }}>
                 {humanBreak(e.break_time)}
+              </td>
+              <td style={{ ...td, fontWeight: 600, color: '#1565c0' }}>
+                {e.working_hours ? humanBreak(e.working_hours) : '—'}
               </td>
             </tr>
           ))}

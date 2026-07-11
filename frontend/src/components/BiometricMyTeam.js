@@ -14,7 +14,7 @@ function firstOfMonth() {
   return new Date(d.getFullYear(), d.getMonth(), 1).toISOString().slice(0, 10);
 }
 
-export default function BiometricMyTeam() {
+export default function BiometricMyTeam({ endpoint = 'team' }) {
   const { user } = useAuth();
   const today = new Date().toISOString().slice(0, 10);
   const [from, setFrom] = useState(firstOfMonth());
@@ -33,6 +33,15 @@ export default function BiometricMyTeam() {
     setLoading(true); setError('');
     const qs = `from_date=${from}&to_date=${to}`;
     try {
+      // Full company day-wise view (admin / pardhasaradhi)
+      if (endpoint === 'company') {
+        const res = await fetch(`${API_BASE_URL}/api/biometric/company?${qs}`, { headers: authHeader() });
+        if (!res.ok) {
+          const e = await res.json().catch(() => ({}));
+          throw new Error(e.detail || `Request failed (${res.status})`);
+        }
+        setData(await res.json()); setMode('team'); return;
+      }
       // Try manager view first
       let res = await fetch(`${API_BASE_URL}/api/biometric/team?${qs}`, { headers: authHeader() });
       if (res.ok) {
@@ -54,15 +63,17 @@ export default function BiometricMyTeam() {
     } finally {
       setLoading(false);
     }
-  }, [user, from, to, authHeader]);
+  }, [user, from, to, authHeader, endpoint]);
 
   useEffect(() => { load(); }, [load]);
 
+  const heading = endpoint === 'company'
+    ? 'Company Attendance — day-wise'
+    : (mode === 'team' ? 'Team Attendance' : 'My Attendance');
+
   return (
-    <div style={{ padding: 24, maxWidth: 1000, margin: '0 auto' }}>
-      <h2 style={{ margin: '0 0 4px' }}>
-        {mode === 'team' ? 'Team Attendance' : 'My Attendance'} (eSSL)
-      </h2>
+    <div style={{ padding: 24, maxWidth: 1100, margin: '0 auto' }}>
+      <h2 style={{ margin: '0 0 4px' }}>{heading} (eSSL)</h2>
       <div style={{ display: 'flex', gap: 10, alignItems: 'center', margin: '14px 0', flexWrap: 'wrap' }}>
         <label style={lbl}>From <input type="date" value={from} max={to}
           onChange={(e) => setFrom(e.target.value)} style={inp} /></label>
@@ -89,10 +100,10 @@ function DayTable({ days }) {
         <thead><tr>
           <th style={th}>Date</th><th style={th}>Status</th><th style={th}>1st Punch-in</th>
           <th style={th}>Last Punch-out</th><th style={th}>Breaks (other punches)</th>
-          <th style={th}>Total Break Time</th><th style={th}>Late by</th>
+          <th style={th}>Total Break Time</th><th style={th}>Total Working Hours</th><th style={th}>Late by</th>
         </tr></thead>
         <tbody>
-          {days.length === 0 && <tr><td colSpan={7} style={empty}>No records in this range.</td></tr>}
+          {days.length === 0 && <tr><td colSpan={8} style={empty}>No records in this range.</td></tr>}
           {days.map((d, i) => (
             <tr key={i} style={{ background: i % 2 ? '#fafbfc' : '#fff' }}>
               <td style={td}>{d.date}<span style={dev}>{d.weekday}</span></td>
@@ -110,6 +121,8 @@ function DayTable({ days }) {
               </td>
               <td style={{ ...td, fontWeight: 600, color: breakMinutes(d.break_time) > 60 ? '#c62828' : '#555' }}>
                 {humanBreak(d.break_time)}</td>
+              <td style={{ ...td, fontWeight: 600, color: '#1565c0' }}>
+                {d.working_hours ? humanBreak(d.working_hours) : '—'}</td>
               <td style={{ ...td, color: d.late_by && d.late_by !== '00:00:00' ? '#c62828' : '#999' }}>
                 {d.late_by || '00:00:00'}</td>
             </tr>

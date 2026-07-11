@@ -53,7 +53,7 @@ def _direction(serial, name=""):
     return name or ""
 
 # Office policy
-LATE_AFTER = (9, 30)                 # In-gate later than 09:30 = late
+LATE_AFTER = (9, 0)                   # In-gate later than 09:00 = late
 WORKING_WEEKDAYS = {0, 1, 2, 3, 4, 5}  # Mon-Sat count as working days (adjust if 5-day week)
 
 # Who may see the FULL company live view (besides admins/directors)
@@ -72,7 +72,7 @@ def _is_late(dt_ist):
     return (dt_ist.hour, dt_ist.minute) > LATE_AFTER
 
 def _late_by(dt_ist):
-    """How long after 09:30 the person's first punch was, as HH:MM:SS."""
+    """How long after 09:00 the person's first punch was, as HH:MM:SS."""
     shift = dt_ist.replace(hour=LATE_AFTER[0], minute=LATE_AFTER[1], second=0, microsecond=0)
     if dt_ist <= shift:
         return "00:00:00"
@@ -160,12 +160,11 @@ async def _all_employees():
             logger.debug("roster read in %s failed: %s", cname, e)
     return roster
 
-def _total_break_time(items):
-    """Sum time spent OUT of office across the day using In/Out direction.
-    items = sorted [{t, dir}] where dir is 'In' or 'Out'.
-    Starts 'inside', so the first-in punch and the final unmatched last-out
-    punch are naturally excluded — only Out->In round trips count."""
-    state = "in"          # assume inside after arrival
+def _break_delta(items):
+    """Time spent OUT of office across the day (Out->In round trips).
+    items = sorted [{t, dir}]. Starts 'inside', so the first-in punch and the
+    final unmatched last-out are naturally excluded."""
+    state = "in"
     outside_since = None
     total = timedelta(0)
     for it in items[1:]:  # leave out the 1st (arrival) punch
@@ -177,8 +176,21 @@ def _total_break_time(items):
             total += it["t"] - outside_since
             state = "in"
             outside_since = None
-    mins = int(total.total_seconds() // 60)
+    return total
+
+def _total_break_time(items):
+    mins = int(_break_delta(items).total_seconds() // 60)
     return f"{mins // 60:02d}:{mins % 60:02d}"
+
+def _working_hours(items):
+    """Actual worked time = (last punch - first punch) - break time."""
+    if len(items) < 2:
+        return ""
+    span = items[-1]["t"] - items[0]["t"]
+    work = span - _break_delta(items)
+    if work.total_seconds() < 0:
+        work = timedelta(0)
+    return _fmt_hm(work)
 
 def _day_bounds(date_str):
     if date_str:
@@ -267,6 +279,7 @@ async def summary(date: str = Query(None), admin=Depends(require_biometric_admin
             "last_out_device": last["dir"] if len(items) > 1 else "",
             "breaks": breaks,
             "break_time": _total_break_time(items),
+            "working_hours": _working_hours(items),
             "punch_count": len(items),
         })
     out.sort(key=lambda x: (x["emp_name"] == "—", x["emp_name"], x["user_id"]))
@@ -384,7 +397,7 @@ def _day_record(day, items):
         "last_out_device": last["dir"] if multi else "",
         "breaks": breaks,
         "break_time": _total_break_time(items),
-        "working_hours": _fmt_hm(last["t"] - first["t"]) if multi else "",
+        "working_hours": _working_hours(items),
         "punch_count": len(items),
     }
 
@@ -491,6 +504,27 @@ async def team_attendance(from_date: str = Query(None), to_date: str = Query(Non
     tl = sum(e["late_days"] for e in data["employees"])
     present_today = sum(1 for e in data["employees"] if e.get("today"))
     data["manager"] = details.get("managerName")
+    data["team_totals"] = {"members": len(codes), "present_days": tp, "absent_days": ta,
+                           "late_days": tl, "present_today": present_today,
+                           "absent_today": len(codes) - present_today}
+    return data
+
+
+@router.get("/company")
+async def company_attendance(from_date: str = Query(None), to_date: str = Query(None),
+                             admin=Depends(require_biometric_admin)):
+    """Full company day-wise attendance over a range (admin / pardhasaradhi).
+    Same shape as /team so the frontend reuses the collapsible view."""
+    roster = await _all_employees()
+    codes = [c for c in roster.keys() if c]
+    if not codes:
+        raise HTTPException(404, "No employees found.")
+    data = await _attendance_for(codes, from_date, to_date, want_days=True)
+    data["employees"].sort(key=lambda e: (e["emp_name"] == "—", e["emp_name"], e["emp_code"]))
+    tp = sum(e["present_days"] for e in data["employees"])
+    ta = sum(e["absent_days"] for e in data["employees"])
+    tl = sum(e["late_days"] for e in data["employees"])
+    present_today = sum(1 for e in data["employees"] if e.get("today"))
     data["team_totals"] = {"members": len(codes), "present_days": tp, "absent_days": ta,
                            "late_days": tl, "present_today": present_today,
                            "absent_today": len(codes) - present_today}

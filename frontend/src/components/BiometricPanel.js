@@ -18,13 +18,17 @@ export default function BiometricPanel() {
 
   return (
     <div>
-      <div style={{ display: 'flex', gap: 8, padding: '16px 24px 0' }}>
+      <div style={{ display: 'flex', gap: 8, padding: '16px 24px 0', flexWrap: 'wrap' }}>
         <button onClick={() => setView('company')}
           style={view === 'company' ? tabOn : tabOff}>Company (today)</button>
+        <button onClick={() => setView('company_range')}
+          style={view === 'company_range' ? tabOn : tabOff}>Company (day-wise)</button>
         <button onClick={() => setView('team')}
           style={view === 'team' ? tabOn : tabOff}>My Team (day-wise)</button>
       </div>
-      {view === 'company' ? <BiometricLiveLogs /> : <BiometricMyTeam />}
+      {view === 'company' && <BiometricLiveLogs />}
+      {view === 'company_range' && <BiometricMyTeam endpoint="company" />}
+      {view === 'team' && <BiometricMyTeam endpoint="team" />}
     </div>
   );
 }

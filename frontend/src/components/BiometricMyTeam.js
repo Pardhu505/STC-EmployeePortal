@@ -7,6 +7,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { API_BASE_URL } from '../config/api';
+import { fetchWithRetry } from '../utils/fetchRetry';
 import { humanBreak, breakMinutes } from './BiometricLiveLogs';
 
 function firstOfMonth() {
@@ -35,7 +36,7 @@ export default function BiometricMyTeam({ endpoint = 'team' }) {
     try {
       // Full company day-wise view (admin / pardhasaradhi)
       if (endpoint === 'company') {
-        const res = await fetch(`${API_BASE_URL}/api/biometric/company?${qs}`, { headers: authHeader() });
+        const res = await fetchWithRetry(`${API_BASE_URL}/api/biometric/company?${qs}`, { headers: authHeader() });
         if (!res.ok) {
           const e = await res.json().catch(() => ({}));
           throw new Error(e.detail || `Request failed (${res.status})`);
@@ -43,7 +44,7 @@ export default function BiometricMyTeam({ endpoint = 'team' }) {
         setData(await res.json()); setMode('team'); return;
       }
       // Try manager view first
-      let res = await fetch(`${API_BASE_URL}/api/biometric/team?${qs}`, { headers: authHeader() });
+      let res = await fetchWithRetry(`${API_BASE_URL}/api/biometric/team?${qs}`, { headers: authHeader() });
       if (res.ok) {
         setData(await res.json()); setMode('team'); return;
       }
@@ -52,7 +53,7 @@ export default function BiometricMyTeam({ endpoint = 'team' }) {
         throw new Error(e.detail || `Request failed (${res.status})`);
       }
       // Not a manager -> own records
-      res = await fetch(`${API_BASE_URL}/api/biometric/me?${qs}`, { headers: authHeader() });
+      res = await fetchWithRetry(`${API_BASE_URL}/api/biometric/me?${qs}`, { headers: authHeader() });
       if (!res.ok) {
         const e = await res.json().catch(() => ({}));
         throw new Error(e.detail || `Request failed (${res.status})`);

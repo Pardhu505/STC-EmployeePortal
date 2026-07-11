@@ -7,8 +7,9 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { API_BASE_URL } from '../config/api';
+import { fetchWithRetry } from '../utils/fetchRetry';
 
-const POLL_MS = 30000;
+const POLL_MS = 10000;
 
 export default function BiometricLiveLogs() {
   const { user, isAdmin } = useAuth();
@@ -33,7 +34,7 @@ export default function BiometricLiveLogs() {
     if (!user) return;
     setLoading(true); setError('');
     try {
-      const res = await fetch(
+      const res = await fetchWithRetry(
         `${API_BASE_URL}/api/biometric/summary?date=${date}`,
         { headers: authHeader() }
       );
@@ -77,7 +78,7 @@ export default function BiometricLiveLogs() {
         <h2 style={{ margin: 0 }}>Biometric Attendance (eSSL)</h2>
         <span style={{ background: '#e8f5e9', color: '#2e7d32', padding: '2px 10px',
                        borderRadius: 12, fontSize: 13 }}>{count} punches</span>
-        {isToday && <span style={{ fontSize: 12, color: '#888' }}>live · refreshes every 30s</span>}
+        {isToday && <span style={{ fontSize: 12, color: '#888' }}>live · refreshes every 10s</span>}
       </div>
 
       <div style={{ display: 'flex', gap: 10, alignItems: 'center', margin: '16px 0', flexWrap: 'wrap' }}>

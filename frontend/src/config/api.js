@@ -1,5 +1,5 @@
 
-export const API_BASE_URL = 'https:stcportal.duckdns.org'
+export const API_BASE_URL = 'https://stcportal.duckdns.org'
 
 
 

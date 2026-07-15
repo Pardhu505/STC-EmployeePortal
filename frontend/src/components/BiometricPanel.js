@@ -1,17 +1,17 @@
 // BiometricPanel.js
 // Routes the Live Attendance tab by role:
-//   - Full access (admin or pardhasaradhi): toggle between the company-wide
+//   - Full access (admins/directors + BIOMETRIC_FULL_EMAILS): toggle between the company-wide
 //     "today" view and their own day-wise team report.
 //   - Everyone else: BiometricMyTeam decides team (manager) vs self (employee).
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import BiometricLiveLogs from './BiometricLiveLogs';
 import BiometricMyTeam from './BiometricMyTeam';
+import { hasFullBiometricAccess } from '../config/biometricAccess';
 
 export default function BiometricPanel() {
   const { user, isAdmin } = useAuth();
-  const fullAccess = isAdmin ||
-    (user?.email || '').toLowerCase() === 'pardhasaradhi@showtimeconsulting.in';
+  const fullAccess = hasFullBiometricAccess(user, isAdmin);
   const [view, setView] = useState('company');
 
   if (!fullAccess) return <BiometricMyTeam />;

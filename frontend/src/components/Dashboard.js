@@ -24,6 +24,7 @@ import { Users, BarChart3, Bell, MessageSquare, Gift, Shield, CalendarCheck, Map
 import AttendanceReport from './AdminAttedenceReport';
 import HRAttendance from './HRAttendance';
 import BiometricPanel from './BiometricPanel';
+import { hasFullBiometricAccess } from '../config/biometricAccess';
 import BiometricMyTeam from './BiometricMyTeam';
 
 import { fetchEmployeesWorkDetails } from '../api'; // Import the centralized fetch function
@@ -301,7 +302,7 @@ const Dashboard = () => {
     { id: 'meetings', label: 'Meetings', icon: Video },
 
     { id: 'attendance', label: user?.isAdmin ? 'Attendance Report' : 'Attendance', icon: CalendarCheck },
-    ...((isAdmin || (user?.email || '').toLowerCase() === 'pardhasaradhi@showtimeconsulting.in')
+    ...(hasFullBiometricAccess(user, isAdmin)
         ? [{ id: 'biometric', label: 'Live Attendance', icon: Fingerprint }] : []),
     // { id: 'payslips', label: 'Payslips', icon: FileText },
     // Use the new isAdmin check from AuthContext to show/hide the Admin Panel button

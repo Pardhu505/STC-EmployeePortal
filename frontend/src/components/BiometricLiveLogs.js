@@ -8,6 +8,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { API_BASE_URL } from '../config/api';
 import { fetchWithRetry } from '../utils/fetchRetry';
+import { hasFullBiometricAccess } from '../config/biometricAccess';
 
 const POLL_MS = 10000;
 
@@ -63,7 +64,7 @@ export default function BiometricLiveLogs() {
     return () => clearInterval(id);
   }, [load, isToday]);
 
-  const allowedFull = isAdmin || (user?.email || '').toLowerCase() === 'pardhasaradhi@showtimeconsulting.in';
+  const allowedFull = hasFullBiometricAccess(user, isAdmin);
   if (!allowedFull) {
     return (
       <div style={{ padding: 40, textAlign: 'center', color: '#b71c1c' }}>

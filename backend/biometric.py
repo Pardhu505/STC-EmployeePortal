@@ -57,7 +57,7 @@ LATE_AFTER = (9, 0)                   # In-gate later than 09:00 = late
 WORKING_WEEKDAYS = {0, 1, 2, 3, 4, 5}  # Mon-Sat count as working days (adjust if 5-day week)
 
 # Who may see the FULL company live view (besides admins/directors)
-BIOMETRIC_FULL_EMAILS = {"pardhasaradhi@showtimeconsulting.in"}
+BIOMETRIC_FULL_EMAILS = {"pardhasaradhi@showtimeconsulting.in","khushboo@showtimeconsulting.in","rs@showtimeconsulting.in","alimpan@showtimeconsulting.in","at@showtimeconsulting.in"}
 
 async def require_biometric_admin(user=Depends(get_current_user)):
     """Full company view: admins/directors, or explicitly allowed emails."""

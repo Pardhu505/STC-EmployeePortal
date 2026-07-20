@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useLocation } from 'react-router-dom';
 import { API_BASE_URL } from '../config/api';
 import { fetchWithRetry } from '../utils/fetchRetry';
+import { DotLottieReact } from '@lottiefiles/dotlottie-react';
 import Header from './Header';
 import Footer from './Footer'; // Import the new Footer component
 import PortalCards from './PortalCards';
@@ -168,15 +169,23 @@ const statChipVariants = {
   show: { opacity: 1, y: 0, transition: { duration: 0.5, ease: [0.22, 1, 0.36, 1] } },
 };
 
-function StatChip({ label, children, accent }) {
+function StatChip({ label, iconSrc, children, accent }) {
   return (
     <motion.div
       variants={statChipVariants}
-      whileHover={{ y: -3, scale: 1.02 }}
-      className="rounded-2xl bg-white/10 backdrop-blur-md border border-white/15 px-4 py-3 shadow-sm"
+      whileHover={{ y: -4, scale: 1.03 }}
+      transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+      className="flex items-center gap-3 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 px-4 py-3 shadow-lg"
     >
-      <div className="text-[11px] uppercase tracking-wide text-blue-100/80">{label}</div>
-      <div className={`text-2xl font-bold mt-1 ${accent || 'text-white'}`}>{children}</div>
+      <div className="shrink-0 h-11 w-11 rounded-xl bg-white/15 flex items-center justify-center overflow-hidden">
+        {iconSrc && (
+          <DotLottieReact src={iconSrc} autoplay loop style={{ width: 40, height: 40 }} />
+        )}
+      </div>
+      <div className="min-w-0">
+        <div className="text-[11px] uppercase tracking-wide text-blue-100/80 whitespace-nowrap">{label}</div>
+        <div className={`text-xl font-bold leading-tight ${accent || 'text-white'}`}>{children}</div>
+      </div>
     </motion.div>
   );
 }
@@ -406,35 +415,11 @@ const Dashboard = () => {
           {!portalViewerOpen && (
           <Card className="bg-gradient-to-r from-[#225F8B] to-[#225F8B]/80 text-white border-0 shadow-xl mb-8">
             <CardContent className="p-8">
-              <div className="flex items-center justify-between">
-                <div>
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+                <div className="shrink-0">
                   <h1 className="text-3xl font-bold mb-2">Welcome back, {user?.name}!</h1>
                   <p className="text-blue-100 text-lg">{user?.designation} • {user?.department}</p>
-                  <p className="text-blue-200 text-sm mt-2">Access your workspace portals and stay updated with company announcements</p>
-
-                  {meStats && (
-                    <motion.div
-                      className="mt-5 grid grid-cols-1 sm:grid-cols-3 gap-3 max-w-2xl"
-                      initial="hidden"
-                      animate="show"
-                      variants={{ hidden: {}, show: { transition: { staggerChildren: 0.12, delayChildren: 0.1 } } }}
-                    >
-                      <StatChip label="Today's Login">
-                        {meStats.todayLogin
-                          ? <span className="flex items-center gap-2">
-                              {meStats.todayLogin}
-                              {meStats.todayLate && <span className="text-[11px] font-bold text-red-200">Late</span>}
-                            </span>
-                          : <span className="text-blue-200/70">—</span>}
-                      </StatChip>
-                      <StatChip label="Late Logins (month)" accent={meStats.lateMonth > 0 ? 'text-yellow-200' : 'text-white'}>
-                        <AnimatedNumber value={meStats.lateMonth} />
-                      </StatChip>
-                      <StatChip label="Days under 7h 30m" accent={meStats.shortDays > 0 ? 'text-orange-200' : 'text-white'}>
-                        <AnimatedNumber value={meStats.shortDays} />
-                      </StatChip>
-                    </motion.div>
-                  )}
+                  <p className="text-blue-200 text-sm mt-2 max-w-sm">Access your workspace portals and stay updated with company announcements</p>
                   {announcements.some(a => a.type === 'birthday') && (
                     <div className="mt-4 flex items-center space-x-2">
                       <Gift className="h-5 w-5 text-yellow-300" />
@@ -445,13 +430,38 @@ const Dashboard = () => {
                     </div>
                   )}
                 </div>
-                <div className="hidden md:block">
+
+                {/* Animated personal stats (middle) */}
+                {meStats && (
+                  <motion.div
+                    className="flex-1 flex flex-col gap-3 w-full lg:max-w-md"
+                    initial="hidden"
+                    animate="show"
+                    variants={{ hidden: {}, show: { transition: { staggerChildren: 0.12, delayChildren: 0.1 } } }}
+                  >
+                    <StatChip label="Today's Login" iconSrc="/lottie/todays-login.json">
+                      {meStats.todayLogin
+                        ? <span className="flex items-center gap-2">
+                            {meStats.todayLogin}
+                            {meStats.todayLate && <span className="text-[11px] font-bold text-red-200">Late</span>}
+                          </span>
+                        : <span className="text-blue-200/70">—</span>}
+                    </StatChip>
+                    <StatChip label="Late Logins (month)" iconSrc="/lottie/late-logins.json"
+                      accent={meStats.lateMonth > 0 ? 'text-yellow-200' : 'text-white'}>
+                      <AnimatedNumber value={meStats.lateMonth} />
+                    </StatChip>
+                    <StatChip label="Days under 7h 30m" iconSrc="/lottie/short-hours.json"
+                      accent={meStats.shortDays > 0 ? 'text-orange-200' : 'text-white'}>
+                      <AnimatedNumber value={meStats.shortDays} />
+                    </StatChip>
+                  </motion.div>
+                )}
+
+                <div className="hidden md:block shrink-0">
                   <div className="flex flex-col items-center" suppressHydrationWarning>
-
                     <DateTimeWidget />
-
                     <CalendarWidget />
-
                   </div>
                 </div>
               </div>

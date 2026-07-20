@@ -173,18 +173,18 @@ function StatChip({ label, iconSrc, children, accent }) {
   return (
     <motion.div
       variants={statChipVariants}
-      whileHover={{ y: -4, scale: 1.03 }}
+      whileHover={{ scale: 1.05 }}
       transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-      className="flex items-center gap-3 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 px-4 py-3 shadow-lg"
+      className="flex items-center gap-3"
     >
-      <div className="shrink-0 h-11 w-11 rounded-xl bg-white/15 flex items-center justify-center overflow-hidden">
+      <div className="shrink-0 h-14 w-14 flex items-center justify-center">
         {iconSrc && (
-          <DotLottieReact src={iconSrc} autoplay loop style={{ width: 40, height: 40 }} />
+          <DotLottieReact src={iconSrc} autoplay loop style={{ width: 56, height: 56 }} />
         )}
       </div>
       <div className="min-w-0">
         <div className="text-[11px] uppercase tracking-wide text-blue-100/80 whitespace-nowrap">{label}</div>
-        <div className={`text-xl font-bold leading-tight ${accent || 'text-white'}`}>{children}</div>
+        <div className={`text-2xl font-bold leading-tight ${accent || 'text-white'}`}>{children}</div>
       </div>
     </motion.div>
   );

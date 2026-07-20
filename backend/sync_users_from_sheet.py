@@ -1,26 +1,21 @@
 """
 sync_users_from_sheet.py
 ------------------------
-Create portal users from rows in the Google Sheet. Reuses the portal's own
-signup() logic, so reviewer calculation, team-collection routing, and password
-hashing behave EXACTLY like a normal signup. Existing users (matched by email)
-are skipped, so it's safe to re-run.
+Create portal users from Google Sheet rows (reusing the portal's signup logic),
+and set each user's 'shift' from the sheet's 'shift' column.
+
+    shift = 1  -> 1st shift, late after 09:00 (default)
+    shift = 2  -> 2nd shift, late after 11:30
+
+Existing users are NOT recreated, but their 'shift' IS updated on every run — so
+to move someone between shifts, change the cell and re-run.
 
 Run on the AWS server:
     cd /home/ubuntu/STC-EmployeePortal/backend
     source venv/bin/activate
     python sync_users_from_sheet.py
 
-Env used:
-    GOOGLE_SHEETS_CREDENTIALS   service-account JSON (already set for sheets.py)
-    USERS_SHEET_URL             the sheet to read (falls back to the one below)
-    DEFAULT_USER_PASSWORD       password for rows with a blank 'password' cell
-                                (default: Showtime@123 — users should reset it)
-
-Sheet columns (case-insensitive; extra columns ignored):
-    name, email, team, empCode, designation, department, phone,
-    emergency_contact, date_of_birth, password
-'team' must be one of the portal's valid TEAMS, or the row is reported as failed.
+Env: GOOGLE_SHEETS_CREDENTIALS, USERS_SHEET_URL, DEFAULT_USER_PASSWORD (opt).
 """
 import os
 import asyncio
@@ -31,6 +26,7 @@ from dotenv import load_dotenv
 
 from sheets import get_data_from_sheet
 from models import SignupRequest
+from database import stc_db
 import profile as profile_mod
 
 load_dotenv()
@@ -45,7 +41,6 @@ DEFAULT_PASSWORD = os.getenv("DEFAULT_USER_PASSWORD", "Showtime@123")
 
 
 def pick(row, *aliases):
-    """Case-insensitive column lookup; returns '' if not present/blank."""
     lowered = {str(k).strip().lower(): v for k, v in row.items()}
     for a in aliases:
         if a in lowered and lowered[a] is not None:
@@ -53,15 +48,27 @@ def pick(row, *aliases):
     return ""
 
 
+async def set_shift(email, shift):
+    """Set the 'shift' field on the user's doc, wherever it lives."""
+    for cname in await stc_db.list_collection_names():
+        if cname.startswith("system."):
+            continue
+        res = await stc_db[cname].update_one({"email": email}, {"$set": {"shift": shift}})
+        if res.matched_count:
+            return True
+    return False
+
+
 async def main():
     rows = get_data_from_sheet(SHEET_URL)
     log.info("Read %d rows from the sheet.", len(rows))
 
-    created = skipped = failed = 0
-    for i, row in enumerate(rows, start=2):  # row 1 is headers
+    created = skipped = failed = shift_set = 0
+    for i, row in enumerate(rows, start=2):
         email = pick(row, "email")
         if not email:
             continue
+        shift = pick(row, "shift")  # "1" / "2" / ""
         req = SignupRequest(
             name=pick(row, "name"),
             email=email,
@@ -79,18 +86,27 @@ async def main():
             created += 1
             log.info("row %d: created %s", i, email)
         except HTTPException as e:
-            detail = str(e.detail)
-            if "already exists" in detail.lower():
+            if "already exists" in str(e.detail).lower():
                 skipped += 1
             else:
                 failed += 1
-                log.warning("row %d: FAILED %s -> %s", i, email, detail)
+                log.warning("row %d: FAILED %s -> %s", i, email, e.detail)
+                continue
         except Exception as e:
             failed += 1
             log.warning("row %d: FAILED %s -> %s", i, email, e)
+            continue
 
-    log.info("Done. created=%d  skipped(existing)=%d  failed=%d", created, skipped, failed)
+        # set/refresh shift for both new and existing users
+        if shift in ("1", "2"):
+            if await set_shift(email, shift):
+                shift_set += 1
+
+    log.info("Done. created=%d  skipped(existing)=%d  failed=%d  shift_updated=%d",
+             created, skipped, failed, shift_set)
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    # default loop (matches the app's Mongo client) — avoids 'different loop' error
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(main())

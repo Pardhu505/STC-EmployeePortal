@@ -53,7 +53,12 @@ def _direction(serial, name=""):
     return name or ""
 
 # Office policy
-LATE_AFTER = (9, 0)                   # In-gate later than 09:00 = late
+LATE_AFTER = (9, 0)                   # Shift 1 (default): In after 09:00 = late
+SHIFT_STARTS = {                      # per-shift start time; value in the sheet's 'shift' column
+    "1": (9, 0),
+    "2": (11, 30),                    # 2nd shift 11:30 AM - 8:00 PM: late after 11:30
+}
+DEFAULT_SHIFT_START = LATE_AFTER
 WORKING_WEEKDAYS = {0, 1, 2, 3, 4, 5}  # Mon-Sat count as working days (adjust if 5-day week)
 
 # Who may see the FULL company live view (besides admins/directors)
@@ -68,16 +73,40 @@ async def require_biometric_admin(user=Depends(get_current_user)):
         return user
     raise HTTPException(403, "Not authorized for the full biometric view")
 
-def _is_late(dt_ist):
-    return (dt_ist.hour, dt_ist.minute) > LATE_AFTER
+def _is_late(dt_ist, shift_start=DEFAULT_SHIFT_START):
+    return (dt_ist.hour, dt_ist.minute) > shift_start
 
-def _late_by(dt_ist):
-    """How long after 09:00 the person's first punch was, as HH:MM:SS."""
-    shift = dt_ist.replace(hour=LATE_AFTER[0], minute=LATE_AFTER[1], second=0, microsecond=0)
+def _late_by(dt_ist, shift_start=DEFAULT_SHIFT_START):
+    """How long after the employee's shift start their first punch was (HH:MM:SS)."""
+    shift = dt_ist.replace(hour=shift_start[0], minute=shift_start[1], second=0, microsecond=0)
     if dt_ist <= shift:
         return "00:00:00"
     secs = int((dt_ist - shift).total_seconds())
     return f"{secs // 3600:02d}:{(secs % 3600) // 60:02d}:{secs % 60:02d}"
+
+async def _shift_map():
+    """Return {empCode: (hour, minute)} shift-start per employee, from the user
+    docs' 'shift' field. Anyone without a recognised shift uses shift 1 (09:00)."""
+    shifts = {}
+    try:
+        collection_names = await stc_db.list_collection_names()
+    except Exception:
+        return shifts
+    for cname in collection_names:
+        if cname.startswith("system.") or cname in ("facebook_posts", "ap_mapping"):
+            continue
+        try:
+            cur = stc_db[cname].find({}, {"_id": 0, "empCode": 1, "Emp code": 1, "shift": 1})
+            async for u in cur:
+                code = str(u.get("empCode") or u.get("Emp code") or "").strip()
+                if not code:
+                    continue
+                key = str(u.get("shift") or "").strip()
+                if key in SHIFT_STARTS:
+                    shifts[code] = SHIFT_STARTS[key]
+        except Exception as e:
+            logger.debug("shift read in %s failed: %s", cname, e)
+    return shifts
 
 async def ensure_indexes():
     # Dedup key now includes serial so the same person can punch on both devices.
@@ -260,6 +289,7 @@ async def summary(date: str = Query(None), admin=Depends(require_biometric_admin
             {"t": pt, "dir": _direction(p.get("serial", ""), p.get("device", ""))})
 
     roster = await _all_employees()   # {empCode: name} for the whole company
+    shift_map = await _shift_map()    # {empCode: (h, m)} shift start
 
     out = []
     for uid, items in by_emp.items():
@@ -274,7 +304,7 @@ async def summary(date: str = Query(None), admin=Depends(require_biometric_admin
             "emp_name": roster.get(str(uid), "—"),
             "first_in": first_ist.strftime("%H:%M"),
             "first_in_device": first["dir"],
-            "late": _is_late(first_ist),
+            "late": _is_late(first_ist, shift_map.get(str(uid), DEFAULT_SHIFT_START)),
             "last_out": last["t"].astimezone(IST).strftime("%H:%M") if len(items) > 1 else "",
             "last_out_device": last["dir"] if len(items) > 1 else "",
             "breaks": breaks,
@@ -378,7 +408,7 @@ def _working_days(from_d, to_d):
         d += timedelta(days=1)
     return n
 
-def _day_record(day, items):
+def _day_record(day, items, shift_start=DEFAULT_SHIFT_START):
     items.sort(key=lambda x: x["t"])
     first, last = items[0], items[-1]
     fin = first["t"].astimezone(IST)
@@ -391,8 +421,8 @@ def _day_record(day, items):
         "status": "Present",
         "first_in": fin.strftime("%H:%M"),
         "first_in_device": first["dir"],
-        "late": _is_late(fin),
-        "late_by": _late_by(fin),
+        "late": _is_late(fin, shift_start),
+        "late_by": _late_by(fin, shift_start),
         "last_out": last["t"].astimezone(IST).strftime("%H:%M") if multi else "",
         "last_out_device": last["dir"] if multi else "",
         "breaks": breaks,
@@ -425,6 +455,7 @@ async def _attendance_for(codes, from_date, to_date, want_days=True):
             {"t": pt, "dir": _direction(p.get("serial", ""), p.get("device", ""))})
 
     roster = await _all_employees()
+    shift_map = await _shift_map()
     today = datetime.now(IST).date()
     working = _working_days(from_d, to_d)
 
@@ -437,7 +468,8 @@ async def _attendance_for(codes, from_date, to_date, want_days=True):
     employees = []
     for code in codes:
         code = str(code)
-        day_map = {d: _day_record(d, grouped[(c, d)]) for (c, d) in grouped if c == code}
+        _ss = shift_map.get(code, DEFAULT_SHIFT_START)
+        day_map = {d: _day_record(d, grouped[(c, d)], _ss) for (c, d) in grouped if c == code}
         # build a record for every day in the range
         days, present, absent, late_cnt = [], 0, 0, 0
         d = from_d

@@ -1,20 +1,20 @@
 """
 export_users_to_sheet.py
 ------------------------
-One-time / on-demand export of existing portal users INTO the Google Sheet, so
-the sheet becomes the place you manage the roster. Run on the AWS server (it has
-Atlas access and the GOOGLE_SHEETS_CREDENTIALS env var).
+Export existing portal users INTO the Google Sheet. Run on the AWS server.
 
     cd /home/ubuntu/STC-EmployeePortal/backend
     source venv/bin/activate
     python export_users_to_sheet.py
 
-Env used:
-    GOOGLE_SHEETS_CREDENTIALS   the service-account JSON (already set for sheets.py)
-    USERS_SHEET_URL             the sheet to write to (falls back to the one below)
+Env used (from .env):
+    ATTENDANCE_MONGO_URL or MONGO_URL   Atlas connection string
+    DB_NAME                             (defaults to internal_communication)
+    GOOGLE_SHEETS_CREDENTIALS           service-account JSON (single line!)
+    USERS_SHEET_URL                     sheet to write to
 
-NOTE: this OVERWRITES the first worksheet with the current users (headers + rows).
-The 'password' column is intentionally left blank — never export password hashes.
+Creates its OWN Mongo client (avoids the 'attached to a different loop' error).
+OVERWRITES the first worksheet with current users. 'password' column left blank.
 """
 import os
 import json
@@ -23,56 +23,50 @@ import logging
 
 import gspread
 from google.oauth2.service_account import Credentials
+from motor.motor_asyncio import AsyncIOMotorClient
 from dotenv import load_dotenv
-
-from database import stc_db
 
 load_dotenv()
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger("export-users")
 
+MONGO_URL = os.getenv("MONGO_URL") or os.getenv("ATTENDANCE_MONGO_URL")
+DB_NAME = os.getenv("DB_NAME", "internal_communication")
 SHEET_URL = os.getenv(
     "USERS_SHEET_URL",
     "https://docs.google.com/spreadsheets/d/1QJ6JqvDoTlmAh2P_D2Atut2WhguHCFMzmRYLOyiijrI/edit?gid=0#gid=0",
 )
 
-# Column order written to the sheet. 'password' stays blank (for new rows you add).
 HEADERS = ["name", "email", "empCode", "team", "designation", "department",
            "phone", "date_of_birth", "reviewer", "password"]
-
-# Collections in stc_db that are NOT user teams
 SKIP_COLLECTIONS = {"facebook_posts", "ap_mapping"}
-
-
-async def gather_users():
-    users = []
-    for cname in await stc_db.list_collection_names():
-        if cname.startswith("system.") or cname in SKIP_COLLECTIONS:
-            continue
-        async for u in stc_db[cname].find({}, {"_id": 0, "password_hash": 0}):
-            if not u.get("email"):
-                continue
-            users.append(u)
-    # de-dup by email, keep first
-    seen, unique = set(), []
-    for u in users:
-        e = str(u.get("email")).lower()
-        if e in seen:
-            continue
-        seen.add(e)
-        unique.append(u)
-    return unique
 
 
 def _cell(u, key):
     v = u.get(key, "")
     if v is None:
         return ""
-    # dates -> YYYY-MM-DD
     try:
         return v.strftime("%Y-%m-%d")
     except AttributeError:
         return str(v)
+
+
+async def gather_users(db):
+    users, seen = [], set()
+    for cname in await db.list_collection_names():
+        if cname.startswith("system.") or cname in SKIP_COLLECTIONS:
+            continue
+        async for u in db[cname].find({}, {"_id": 0, "password_hash": 0}):
+            email = u.get("email")
+            if not email:
+                continue
+            e = str(email).lower()
+            if e in seen:
+                continue
+            seen.add(e)
+            users.append(u)
+    return users
 
 
 def write_sheet(users):
@@ -87,17 +81,21 @@ def write_sheet(users):
 
     rows = [HEADERS]
     for u in users:
-        row = [_cell(u, h) if h != "password" else "" for h in HEADERS]
-        rows.append(row)
-
+        rows.append([_cell(u, h) if h != "password" else "" for h in HEADERS])
     ws.clear()
     ws.update(rows, value_input_option="RAW")
-    log.info("Wrote %d users to the sheet (first worksheet).", len(users))
+    log.info("Wrote %d users to the sheet.", len(users))
 
 
 async def main():
-    users = await gather_users()
+    if not MONGO_URL:
+        raise SystemExit("MONGO_URL / ATTENDANCE_MONGO_URL not set in .env")
+    client = AsyncIOMotorClient(MONGO_URL, tlsAllowInvalidCertificates=True)
+    db = client[DB_NAME]
+    users = await gather_users(db)
+    log.info("Found %d users.", len(users))
     write_sheet(users)
+    client.close()
 
 
 if __name__ == "__main__":

@@ -151,6 +151,7 @@ const Dashboard = () => {
   const location = useLocation();
   const { user, isAdmin, loading: authLoading, navigationTarget } = useAuth();
   const [activeSection, setActiveSection] = useState('portals');
+  const [portalViewerOpen, setPortalViewerOpen] = useState(false);
   const [readAnnouncementIds, setReadAnnouncementIds] = useState(new Set());
   const [announcements, setAnnouncements] = useState([]);
   const [allEmployees, setAllEmployees] = useState([]);
@@ -264,7 +265,7 @@ const Dashboard = () => {
     if (authLoading) return <div className="flex justify-center items-center h-64">Loading...</div>;
 
     switch (activeSection) {
-      case 'portals': return <PortalCards />;
+      case 'portals': return <PortalCards onViewerChange={setPortalViewerOpen} />;
       case 'announcements': return <Announcements announcements={announcements} setAnnouncements={setAnnouncements} fetchAnnouncements={fetchAnnouncements} />;
       case 'projects': return <Projects />;
       case 'profile': return <UserProfile />;
@@ -274,7 +275,7 @@ const Dashboard = () => {
 
       case 'admin': 
         // Use the new isAdmin check from AuthContext
-        return isAdmin ? <AdminPanel /> : <PortalCards />;
+        return isAdmin ? <AdminPanel /> : <PortalCards onViewerChange={setPortalViewerOpen} />;
       // case 'payslips': return <PayslipManagement />;
 
       case 'biometric':
@@ -289,7 +290,7 @@ const Dashboard = () => {
         ) return <HRAttendance />;
         // Managers -> biometric team report; employees -> own biometric records
         return <BiometricMyTeam />;
-      default: return <PortalCards />;
+      default: return <PortalCards onViewerChange={setPortalViewerOpen} />;
     }
   };
 
@@ -330,6 +331,7 @@ const Dashboard = () => {
         />
         <div className="container mx-auto px-4 py-8">
           {/* Welcome Card */}
+          {!portalViewerOpen && (
           <Card className="bg-gradient-to-r from-[#225F8B] to-[#225F8B]/80 text-white border-0 shadow-xl mb-8">
             <CardContent className="p-8">
               <div className="flex items-center justify-between">
@@ -359,6 +361,7 @@ const Dashboard = () => {
               </div>
             </CardContent>
           </Card>
+          )}
 
           {/* Navigation */}
           <div className="mb-8 flex flex-wrap gap-2">

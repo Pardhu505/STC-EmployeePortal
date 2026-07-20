@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
@@ -6,7 +6,7 @@ import { ExternalLink, ArrowRight, ArrowLeft } from 'lucide-react';
 import { PORTAL_DATA } from '../data/mock';
 import { useAuth } from '../contexts/AuthContext';
 
-const PortalCards = () => {
+const PortalCards = ({ onViewerChange }) => {
   const { user } = useAuth();
   const hasElevatedAccess =
     user?.designation === 'Reporting manager' ||
@@ -16,8 +16,16 @@ const PortalCards = () => {
   // The portal currently open inside the in-app viewer (null = show the grid)
   const [activePortal, setActivePortal] = useState(null);
 
-  const openInApp = (portal) => setActivePortal(portal);
+  const notify = (open) => { if (onViewerChange) onViewerChange(open); };
+  const openInApp = (portal) => { setActivePortal(portal); notify(true); };
+  const closeViewer = () => { setActivePortal(null); notify(false); };
   const openInNewTab = (url) => window.open(url, '_blank', 'noopener,noreferrer');
+
+  // If this component unmounts (user switches tab) while a portal is open,
+  // make sure the parent restores the welcome banner.
+  useEffect(() => {
+    return () => { if (onViewerChange) onViewerChange(false); };
+  }, [onViewerChange]);
 
   const visiblePortals = PORTAL_DATA.filter(portal => {
     if (portal.managerOnly) {
@@ -29,10 +37,10 @@ const PortalCards = () => {
   // ---- In-app viewer (iframe) ----
   if (activePortal) {
     return (
-      <div className="flex flex-col" style={{ height: 'calc(100vh - 120px)' }}>
+      <div className="flex flex-col" style={{ height: 'calc(100vh - 150px)' }}>
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-3">
-            <Button variant="outline" size="sm" onClick={() => setActivePortal(null)}>
+            <Button variant="outline" size="sm" onClick={closeViewer}>
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back to Portals
             </Button>

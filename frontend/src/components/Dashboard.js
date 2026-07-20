@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { useAuth } from '../contexts/AuthContext';
 import { useLocation } from 'react-router-dom';
 import { API_BASE_URL } from '../config/api';
@@ -17,7 +18,6 @@ import Meetings from './Meetings'; // Import the new Meetings component
 // import PayslipManagement from './PayslipManagement';
 
 import { Card, CardContent } from './ui/card';
-import { Button } from './ui/button';
 
 import { Users, BarChart3, Bell, MessageSquare, Gift, Shield, CalendarCheck, Map as MapIcon, Video, Fingerprint } from 'lucide-react';
 
@@ -152,6 +152,7 @@ const Dashboard = () => {
   const { user, isAdmin, loading: authLoading, navigationTarget } = useAuth();
   const [activeSection, setActiveSection] = useState('portals');
   const [portalViewerOpen, setPortalViewerOpen] = useState(false);
+  const reduceMotion = useReducedMotion();
   const [readAnnouncementIds, setReadAnnouncementIds] = useState(new Set());
   const [announcements, setAnnouncements] = useState([]);
   const [allEmployees, setAllEmployees] = useState([]);
@@ -364,30 +365,47 @@ const Dashboard = () => {
           )}
 
           {/* Navigation */}
-          <div className="mb-8 flex flex-wrap gap-2">
+          <div className="mb-8 flex gap-2 overflow-x-auto pb-2 md:flex-wrap md:overflow-x-visible no-scrollbar -mx-1 px-1">
             {navigationItems.map((item) => {
               const Icon = item.icon;
+              const active = activeSection === item.id;
               return (
-                <Button
+                <button
                   key={item.id}
-                  variant={activeSection === item.id ? 'default' : 'outline'}
                   onClick={() => setActiveSection(item.id)}
-                  className={`flex items-center gap-2 transition-all duration-200 ${
-                    activeSection === item.id
-                      ? 'bg-gradient-to-r from-[#225F8B] to-[#225F8B]/80 text-white shadow-lg'
-                      : 'hover:bg-blue-50 hover:border-[#225F8B]/50 bg-white/80 backdrop-blur-sm'
+                  className={`relative shrink-0 whitespace-nowrap flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors duration-200 ${
+                    active
+                      ? 'text-white'
+                      : 'text-gray-700 bg-white/80 backdrop-blur-sm border border-gray-200 hover:bg-blue-50 hover:border-[#225F8B]/50'
                   }`}
                 >
-                  <Icon className="h-4 w-4" />
-                  {item.label}
-                </Button>
+                  {active && (
+                    <motion.span
+                      layoutId="nav-pill"
+                      className="absolute inset-0 rounded-md bg-gradient-to-r from-[#225F8B] to-[#225F8B]/80 shadow-lg"
+                      transition={{ type: 'spring', stiffness: 400, damping: 32 }}
+                    />
+                  )}
+                  <Icon className="h-4 w-4 relative z-10" />
+                  <span className="relative z-10">{item.label}</span>
+                </button>
               );
             })}
           </div>
 
           {/* Content */}
-          <div className="transition-all duration-300">
-            {renderContent()}
+          <div className="min-h-[300px]">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={activeSection}
+                initial={reduceMotion ? false : { opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -8 }}
+                transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+              >
+                {renderContent()}
+              </motion.div>
+            </AnimatePresence>
           </div>
         </div>
         <Footer />

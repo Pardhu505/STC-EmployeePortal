@@ -1,8 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
-import { ExternalLink, ArrowRight } from 'lucide-react';
+import { ExternalLink, ArrowRight, ArrowLeft } from 'lucide-react';
 import { PORTAL_DATA } from '../data/mock';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -13,9 +13,11 @@ const PortalCards = () => {
     user?.department === 'HR' ||
     user?.designation === 'System Admin';
 
-  const handlePortalClick = (url) => {
-    window.open(url, '_blank', 'noopener,noreferrer');
-  };
+  // The portal currently open inside the in-app viewer (null = show the grid)
+  const [activePortal, setActivePortal] = useState(null);
+
+  const openInApp = (portal) => setActivePortal(portal);
+  const openInNewTab = (url) => window.open(url, '_blank', 'noopener,noreferrer');
 
   const visiblePortals = PORTAL_DATA.filter(portal => {
     if (portal.managerOnly) {
@@ -24,6 +26,47 @@ const PortalCards = () => {
     return true;
   });
 
+  // ---- In-app viewer (iframe) ----
+  if (activePortal) {
+    return (
+      <div className="flex flex-col" style={{ height: 'calc(100vh - 120px)' }}>
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-3">
+            <Button variant="outline" size="sm" onClick={() => setActivePortal(null)}>
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to Portals
+            </Button>
+            <h2 className="text-xl font-bold text-gray-900">{activePortal.title}</h2>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => openInNewTab(activePortal.url)}
+          >
+            <ExternalLink className="h-4 w-4 mr-2" />
+            Open in new tab
+          </Button>
+        </div>
+
+        <div className="flex-1 rounded-xl overflow-hidden border border-gray-200 bg-white shadow-sm relative">
+          <iframe
+            src={activePortal.url}
+            title={activePortal.title}
+            className="w-full h-full"
+            style={{ border: 'none' }}
+            allow="clipboard-read; clipboard-write; fullscreen"
+          />
+        </div>
+
+        <p className="text-xs text-gray-500 mt-2">
+          If the portal doesn't load here (some sites block embedding), use
+          "Open in new tab" above.
+        </p>
+      </div>
+    );
+  }
+
+  // ---- Portal grid ----
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -35,10 +78,10 @@ const PortalCards = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {visiblePortals.map((portal) => (
-          <Card 
-            key={portal.id} 
+          <Card
+            key={portal.id}
             className="group hover:shadow-xl transition-all duration-300 cursor-pointer border-0 bg-white/80 backdrop-blur-sm hover:scale-105"
-            onClick={() => handlePortalClick(portal.url)}
+            onClick={() => openInApp(portal)}
           >
             <CardHeader className="pb-4">
               <div className="flex items-center justify-between">
@@ -53,27 +96,36 @@ const PortalCards = () => {
                 {portal.title}
               </CardTitle>
             </CardHeader>
-            
+
             <CardContent className="pt-0">
               <p className="text-gray-600 mb-6 text-sm leading-relaxed">
                 {portal.description}
               </p>
-              
+
               <div className="flex items-center justify-between">
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   size="sm"
                   className="group-hover:bg-[#225F8B]/10 group-hover:border-[#225F8B]/50 group-hover:text-[#225F8B] transition-all duration-200"
                   onClick={(e) => {
                     e.stopPropagation();
-                    handlePortalClick(portal.url);
+                    openInApp(portal);
                   }}
                 >
-                  <ExternalLink className="h-4 w-4 mr-2" />
+                  <ArrowRight className="h-4 w-4 mr-2" />
                   Open Portal
                 </Button>
-                
-                <ArrowRight className="h-4 w-4 text-gray-400 group-hover:text-[#225F8B] group-hover:translate-x-1 transition-all duration-200" />
+
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openInNewTab(portal.url);
+                  }}
+                  title="Open in new tab"
+                  className="text-gray-400 hover:text-[#225F8B] transition-all duration-200"
+                >
+                  <ExternalLink className="h-4 w-4" />
+                </button>
               </div>
             </CardContent>
           </Card>
@@ -89,7 +141,8 @@ const PortalCards = () => {
                 Quick Access Tips
               </h3>
               <p className="text-gray-600 text-sm">
-                Click on any portal card to open it in a new tab. All portals are accessible to all employees.
+                Click any portal to open it right here inside the Employee Portal.
+                Use the small icon (or "Open in new tab") if you'd rather open it separately.
               </p>
             </div>
             <div className="hidden md:block">

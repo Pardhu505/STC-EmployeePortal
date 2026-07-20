@@ -37,7 +37,7 @@ const PortalCards = ({ onViewerChange }) => {
   // ---- In-app viewer (iframe) ----
   if (activePortal) {
     return (
-      <div className="flex flex-col" style={{ height: 'calc(100vh - 150px)' }}>
+      <div className="flex flex-col" style={{ height: 'calc(100vh - 96px)' }}>
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-3">
             <Button variant="outline" size="sm" onClick={closeViewer}>

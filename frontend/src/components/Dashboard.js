@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
+import { motion, AnimatePresence, useReducedMotion, animate, useMotionValue } from 'framer-motion';
 import { useAuth } from '../contexts/AuthContext';
 import { useLocation } from 'react-router-dom';
 import { API_BASE_URL } from '../config/api';
+import { fetchWithRetry } from '../utils/fetchRetry';
 import Header from './Header';
 import Footer from './Footer'; // Import the new Footer component
 import PortalCards from './PortalCards';
@@ -146,6 +147,40 @@ const generateBirthdayAnnouncements = (birthdayEmployees, currentUser) => {
   });
 };
 
+// Count-up number that respects reduced-motion
+function AnimatedNumber({ value = 0, duration = 1.1 }) {
+  const reduce = useReducedMotion();
+  const mv = useMotionValue(0);
+  const [display, setDisplay] = useState(0);
+  useEffect(() => {
+    if (reduce) { setDisplay(value); return; }
+    const controls = animate(mv, value, {
+      duration, ease: [0.22, 1, 0.36, 1],
+      onUpdate: (v) => setDisplay(Math.round(v)),
+    });
+    return controls.stop;
+  }, [value, duration, reduce, mv]);
+  return <>{display}</>;
+}
+
+const statChipVariants = {
+  hidden: { opacity: 0, y: 14 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.5, ease: [0.22, 1, 0.36, 1] } },
+};
+
+function StatChip({ label, children, accent }) {
+  return (
+    <motion.div
+      variants={statChipVariants}
+      whileHover={{ y: -3, scale: 1.02 }}
+      className="rounded-2xl bg-white/10 backdrop-blur-md border border-white/15 px-4 py-3 shadow-sm"
+    >
+      <div className="text-[11px] uppercase tracking-wide text-blue-100/80">{label}</div>
+      <div className={`text-2xl font-bold mt-1 ${accent || 'text-white'}`}>{children}</div>
+    </motion.div>
+  );
+}
+
 const Dashboard = () => {
 
   const location = useLocation();
@@ -153,6 +188,42 @@ const Dashboard = () => {
   const [activeSection, setActiveSection] = useState('portals');
   const [portalViewerOpen, setPortalViewerOpen] = useState(false);
   const reduceMotion = useReducedMotion();
+  const [meStats, setMeStats] = useState(null);
+
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetchWithRetry(`${API_BASE_URL}/api/biometric/me`, {
+          headers: { Authorization: `Bearer ${btoa(JSON.stringify(user))}` },
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        const emp = data.employee;
+        if (!emp) return;
+        const todayISO = new Date().toISOString().slice(0, 10);
+        const toMin = (hhmm) => {
+          if (!hhmm || hhmm.indexOf(':') < 0) return null;
+          const [h, m] = hhmm.split(':').map(Number);
+          return h * 60 + m;
+        };
+        const today = (emp.days || []).find((d) => d.date === todayISO && d.status === 'Present');
+        const shortDays = (emp.days || []).filter(
+          (d) => d.status === 'Present' && toMin(d.working_hours) !== null && toMin(d.working_hours) < 450
+        ).length;
+        if (!cancelled) {
+          setMeStats({
+            todayLogin: today ? today.first_in : null,
+            todayLate: today ? today.late : false,
+            lateMonth: emp.late_days || 0,
+            shortDays,
+          });
+        }
+      } catch (e) { /* stats are optional; ignore */ }
+    })();
+    return () => { cancelled = true; };
+  }, [user]);
   const [readAnnouncementIds, setReadAnnouncementIds] = useState(new Set());
   const [announcements, setAnnouncements] = useState([]);
   const [allEmployees, setAllEmployees] = useState([]);
@@ -340,6 +411,30 @@ const Dashboard = () => {
                   <h1 className="text-3xl font-bold mb-2">Welcome back, {user?.name}!</h1>
                   <p className="text-blue-100 text-lg">{user?.designation} • {user?.department}</p>
                   <p className="text-blue-200 text-sm mt-2">Access your workspace portals and stay updated with company announcements</p>
+
+                  {meStats && (
+                    <motion.div
+                      className="mt-5 grid grid-cols-1 sm:grid-cols-3 gap-3 max-w-2xl"
+                      initial="hidden"
+                      animate="show"
+                      variants={{ hidden: {}, show: { transition: { staggerChildren: 0.12, delayChildren: 0.1 } } }}
+                    >
+                      <StatChip label="Today's Login">
+                        {meStats.todayLogin
+                          ? <span className="flex items-center gap-2">
+                              {meStats.todayLogin}
+                              {meStats.todayLate && <span className="text-[11px] font-bold text-red-200">Late</span>}
+                            </span>
+                          : <span className="text-blue-200/70">—</span>}
+                      </StatChip>
+                      <StatChip label="Late Logins (month)" accent={meStats.lateMonth > 0 ? 'text-yellow-200' : 'text-white'}>
+                        <AnimatedNumber value={meStats.lateMonth} />
+                      </StatChip>
+                      <StatChip label="Days under 7h 30m" accent={meStats.shortDays > 0 ? 'text-orange-200' : 'text-white'}>
+                        <AnimatedNumber value={meStats.shortDays} />
+                      </StatChip>
+                    </motion.div>
+                  )}
                   {announcements.some(a => a.type === 'birthday') && (
                     <div className="mt-4 flex items-center space-x-2">
                       <Gift className="h-5 w-5 text-yellow-300" />
@@ -365,6 +460,7 @@ const Dashboard = () => {
           )}
 
           {/* Navigation */}
+          {!portalViewerOpen && (
           <div className="mb-8 flex gap-2 overflow-x-auto pb-2 md:flex-wrap md:overflow-x-visible no-scrollbar -mx-1 px-1">
             {navigationItems.map((item) => {
               const Icon = item.icon;
@@ -392,6 +488,7 @@ const Dashboard = () => {
               );
             })}
           </div>
+          )}
 
           {/* Content */}
           <div className="min-h-[300px]">
@@ -408,7 +505,7 @@ const Dashboard = () => {
             </AnimatePresence>
           </div>
         </div>
-        <Footer />
+        {!portalViewerOpen && <Footer />}
 
       </div>
     </div>

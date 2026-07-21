@@ -4,7 +4,6 @@ import { useAuth } from '../contexts/AuthContext';
 import { useLocation } from 'react-router-dom';
 import { API_BASE_URL } from '../config/api';
 import { fetchWithRetry } from '../utils/fetchRetry';
-import { DotLottieReact } from '@lottiefiles/dotlottie-react';
 import Header from './Header';
 import Footer from './Footer'; // Import the new Footer component
 import PortalCards from './PortalCards';
@@ -21,7 +20,7 @@ import Meetings from './Meetings'; // Import the new Meetings component
 
 import { Card, CardContent } from './ui/card';
 
-import { Users, BarChart3, Bell, MessageSquare, Gift, Shield, CalendarCheck, Map as MapIcon, Video, Fingerprint } from 'lucide-react';
+import { Users, BarChart3, Bell, MessageSquare, Gift, Shield, CalendarCheck, Map as MapIcon, Video, Fingerprint, LogIn, Clock, Timer, CalendarPlus, ChevronLeft, ChevronRight } from 'lucide-react';
 
 import AttendanceReport from './AdminAttedenceReport';
 import HRAttendance from './HRAttendance';
@@ -48,8 +47,9 @@ const DateTimeWidget = () => {
   };
 
   return (
-    <div className="text-center font-mono text-lg font-semibold text-white mb-2" suppressHydrationWarning>
-      <span className="bg-black/10 px-2 py-1 rounded-md">{formatTime(time)}</span>
+    <div className="flex items-center justify-center gap-2 text-white mb-3" suppressHydrationWarning>
+      <Clock className="h-4 w-4 text-cyan-300" />
+      <span className="font-mono text-lg font-semibold tracking-wide">{formatTime(time)}</span>
     </div>
   );
 };
@@ -69,37 +69,32 @@ const CalendarWidget = () => {
   const daysInMonth = new Date(year, month + 1, 0).getDate();
 
   const calendarDays = [];
-  // Blank cells for days before the 1st of the month
   for (let i = 0; i < firstDayOfMonth; i++) {
-    calendarDays.push(<div key={`blank-${i}`} className="w-1 h-2"></div>);
+    calendarDays.push(<div key={`blank-${i}`} className="h-7"></div>);
   }
-
-  // Cells for each day of the month
   for (let day = 1; day <= daysInMonth; day++) {
     const isToday = day === currentDate;
-
     calendarDays.push(
-      <div key={day} className={`w-3 h-3 flex items-center justify-center relative rounded-full ${isToday ? 'bg-[#225F8B]' : ''}`}>
-        <span className={`text-xs ${isToday ? 'font-bold text-transparent' : 'text-gray-700'}`}>
+      <div key={day} className="h-7 flex items-center justify-center">
+        <span className={`flex items-center justify-center h-7 w-7 rounded-full text-[13px] ${
+          isToday ? 'bg-cyan-400 text-slate-900 font-bold shadow-md' : 'text-white/90'}`}>
           {day}
         </span>
-        {isToday && (
-          <div className="absolute bottom-1 w-1.5 h-1.5 bg-white rounded-full"></div>
-        )}
       </div>
     );
   }
 
   return (
-  <div className="p-3 bg-white/90 backdrop-blur-sm rounded-lg shadow-md w-48" suppressHydrationWarning>
-      <div className="text-center text-xs font-semibold text-gray-800 mb-2">
-        <span>{monthNames[month]} {year}</span>
+    <div className="w-64 text-white" suppressHydrationWarning>
+      <div className="flex items-center justify-between mb-2 px-1">
+        <ChevronLeft className="h-4 w-4 text-white/60" />
+        <span className="text-sm font-semibold">{monthNames[month]} {year}</span>
+        <ChevronRight className="h-4 w-4 text-white/60" />
       </div>
-      <div className="grid grid-cols-7 gap-1 text-center text-xs text-gray-500 mb-1">
-        {dayNames.map((day, i) => <div key={`${day}-${i}`} className="w-3 h-3 flex items-center justify-center">{day}</div>)}
-
+      <div className="grid grid-cols-7 text-center text-[11px] text-teal-100/70 mb-1">
+        {dayNames.map((day, i) => <div key={`${day}-${i}`} className="h-6 flex items-center justify-center">{day}</div>)}
       </div>
-      <div className="grid grid-cols-7 gap-1">{calendarDays}</div>
+      <div className="grid grid-cols-7">{calendarDays}</div>
     </div>
   );
 };
@@ -169,25 +164,34 @@ const statChipVariants = {
   show: { opacity: 1, y: 0, transition: { duration: 0.5, ease: [0.22, 1, 0.36, 1] } },
 };
 
-function StatChip({ label, iconSrc, children, accent }) {
+// Circular icon badge with a rotating dashed ring (matches the reference design)
+function RingIcon({ color, ring, children }) {
+  const reduce = useReducedMotion();
   return (
-    <motion.div
-      variants={statChipVariants}
-      whileHover={{ scale: 1.05 }}
-      transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-      className="flex items-center gap-3"
-    >
-      <div className="shrink-0 h-14 w-14 flex items-center justify-center">
-        {iconSrc && (
-          <DotLottieReact src={iconSrc} autoplay loop style={{ width: 56, height: 56 }} />
-        )}
+    <div className="relative h-[70px] w-[70px] flex items-center justify-center">
+      <motion.svg
+        className="absolute inset-0" width="70" height="70" viewBox="0 0 70 70"
+        animate={reduce ? {} : { rotate: 360 }}
+        transition={{ duration: 9, repeat: Infinity, ease: 'linear' }}
+      >
+        <circle cx="35" cy="35" r="32" fill="none" stroke={ring} strokeWidth="2.5"
+          strokeDasharray="3 7" strokeLinecap="round" opacity="0.85" />
+      </motion.svg>
+      <div className="h-[52px] w-[52px] rounded-full flex items-center justify-center shadow-lg"
+        style={{ background: color }}>
+        {children}
       </div>
-      <div className="min-w-0">
-        <div className="text-[11px] uppercase tracking-wide text-blue-100/80 whitespace-nowrap">{label}</div>
-        <div className={`text-2xl font-bold leading-tight ${accent || 'text-white'}`}>{children}</div>
-      </div>
-    </motion.div>
+    </div>
   );
+}
+
+// "08:52" -> "08:52 AM"
+function to12h(hhmm) {
+  if (!hhmm || hhmm.indexOf(':') < 0) return { time: '—', ap: '' };
+  let [h, m] = hhmm.split(':').map(Number);
+  const ap = h >= 12 ? 'PM' : 'AM';
+  h = h % 12 || 12;
+  return { time: `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`, ap };
 }
 
 const Dashboard = () => {
@@ -413,58 +417,78 @@ const Dashboard = () => {
         <div className="container mx-auto px-4 py-8">
           {/* Welcome Card */}
           {!portalViewerOpen && (
-          <Card className="bg-gradient-to-r from-[#225F8B] to-[#225F8B]/80 text-white border-0 shadow-xl mb-8">
-            <CardContent className="p-8">
-              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-                <div className="shrink-0">
-                  <h1 className="text-3xl font-bold mb-2">Welcome back, {user?.name}!</h1>
-                  <p className="text-blue-100 text-lg">{user?.designation} • {user?.department}</p>
-                  <p className="text-blue-200 text-sm mt-2 max-w-sm">Access your workspace portals and stay updated with company announcements</p>
-                  {announcements.some(a => a.type === 'birthday') && (
-                    <div className="mt-4 flex items-center space-x-2">
-                      <Gift className="h-5 w-5 text-yellow-300" />
-                      <span className="text-yellow-200 text-sm">
-                        {announcements.filter(a => a.type === 'birthday').length} birthday
-                        {announcements.filter(a => a.type === 'birthday').length > 1 ? 's' : ''} today! 🎉
-                      </span>
-                    </div>
-                  )}
+          <Card className="border-0 shadow-xl mb-8 overflow-hidden text-white"
+            style={{ background: 'linear-gradient(135deg,#0D5E5A 0%,#0A7871 100%)' }}>
+            <CardContent className="p-6 lg:p-8">
+              <div className="flex flex-col xl:flex-row xl:items-center gap-6">
+                {/* Left: greeting */}
+                <div className="flex items-start gap-4 shrink-0 xl:w-[320px]">
+                  <div className="hidden sm:flex h-16 w-16 rounded-full bg-white/10 items-center justify-center overflow-hidden shrink-0">
+                    <img src="/lottie/mountain.png" alt="" className="h-16 w-16 object-cover"
+                      onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+                  </div>
+                  <div>
+                    <h1 className="text-2xl lg:text-3xl font-bold leading-tight">Welcome back,<br />{user?.name}!</h1>
+                    <p className="text-teal-100/90 mt-1">{user?.designation} • {user?.department}</p>
+                    <p className="text-teal-200/70 text-sm mt-2 max-w-xs">Access your workspace portals and stay updated with company announcements</p>
+                  </div>
                 </div>
 
-                {/* Animated personal stats (middle) */}
+                {/* Middle: animated stats */}
                 {meStats && (
                   <motion.div
-                    className="flex-1 flex flex-col gap-3 w-full lg:max-w-md"
-                    initial="hidden"
-                    animate="show"
-                    variants={{ hidden: {}, show: { transition: { staggerChildren: 0.12, delayChildren: 0.1 } } }}
+                    className="flex-1 grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-white/10"
+                    initial="hidden" animate="show"
+                    variants={{ hidden: {}, show: { transition: { staggerChildren: 0.14, delayChildren: 0.1 } } }}
                   >
-                    <StatChip label="Today's Login" iconSrc="/lottie/todays-login.json">
+                    <motion.div variants={statChipVariants} className="flex flex-col items-center text-center px-4 py-3">
+                      <RingIcon color="#14B8A6" ring="#5eead4"><LogIn className="h-6 w-6 text-white" /></RingIcon>
+                      <div className="mt-3 text-[11px] font-semibold uppercase tracking-wider text-teal-100/80">Today's Login</div>
+                      <div className="text-2xl font-bold text-white mt-0.5">
+                        {to12h(meStats.todayLogin).time}
+                        <span className="text-sm font-semibold ml-1">{to12h(meStats.todayLogin).ap}</span>
+                      </div>
                       {meStats.todayLogin
-                        ? <span className="flex items-center gap-2">
-                            {meStats.todayLogin}
-                            {meStats.todayLate && <span className="text-[11px] font-bold text-red-200">Late</span>}
-                          </span>
-                        : <span className="text-blue-200/70">—</span>}
-                    </StatChip>
-                    <StatChip label="Late Logins (month)" iconSrc="/lottie/late-logins.json"
-                      accent={meStats.lateMonth > 0 ? 'text-yellow-200' : 'text-white'}>
-                      <AnimatedNumber value={meStats.lateMonth} />
-                    </StatChip>
-                    <StatChip label="Days under 7h 30m" iconSrc="/lottie/short-hours.json"
-                      accent={meStats.shortDays > 0 ? 'text-orange-200' : 'text-white'}>
-                      <AnimatedNumber value={meStats.shortDays} />
-                    </StatChip>
+                        ? (meStats.todayLate
+                            ? <span className="mt-1 text-[11px] font-bold text-slate-900 bg-yellow-400 px-2 py-0.5 rounded-full">Late</span>
+                            : <span className="mt-1 text-[11px] font-semibold text-emerald-200">On time</span>)
+                        : <span className="mt-1 text-[11px] text-teal-200/60">No punch yet</span>}
+                    </motion.div>
+
+                    <motion.div variants={statChipVariants} className="flex flex-col items-center text-center px-4 py-3">
+                      <RingIcon color="#22c55e" ring="#86efac"><CalendarPlus className="h-6 w-6 text-white" /></RingIcon>
+                      <div className="mt-3 text-[11px] font-semibold uppercase tracking-wider text-teal-100/80">Late Logins (Month)</div>
+                      <div className="text-2xl font-bold text-[#FACC15] mt-0.5"><AnimatedNumber value={meStats.lateMonth} /></div>
+                      <span className="mt-1 text-[11px] text-teal-200/70">This Month</span>
+                    </motion.div>
+
+                    <motion.div variants={statChipVariants} className="flex flex-col items-center text-center px-4 py-3">
+                      <RingIcon color="#F59E0B" ring="#fdba74"><Timer className="h-6 w-6 text-white" /></RingIcon>
+                      <div className="mt-3 text-[11px] font-semibold uppercase tracking-wider text-teal-100/80">Days under 7h 30m</div>
+                      <div className="text-2xl font-bold text-[#F59E0B] mt-0.5"><AnimatedNumber value={meStats.shortDays} /></div>
+                      <span className="mt-1 text-[11px] text-teal-200/70">This Month</span>
+                    </motion.div>
                   </motion.div>
                 )}
 
-                <div className="hidden md:block shrink-0">
-                  <div className="flex flex-col items-center" suppressHydrationWarning>
+                {/* Right: clock + calendar in a glass panel */}
+                <div className="hidden lg:block shrink-0">
+                  <div className="rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md p-4">
                     <DateTimeWidget />
                     <CalendarWidget />
                   </div>
                 </div>
               </div>
+
+              {announcements.some(a => a.type === 'birthday') && (
+                <div className="mt-4 flex items-center space-x-2">
+                  <Gift className="h-5 w-5 text-yellow-300" />
+                  <span className="text-yellow-200 text-sm">
+                    {announcements.filter(a => a.type === 'birthday').length} birthday
+                    {announcements.filter(a => a.type === 'birthday').length > 1 ? 's' : ''} today! 🎉
+                  </span>
+                </div>
+              )}
             </CardContent>
           </Card>
           )}
@@ -482,13 +506,13 @@ const Dashboard = () => {
                   className={`relative shrink-0 whitespace-nowrap flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors duration-200 ${
                     active
                       ? 'text-white'
-                      : 'text-gray-700 bg-white/80 backdrop-blur-sm border border-gray-200 hover:bg-blue-50 hover:border-[#225F8B]/50'
+                      : 'text-gray-700 bg-white/80 backdrop-blur-sm border border-gray-200 hover:bg-teal-50 hover:border-[#0A7871]/50'
                   }`}
                 >
                   {active && (
                     <motion.span
                       layoutId="nav-pill"
-                      className="absolute inset-0 rounded-md bg-gradient-to-r from-[#225F8B] to-[#225F8B]/80 shadow-lg"
+                      className="absolute inset-0 rounded-md bg-gradient-to-r from-[#0A7871] to-[#0D5E5A] shadow-lg"
                       transition={{ type: 'spring', stiffness: 400, damping: 32 }}
                     />
                   )}

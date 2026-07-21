@@ -79,7 +79,7 @@ const PortalCards = ({ onViewerChange }) => {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold text-gray-900">Portal Access</h2>
-        <Badge variant="outline" className="bg-[#225F8B]/10 text-[#225F8B] border-[#225F8B]/20">
+        <Badge variant="outline" className="bg-[#0A7871]/10 text-[#0A7871] border-[#0A7871]/20">
           {visiblePortals.length} Available
         </Badge>
       </div>
@@ -100,7 +100,7 @@ const PortalCards = ({ onViewerChange }) => {
                   {portal.category}
                 </Badge>
               </div>
-              <CardTitle className="text-xl font-bold text-gray-900 group-hover:text-[#225F8B] transition-colors">
+              <CardTitle className="text-xl font-bold text-gray-900 group-hover:text-[#0A7871] transition-colors">
                 {portal.title}
               </CardTitle>
             </CardHeader>
@@ -114,7 +114,7 @@ const PortalCards = ({ onViewerChange }) => {
                 <Button
                   variant="outline"
                   size="sm"
-                  className="group-hover:bg-[#225F8B]/10 group-hover:border-[#225F8B]/50 group-hover:text-[#225F8B] transition-all duration-200"
+                  className="group-hover:bg-[#0A7871]/10 group-hover:border-[#0A7871]/50 group-hover:text-[#0A7871] transition-all duration-200"
                   onClick={(e) => {
                     e.stopPropagation();
                     openInApp(portal);
@@ -130,7 +130,7 @@ const PortalCards = ({ onViewerChange }) => {
                     openInNewTab(portal.url);
                   }}
                   title="Open in new tab"
-                  className="text-gray-400 hover:text-[#225F8B] transition-all duration-200"
+                  className="text-gray-400 hover:text-[#0A7871] transition-all duration-200"
                 >
                   <ExternalLink className="h-4 w-4" />
                 </button>
@@ -141,7 +141,7 @@ const PortalCards = ({ onViewerChange }) => {
       </div>
 
       {/* Quick Access Info */}
-      <Card className="bg-gradient-to-r from-[#225F8B]/5 to-[#225F8B]/10 border-[#225F8B]/20">
+      <Card className="bg-gradient-to-r from-[#0A7871]/5 to-[#0A7871]/10 border-[#0A7871]/20">
         <CardContent className="p-6">
           <div className="flex items-center justify-between">
             <div>
@@ -155,7 +155,7 @@ const PortalCards = ({ onViewerChange }) => {
             </div>
             <div className="hidden md:block">
               <div className="w-16 h-16 bg-white/50 rounded-full flex items-center justify-center">
-                <ExternalLink className="h-8 w-8 text-[#225F8B]" />
+                <ExternalLink className="h-8 w-8 text-[#0A7871]" />
               </div>
             </div>
           </div>

@@ -168,16 +168,16 @@ const statChipVariants = {
 function RingIcon({ color, ring, children }) {
   const reduce = useReducedMotion();
   return (
-    <div className="relative h-[70px] w-[70px] flex items-center justify-center">
+    <div className="relative h-[58px] w-[58px] flex items-center justify-center">
       <motion.svg
-        className="absolute inset-0" width="70" height="70" viewBox="0 0 70 70"
+        className="absolute inset-0" width="58" height="58" viewBox="0 0 58 58"
         animate={reduce ? {} : { rotate: 360 }}
         transition={{ duration: 9, repeat: Infinity, ease: 'linear' }}
       >
-        <circle cx="35" cy="35" r="32" fill="none" stroke={ring} strokeWidth="2.5"
+        <circle cx="29" cy="29" r="26" fill="none" stroke={ring} strokeWidth="2.5"
           strokeDasharray="3 7" strokeLinecap="round" opacity="0.85" />
       </motion.svg>
-      <div className="h-[52px] w-[52px] rounded-full flex items-center justify-center shadow-lg"
+      <div className="h-[44px] w-[44px] rounded-full flex items-center justify-center shadow-lg"
         style={{ background: color }}>
         {children}
       </div>
@@ -419,18 +419,24 @@ const Dashboard = () => {
           {!portalViewerOpen && (
           <Card className="border-0 shadow-xl mb-8 overflow-hidden text-white"
             style={{ background: 'linear-gradient(135deg,#0D5E5A 0%,#0A7871 100%)' }}>
-            <CardContent className="p-6 lg:p-8">
-              <div className="flex flex-col xl:flex-row xl:items-center gap-6">
+            <CardContent className="p-4 lg:p-5">
+              <div className="flex flex-col xl:flex-row xl:items-center gap-4">
                 {/* Left: greeting */}
-                <div className="flex items-start gap-4 shrink-0 xl:w-[320px]">
-                  <div className="hidden sm:flex h-16 w-16 rounded-full bg-white/10 items-center justify-center overflow-hidden shrink-0">
-                    <img src="/lottie/mountain.png" alt="" className="h-16 w-16 object-cover"
-                      onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+                <div className="flex items-center gap-4 shrink-0 xl:w-[300px]">
+                  <div className="hidden sm:flex h-14 w-14 rounded-full bg-white/10 ring-2 ring-white/20 items-center justify-center overflow-hidden shrink-0 relative">
+                    <span className="text-base font-bold text-white">
+                      {(user?.name || '?').split(' ').filter(Boolean).map(w => w[0]).slice(0, 2).join('').toUpperCase()}
+                    </span>
+                    {user?.profilePicture && (
+                      <img src={user.profilePicture} alt={user?.name}
+                        className="absolute inset-0 h-full w-full object-cover"
+                        onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+                    )}
                   </div>
                   <div>
-                    <h1 className="text-2xl lg:text-3xl font-bold leading-tight">Welcome back,<br />{user?.name}!</h1>
-                    <p className="text-teal-100/90 mt-1">{user?.designation} • {user?.department}</p>
-                    <p className="text-teal-200/70 text-sm mt-2 max-w-xs">Access your workspace portals and stay updated with company announcements</p>
+                    <h1 className="text-xl lg:text-2xl font-bold leading-tight">Welcome back, {user?.name}!</h1>
+                    <p className="text-teal-100/90 text-sm mt-0.5">{user?.designation} • {user?.department}</p>
+                    <p className="text-teal-200/70 text-xs mt-1.5 max-w-xs">Access your workspace portals and stay updated with company announcements</p>
                   </div>
                 </div>
 
@@ -441,10 +447,10 @@ const Dashboard = () => {
                     initial="hidden" animate="show"
                     variants={{ hidden: {}, show: { transition: { staggerChildren: 0.14, delayChildren: 0.1 } } }}
                   >
-                    <motion.div variants={statChipVariants} className="flex flex-col items-center text-center px-4 py-3">
-                      <RingIcon color="#14B8A6" ring="#5eead4"><LogIn className="h-6 w-6 text-white" /></RingIcon>
-                      <div className="mt-3 text-[11px] font-semibold uppercase tracking-wider text-teal-100/80">Today's Login</div>
-                      <div className="text-2xl font-bold text-white mt-0.5">
+                    <motion.div variants={statChipVariants} className="flex flex-col items-center text-center px-3 py-1">
+                      <RingIcon color="#14B8A6" ring="#5eead4"><LogIn className="h-5 w-5 text-white" /></RingIcon>
+                      <div className="mt-2 text-[10px] font-semibold uppercase tracking-wider text-teal-100/80">Today's Login</div>
+                      <div className="text-xl font-bold text-white mt-0.5">
                         {to12h(meStats.todayLogin).time}
                         <span className="text-sm font-semibold ml-1">{to12h(meStats.todayLogin).ap}</span>
                       </div>
@@ -455,17 +461,17 @@ const Dashboard = () => {
                         : <span className="mt-1 text-[11px] text-teal-200/60">No punch yet</span>}
                     </motion.div>
 
-                    <motion.div variants={statChipVariants} className="flex flex-col items-center text-center px-4 py-3">
-                      <RingIcon color="#22c55e" ring="#86efac"><CalendarPlus className="h-6 w-6 text-white" /></RingIcon>
-                      <div className="mt-3 text-[11px] font-semibold uppercase tracking-wider text-teal-100/80">Late Logins (Month)</div>
-                      <div className="text-2xl font-bold text-[#FACC15] mt-0.5"><AnimatedNumber value={meStats.lateMonth} /></div>
+                    <motion.div variants={statChipVariants} className="flex flex-col items-center text-center px-3 py-1">
+                      <RingIcon color="#22c55e" ring="#86efac"><CalendarPlus className="h-5 w-5 text-white" /></RingIcon>
+                      <div className="mt-2 text-[10px] font-semibold uppercase tracking-wider text-teal-100/80">Late Logins (Month)</div>
+                      <div className="text-xl font-bold text-[#FACC15] mt-0.5"><AnimatedNumber value={meStats.lateMonth} /></div>
                       <span className="mt-1 text-[11px] text-teal-200/70">This Month</span>
                     </motion.div>
 
-                    <motion.div variants={statChipVariants} className="flex flex-col items-center text-center px-4 py-3">
-                      <RingIcon color="#F59E0B" ring="#fdba74"><Timer className="h-6 w-6 text-white" /></RingIcon>
-                      <div className="mt-3 text-[11px] font-semibold uppercase tracking-wider text-teal-100/80">Days under 7h 30m</div>
-                      <div className="text-2xl font-bold text-[#F59E0B] mt-0.5"><AnimatedNumber value={meStats.shortDays} /></div>
+                    <motion.div variants={statChipVariants} className="flex flex-col items-center text-center px-3 py-1">
+                      <RingIcon color="#F59E0B" ring="#fdba74"><Timer className="h-5 w-5 text-white" /></RingIcon>
+                      <div className="mt-2 text-[10px] font-semibold uppercase tracking-wider text-teal-100/80">Days under 7h 30m</div>
+                      <div className="text-xl font-bold text-[#F59E0B] mt-0.5"><AnimatedNumber value={meStats.shortDays} /></div>
                       <span className="mt-1 text-[11px] text-teal-200/70">This Month</span>
                     </motion.div>
                   </motion.div>

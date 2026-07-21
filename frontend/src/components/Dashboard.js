@@ -47,9 +47,9 @@ const DateTimeWidget = () => {
   };
 
   return (
-    <div className="flex items-center justify-center gap-2 text-white mb-3" suppressHydrationWarning>
-      <Clock className="h-4 w-4 text-cyan-300" />
-      <span className="font-mono text-lg font-semibold tracking-wide">{formatTime(time)}</span>
+    <div className="flex items-center justify-center gap-2 text-white mb-2" suppressHydrationWarning>
+      <Clock className="h-3.5 w-3.5 text-cyan-300" />
+      <span className="font-mono text-base font-semibold tracking-wide">{formatTime(time)}</span>
     </div>
   );
 };
@@ -70,13 +70,13 @@ const CalendarWidget = () => {
 
   const calendarDays = [];
   for (let i = 0; i < firstDayOfMonth; i++) {
-    calendarDays.push(<div key={`blank-${i}`} className="h-7"></div>);
+    calendarDays.push(<div key={`blank-${i}`} className="h-6"></div>);
   }
   for (let day = 1; day <= daysInMonth; day++) {
     const isToday = day === currentDate;
     calendarDays.push(
-      <div key={day} className="h-7 flex items-center justify-center">
-        <span className={`flex items-center justify-center h-7 w-7 rounded-full text-[13px] ${
+      <div key={day} className="h-6 flex items-center justify-center">
+        <span className={`flex items-center justify-center h-6 w-6 rounded-full text-[12px] ${
           isToday ? 'bg-cyan-400 text-slate-900 font-bold shadow-md' : 'text-white/90'}`}>
           {day}
         </span>
@@ -85,14 +85,14 @@ const CalendarWidget = () => {
   }
 
   return (
-    <div className="w-64 text-white" suppressHydrationWarning>
-      <div className="flex items-center justify-between mb-2 px-1">
+    <div className="w-60 text-white" suppressHydrationWarning>
+      <div className="flex items-center justify-between mb-1.5 px-1">
         <ChevronLeft className="h-4 w-4 text-white/60" />
         <span className="text-sm font-semibold">{monthNames[month]} {year}</span>
         <ChevronRight className="h-4 w-4 text-white/60" />
       </div>
-      <div className="grid grid-cols-7 text-center text-[11px] text-teal-100/70 mb-1">
-        {dayNames.map((day, i) => <div key={`${day}-${i}`} className="h-6 flex items-center justify-center">{day}</div>)}
+      <div className="grid grid-cols-7 text-center text-[10px] text-teal-100/70 mb-0.5">
+        {dayNames.map((day, i) => <div key={`${day}-${i}`} className="h-5 flex items-center justify-center">{day}</div>)}
       </div>
       <div className="grid grid-cols-7">{calendarDays}</div>
     </div>
@@ -479,7 +479,7 @@ const Dashboard = () => {
 
                 {/* Right: clock + calendar in a glass panel */}
                 <div className="hidden lg:block shrink-0">
-                  <div className="rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md p-4">
+                  <div className="rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md p-3">
                     <DateTimeWidget />
                     <CalendarWidget />
                   </div>

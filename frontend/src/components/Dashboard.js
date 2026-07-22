@@ -168,16 +168,16 @@ const statChipVariants = {
 function RingIcon({ color, ring, children }) {
   const reduce = useReducedMotion();
   return (
-    <div className="relative h-[72px] w-[72px] flex items-center justify-center">
+    <div className="relative h-[84px] w-[84px] flex items-center justify-center">
       <motion.svg
-        className="absolute inset-0" width="72" height="72" viewBox="0 0 72 72"
+        className="absolute inset-0" width="84" height="84" viewBox="0 0 84 84"
         animate={reduce ? {} : { rotate: 360 }}
         transition={{ duration: 9, repeat: Infinity, ease: 'linear' }}
       >
-        <circle cx="36" cy="36" r="33" fill="none" stroke={ring} strokeWidth="2.5"
+        <circle cx="42" cy="42" r="39" fill="none" stroke={ring} strokeWidth="2.5"
           strokeDasharray="3 7" strokeLinecap="round" opacity="0.85" />
       </motion.svg>
-      <div className="h-[56px] w-[56px] rounded-full flex items-center justify-center shadow-lg"
+      <div className="h-[64px] w-[64px] rounded-full flex items-center justify-center shadow-lg"
         style={{ background: color }}>
         {children}
       </div>
@@ -448,7 +448,7 @@ const Dashboard = () => {
                     variants={{ hidden: {}, show: { transition: { staggerChildren: 0.14, delayChildren: 0.1 } } }}
                   >
                     <motion.div variants={statChipVariants} className="flex flex-col items-center text-center px-3 py-1">
-                      <RingIcon color="#14B8A6" ring="#5eead4"><LogIn className="h-7 w-7 text-white" /></RingIcon>
+                      <RingIcon color="#14B8A6" ring="#5eead4"><LogIn className="h-8 w-8 text-white" /></RingIcon>
                       <div className="mt-2 text-[10px] font-semibold uppercase tracking-wider text-teal-100/80">Today's Login</div>
                       <div className="text-xl font-bold text-white mt-0.5">
                         {to12h(meStats.todayLogin).time}
@@ -462,14 +462,14 @@ const Dashboard = () => {
                     </motion.div>
 
                     <motion.div variants={statChipVariants} className="flex flex-col items-center text-center px-3 py-1">
-                      <RingIcon color="#22c55e" ring="#86efac"><CalendarPlus className="h-7 w-7 text-white" /></RingIcon>
+                      <RingIcon color="#22c55e" ring="#86efac"><CalendarPlus className="h-8 w-8 text-white" /></RingIcon>
                       <div className="mt-2 text-[10px] font-semibold uppercase tracking-wider text-teal-100/80">Late Logins (Month)</div>
                       <div className="text-xl font-bold text-[#FACC15] mt-0.5"><AnimatedNumber value={meStats.lateMonth} /></div>
                       <span className="mt-1 text-[11px] text-teal-200/70">This Month</span>
                     </motion.div>
 
                     <motion.div variants={statChipVariants} className="flex flex-col items-center text-center px-3 py-1">
-                      <RingIcon color="#F59E0B" ring="#fdba74"><Timer className="h-7 w-7 text-white" /></RingIcon>
+                      <RingIcon color="#F59E0B" ring="#fdba74"><Timer className="h-8 w-8 text-white" /></RingIcon>
                       <div className="mt-2 text-[10px] font-semibold uppercase tracking-wider text-teal-100/80">Days under 7h 30m</div>
                       <div className="text-xl font-bold text-[#F59E0B] mt-0.5"><AnimatedNumber value={meStats.shortDays} /></div>
                       <span className="mt-1 text-[11px] text-teal-200/70">This Month</span>

@@ -1,11 +1,16 @@
 import logging
 import re
+import os
 import base64
+import secrets
+import hashlib
 import urllib.parse
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Optional
 
+import requests
+from pydantic import BaseModel
 
 from fastapi import APIRouter, HTTPException, Depends, Body, Header, Request, File, UploadFile
 from passlib.context import CryptContext
@@ -578,3 +583,135 @@ async def deactivate_self( authorization: str = Header(..., alias="Authorization
     except Exception as e:
         logging.error(f"Error during self-deactivation for token: {e}")
         raise HTTPException(status_code=500, detail="An error occurred during account deactivation.")
+
+
+# ==================================================================== #
+# Forgot / reset password (email link via SendGrid)
+# ==================================================================== #
+
+RESET_TOKEN_TTL = timedelta(hours=1)
+_GENERIC_MSG = {"message": "If an account with that email exists, a reset link has been sent."}
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: str
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str
+
+
+def _send_reset_email(to_email: str, name: str, link: str) -> bool:
+    """Send the reset email via the SendGrid v3 API (uses requests; no extra deps)."""
+    api_key = os.getenv("SENDGRID_API_KEY")
+    from_email = os.getenv("RESET_FROM_EMAIL", "stc.portal@showtimeconsulting.in")
+    if not api_key:
+        logging.error("SENDGRID_API_KEY not set; cannot send reset email.")
+        return False
+    html = f"""
+      <div style="font-family:Inter,Arial,sans-serif;max-width:520px;margin:auto;padding:24px;color:#111827">
+        <h2 style="color:#0A7871;margin:0 0 12px">Reset your password</h2>
+        <p>Hi {name},</p>
+        <p>We received a request to reset your STC Employee Portal password.
+           Click the button below to set a new one. This link expires in 1 hour.</p>
+        <p style="text-align:center;margin:28px 0">
+          <a href="{link}" style="background:#0A7871;color:#fff;text-decoration:none;
+             padding:12px 28px;border-radius:8px;font-weight:600;display:inline-block">Reset Password</a>
+        </p>
+        <p style="font-size:13px;color:#6b7280">If the button doesn't work, copy this link:<br>
+           <a href="{link}">{link}</a></p>
+        <p style="font-size:13px;color:#6b7280">If you didn't request this, you can safely ignore this email.</p>
+        <hr style="border:none;border-top:1px solid #e5e7eb;margin:20px 0">
+        <p style="font-size:12px;color:#9ca3af">ShowTime Consulting • Employee Portal</p>
+      </div>"""
+    payload = {
+        "personalizations": [{"to": [{"email": to_email}]}],
+        "from": {"email": from_email, "name": "ShowTime Consulting Portal"},
+        "subject": "Reset your STC Employee Portal password",
+        "content": [{"type": "text/html", "value": html}],
+    }
+    try:
+        r = requests.post(
+            "https://api.sendgrid.com/v3/mail/send",
+            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+            json=payload, timeout=15,
+        )
+        if r.status_code in (200, 202):
+            return True
+        logging.error("SendGrid error %s: %s", r.status_code, r.text[:300])
+        return False
+    except Exception as e:
+        logging.error("SendGrid request failed: %s", e)
+        return False
+
+
+async def _find_user_by_reset_token(token_hash: str):
+    """Scan team collections for a matching reset token. Returns (user, collection)."""
+    for cname in await stc_db.list_collection_names():
+        if cname.startswith("system."):
+            continue
+        coll = stc_db[cname]
+        u = await coll.find_one({"reset_token_hash": token_hash})
+        if u:
+            return u, coll
+    return None, None
+
+
+@router.post("/forgot-password")
+async def forgot_password(req: ForgotPasswordRequest = Body(...)):
+    """Public: emails a reset link if the account exists. Response is always generic."""
+    email = (req.email or "").strip()
+    if not email:
+        return _GENERIC_MSG
+    try:
+        user, collection = await get_user_info_with_collection(stc_db, email, include_hash=False)
+    except Exception as e:
+        logging.error("forgot-password lookup failed for %s: %s", email, e)
+        return _GENERIC_MSG
+    if not user or collection is None:
+        return _GENERIC_MSG  # do not reveal whether the email exists
+
+    token = secrets.token_urlsafe(32)
+    token_hash = hashlib.sha256(token.encode()).hexdigest()
+    expires = datetime.now(timezone.utc) + RESET_TOKEN_TTL
+    await collection.update_one(
+        {"email": re.compile(f"^{re.escape(email)}$", re.IGNORECASE)},
+        {"$set": {"reset_token_hash": token_hash, "reset_token_expires": expires}},
+    )
+    base = os.getenv("FRONTEND_URL", "https://showtime-employeeportal.vercel.app").rstrip("/")
+    link = f"{base}/reset-password?token={token}"
+    if not _send_reset_email(email, user.get("name") or "there", link):
+        logging.error("Reset email could NOT be sent to %s", email)
+    return _GENERIC_MSG
+
+
+@router.post("/reset-password")
+async def reset_password(req: ResetPasswordRequest = Body(...)):
+    """Public: consume a valid, unexpired token and set a new password."""
+    if not req.token or not req.new_password:
+        raise HTTPException(status_code=400, detail="Token and new password are required.")
+    if len(req.new_password) < 6:
+        raise HTTPException(status_code=400, detail="Password must be at least 6 characters.")
+
+    token_hash = hashlib.sha256(req.token.encode()).hexdigest()
+    user, collection = await _find_user_by_reset_token(token_hash)
+    if not user or collection is None:
+        raise HTTPException(status_code=400, detail="Invalid or expired reset link.")
+
+    exp = user.get("reset_token_expires")
+    if exp is None:
+        raise HTTPException(status_code=400, detail="Invalid or expired reset link.")
+    if getattr(exp, "tzinfo", None) is None:
+        exp = exp.replace(tzinfo=timezone.utc)
+    if exp < datetime.now(timezone.utc):
+        raise HTTPException(status_code=400, detail="Reset link has expired. Please request a new one.")
+
+    new_hash = pwd_context.hash(req.new_password)
+    await collection.update_one(
+        {"email": user["email"]},
+        {"$set": {"password_hash": new_hash},
+         "$unset": {"reset_token_hash": "", "reset_token_expires": ""}},
+    )
+    logging.info("Password reset via email link for %s", user.get("email"))
+    return {"message": "Your password has been reset. You can now log in."}

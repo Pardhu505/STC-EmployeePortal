@@ -7,6 +7,8 @@ import Login from "./components/Login";
 
 import Dashboard from "./components/Dashboard";
 import Signup from "./components/signup";
+import ForgotPassword from "./components/ForgotPassword";
+import ResetPassword from "./components/ResetPassword";
 import LoadingSpinner from "./LoadingSpinner";
 import PrivacyPolicy from "./components/PrivacyPolicy";
 import TermsAndConditions from "./components/TermsAndConditions";
@@ -54,6 +56,12 @@ function App() {
                   <Signup />
                 </PublicRoute>
               } />
+              <Route path="/forgot-password" element={
+                <PublicRoute>
+                  <ForgotPassword />
+                </PublicRoute>
+              } />
+              <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/dashboard" element={
                 <ProtectedRoute>
                   <Dashboard />

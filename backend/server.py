@@ -37,6 +37,9 @@ ALLOWED_ORIGINS = [
     "https://showtime-consulting-employee-portal.onrender.com",
     "https://showtime-employeeportal.vercel.app",
     "https://stc-employeeportal.vercel.app",
+    "https://localhost",
+    "capacitor://localhost",
+    "http://localhost",
     "https://stc-employeeportal.onrender.com"
 ]
 

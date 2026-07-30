@@ -3,12 +3,26 @@
 //  - Managers get their team's totals + today's status (tries /team first)
 //  - Employees get their own daily records + totals (falls back to /me)
 // Uses the same auth header pattern as the rest of the portal.
+//
+// Adds: Department column, and day-wise Excel/PDF export over the selected
+// date range, grouped by department. Export is visible only to EXPORT_EMAILS
+// and is ALSO enforced server-side on /api/biometric/export_range.
 
 import React, { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { API_BASE_URL } from '../config/api';
 import { fetchWithRetry } from '../utils/fetchRetry';
 import { humanBreak, breakMinutes } from './BiometricLiveLogs';
+
+const EXPORT_EMAILS = [
+  'pardhasaradhi@showtimeconsulting.in',
+  'admin@showtimeconsulting.in',
+];
+
+function canExport(user) {
+  const email = String((user && user.email) || '').trim().toLowerCase();
+  return EXPORT_EMAILS.indexOf(email) !== -1;
+}
 
 function firstOfMonth() {
   const d = new Date();
@@ -22,12 +36,31 @@ export default function BiometricMyTeam({ endpoint = 'team' }) {
   const [to, setTo] = useState(today);
   const [mode, setMode] = useState('loading');   // 'loading' | 'team' | 'self'
   const [data, setData] = useState(null);
+  const [depts, setDepts] = useState({});
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [exporting, setExporting] = useState('');
+
+  const showExport = canExport(user);
 
   const authHeader = useCallback(() => ({
     'Authorization': `Bearer ${btoa(JSON.stringify(user))}`,
   }), [user]);
+
+  const loadDepts = useCallback(async (payload) => {
+    const emps = (payload && payload.employees) || [];
+    const codes = emps.map((e) => e.emp_code).filter(Boolean);
+    if (!codes.length) return;
+    try {
+      const res = await fetchWithRetry(
+        `${API_BASE_URL}/api/biometric/departments?codes=${encodeURIComponent(codes.join(','))}`,
+        { headers: authHeader() }
+      );
+      if (res.ok) setDepts(await res.json());
+    } catch (e) {
+      /* non-fatal: the column just shows a dash */
+    }
+  }, [authHeader]);
 
   const load = useCallback(async () => {
     if (!user) return;
@@ -41,12 +74,14 @@ export default function BiometricMyTeam({ endpoint = 'team' }) {
           const e = await res.json().catch(() => ({}));
           throw new Error(e.detail || `Request failed (${res.status})`);
         }
-        setData(await res.json()); setMode('team'); return;
+        const payload = await res.json();
+        setData(payload); setMode('team'); loadDepts(payload); return;
       }
       // Try manager view first
       let res = await fetchWithRetry(`${API_BASE_URL}/api/biometric/team?${qs}`, { headers: authHeader() });
       if (res.ok) {
-        setData(await res.json()); setMode('team'); return;
+        const payload = await res.json();
+        setData(payload); setMode('team'); loadDepts(payload); return;
       }
       if (res.status !== 403) {
         const e = await res.json().catch(() => ({}));
@@ -64,16 +99,45 @@ export default function BiometricMyTeam({ endpoint = 'team' }) {
     } finally {
       setLoading(false);
     }
-  }, [user, from, to, authHeader, endpoint]);
+  }, [user, from, to, authHeader, endpoint, loadDepts]);
 
   useEffect(() => { load(); }, [load]);
+
+  const download = useCallback(async (fmt) => {
+    setExporting(fmt); setError('');
+    const scope = endpoint === 'company' ? 'company' : 'team';
+    try {
+      const res = await fetch(
+        `${API_BASE_URL}/api/biometric/export_range?format=${fmt}&scope=${scope}`
+        + `&from_date=${from}&to_date=${to}`,
+        { headers: authHeader() }
+      );
+      if (!res.ok) {
+        const e = await res.json().catch(() => ({}));
+        throw new Error(e.detail || `Export failed (${res.status})`);
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `attendance_${scope}_daywise_${from}_to_${to}.${fmt}`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setExporting('');
+    }
+  }, [endpoint, from, to, authHeader]);
 
   const heading = endpoint === 'company'
     ? 'Company Attendance — day-wise'
     : (mode === 'team' ? 'Team Attendance' : 'My Attendance');
 
   return (
-    <div style={{ padding: 24, maxWidth: 1100, margin: '0 auto' }}>
+    <div style={{ padding: 24, maxWidth: 1200, margin: '0 auto' }}>
       <h2 style={{ margin: '0 0 4px' }}>{heading} (eSSL)</h2>
       <div style={{ display: 'flex', gap: 10, alignItems: 'center', margin: '14px 0', flexWrap: 'wrap' }}>
         <label style={lbl}>From <input type="date" value={from} max={to}
@@ -83,11 +147,36 @@ export default function BiometricMyTeam({ endpoint = 'team' }) {
         <button onClick={load} disabled={loading} style={btn}>
           {loading ? 'Loading…' : 'Refresh'}
         </button>
+
+        {showExport && mode === 'team' && (
+          <span style={{ display: 'flex', gap: 8, marginLeft: 'auto' }}>
+            <button onClick={() => download('xlsx')}
+                    disabled={!!exporting || loading}
+                    title="Day-wise Excel for this range, one sheet per department"
+                    style={xlsBtn}>
+              {exporting === 'xlsx' ? 'Preparing…' : '⭳ Excel (day-wise)'}
+            </button>
+            <button onClick={() => download('pdf')}
+                    disabled={!!exporting || loading}
+                    title="Day-wise PDF, a section per department"
+                    style={pdfBtn}>
+              {exporting === 'pdf' ? 'Preparing…' : '⭳ PDF'}
+            </button>
+          </span>
+        )}
       </div>
+
+      {exporting && (
+        <div style={infoBox}>
+          Building the {exporting === 'xlsx' ? 'Excel workbook' : 'PDF'} for
+          {' '}{from} to {to}. A full month across every department can take
+          {' '}up to a minute — please keep this tab open.
+        </div>
+      )}
 
       {error && <div style={errBox}>{error}</div>}
 
-      {mode === 'team' && data && <TeamView data={data} />}
+      {mode === 'team' && data && <TeamView data={data} depts={depts} />}
       {mode === 'self' && data && <SelfView data={data} />}
     </div>
   );
@@ -151,9 +240,10 @@ function SelfView({ data }) {
 }
 
 /* ---------------- Manager's team (expandable, day-wise) ---------------- */
-function TeamView({ data }) {
+function TeamView({ data, depts }) {
   const t = data.team_totals || {};
   const [open, setOpen] = useState(null);
+  const dmap = depts || {};
   return (
     <>
       <div style={cardRow}>
@@ -166,10 +256,11 @@ function TeamView({ data }) {
         <table style={tbl}>
           <thead><tr>
             <th style={th}></th><th style={{ ...th, textAlign: 'left' }}>Emp Name</th><th style={th}>Emp Code</th>
+            <th style={{ ...th, textAlign: 'left' }}>Department</th>
             <th style={th}>Present</th><th style={th}>Absent</th><th style={th}>Late</th>
           </tr></thead>
           <tbody>
-            {data.employees.length === 0 && <tr><td colSpan={6} style={empty}>No team records.</td></tr>}
+            {data.employees.length === 0 && <tr><td colSpan={7} style={empty}>No team records.</td></tr>}
             {data.employees.map((e, i) => (
               <React.Fragment key={i}>
                 <tr style={{ background: open === i ? '#eef4ff' : (i % 2 ? '#fafbfc' : '#fff'), cursor: 'pointer' }}
@@ -177,14 +268,18 @@ function TeamView({ data }) {
                   <td style={{ ...td, width: 30 }}>{open === i ? '▾' : '▸'}</td>
                   <td style={{ ...td, textAlign: 'left', fontWeight: 600 }}>{e.emp_name}</td>
                   <td style={td}>{e.emp_code}</td>
+                  <td style={{ ...td, textAlign: 'left' }}>
+                    {dmap[e.emp_code] || <span style={{ color: '#bbb' }}>—</span>}
+                  </td>
                   <td style={{ ...td, color: '#2e7d32', fontWeight: 600 }}>{e.present_days}</td>
                   <td style={{ ...td, color: '#c62828', fontWeight: 600 }}>{e.absent_days}</td>
                   <td style={{ ...td, color: '#b26a00', fontWeight: 600 }}>{e.late_days}</td>
                 </tr>
                 {open === i && (
-                  <tr><td colSpan={6} style={{ padding: 12, background: '#f7f9fc' }}>
+                  <tr><td colSpan={7} style={{ padding: 12, background: '#f7f9fc' }}>
                     <div style={{ fontWeight: 600, margin: '2px 0 8px' }}>
                       Detailed report — {e.emp_name} ({e.emp_code})
+                      {dmap[e.emp_code] ? ` · ${dmap[e.emp_code]}` : ''}
                     </div>
                     <DayTable days={e.days || []} />
                   </td></tr>
@@ -217,7 +312,12 @@ function Stat({ label, value, color }) {
 const lbl = { fontSize: 13, color: '#555', display: 'flex', gap: 6, alignItems: 'center' };
 const inp = { padding: 8, borderRadius: 6, border: '1px solid #ccc' };
 const btn = { padding: '8px 14px', borderRadius: 6, border: 'none', background: '#2e7d32', color: '#fff', cursor: 'pointer' };
+const xlsBtn = { padding: '8px 14px', borderRadius: 6, border: '1px solid #1b7a43',
+                 background: '#1b7a43', color: '#fff', cursor: 'pointer', fontWeight: 600 };
+const pdfBtn = { padding: '8px 14px', borderRadius: 6, border: '1px solid #b3352b',
+                 background: '#b3352b', color: '#fff', cursor: 'pointer', fontWeight: 600 };
 const errBox = { background: '#fdecea', color: '#b71c1c', padding: 12, borderRadius: 6, marginBottom: 12 };
+const infoBox = { background: '#e8f4f3', color: '#0d5e5a', padding: 12, borderRadius: 6, marginBottom: 12, fontSize: 13 };
 const cardRow = { display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 16 };
 const statCard = { flex: '1 1 160px', minWidth: 150, background: '#fff', border: '1px solid #eef0f2',
                    borderRadius: 10, padding: '14px 18px', boxShadow: '0 1px 2px rgba(0,0,0,0.04)' };

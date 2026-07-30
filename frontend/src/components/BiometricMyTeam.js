@@ -36,7 +36,10 @@ export default function BiometricMyTeam({ endpoint = 'team' }) {
   const [to, setTo] = useState(today);
   const [mode, setMode] = useState('loading');   // 'loading' | 'team' | 'self'
   const [data, setData] = useState(null);
-  const [depts, setDepts] = useState({});
+  const [meta, setMeta] = useState({});
+  const [opts, setOpts] = useState({ departments: [], states: [] });
+  const [fDept, setFDept] = useState('');
+  const [fState, setFState] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [exporting, setExporting] = useState('');
@@ -47,20 +50,39 @@ export default function BiometricMyTeam({ endpoint = 'team' }) {
     'Authorization': `Bearer ${btoa(JSON.stringify(user))}`,
   }), [user]);
 
-  const loadDepts = useCallback(async (payload) => {
+  const loadMeta = useCallback(async (payload) => {
     const emps = (payload && payload.employees) || [];
     const codes = emps.map((e) => e.emp_code).filter(Boolean);
     if (!codes.length) return;
     try {
       const res = await fetchWithRetry(
-        `${API_BASE_URL}/api/biometric/departments?codes=${encodeURIComponent(codes.join(','))}`,
+        `${API_BASE_URL}/api/biometric/employee_meta?codes=${encodeURIComponent(codes.join(','))}`,
         { headers: authHeader() }
       );
-      if (res.ok) setDepts(await res.json());
+      if (res.ok) setMeta(await res.json());
     } catch (e) {
-      /* non-fatal: the column just shows a dash */
+      /* non-fatal: the columns just show a dash */
     }
   }, [authHeader]);
+
+  // Dropdown options, loaded once.
+  useEffect(() => {
+    if (!user) return;
+    let alive = true;
+    (async () => {
+      try {
+        const res = await fetchWithRetry(
+          `${API_BASE_URL}/api/biometric/filter_options`,
+          { headers: authHeader() }
+        );
+        if (res.ok && alive) {
+          const j = await res.json();
+          setOpts({ departments: j.departments || [], states: j.states || [] });
+        }
+      } catch (e) { /* filters just stay empty */ }
+    })();
+    return () => { alive = false; };
+  }, [user, authHeader]);
 
   const load = useCallback(async () => {
     if (!user) return;
@@ -75,13 +97,13 @@ export default function BiometricMyTeam({ endpoint = 'team' }) {
           throw new Error(e.detail || `Request failed (${res.status})`);
         }
         const payload = await res.json();
-        setData(payload); setMode('team'); loadDepts(payload); return;
+        setData(payload); setMode('team'); loadMeta(payload); return;
       }
       // Try manager view first
       let res = await fetchWithRetry(`${API_BASE_URL}/api/biometric/team?${qs}`, { headers: authHeader() });
       if (res.ok) {
         const payload = await res.json();
-        setData(payload); setMode('team'); loadDepts(payload); return;
+        setData(payload); setMode('team'); loadMeta(payload); return;
       }
       if (res.status !== 403) {
         const e = await res.json().catch(() => ({}));
@@ -99,7 +121,7 @@ export default function BiometricMyTeam({ endpoint = 'team' }) {
     } finally {
       setLoading(false);
     }
-  }, [user, from, to, authHeader, endpoint, loadDepts]);
+  }, [user, from, to, authHeader, endpoint, loadMeta]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -109,7 +131,9 @@ export default function BiometricMyTeam({ endpoint = 'team' }) {
     try {
       const res = await fetch(
         `${API_BASE_URL}/api/biometric/export_range?format=${fmt}&scope=${scope}`
-        + `&from_date=${from}&to_date=${to}`,
+        + `&from_date=${from}&to_date=${to}`
+        + (fDept ? `&department=${encodeURIComponent(fDept)}` : '')
+        + (fState ? `&state=${encodeURIComponent(fState)}` : ''),
         { headers: authHeader() }
       );
       if (!res.ok) {
@@ -120,7 +144,8 @@ export default function BiometricMyTeam({ endpoint = 'team' }) {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `attendance_${scope}_daywise_${from}_to_${to}.${fmt}`;
+      const tag = [fState, fDept].filter(Boolean).join('_').replace(/\s+/g, '_');
+      a.download = `attendance_${scope}${tag ? '_' + tag : ''}_daywise_${from}_to_${to}.${fmt}`;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -130,7 +155,7 @@ export default function BiometricMyTeam({ endpoint = 'team' }) {
     } finally {
       setExporting('');
     }
-  }, [endpoint, from, to, authHeader]);
+  }, [endpoint, from, to, authHeader, fDept, fState]);
 
   const heading = endpoint === 'company'
     ? 'Company Attendance — day-wise'
@@ -147,6 +172,28 @@ export default function BiometricMyTeam({ endpoint = 'team' }) {
         <button onClick={load} disabled={loading} style={btn}>
           {loading ? 'Loading…' : 'Refresh'}
         </button>
+
+        {mode === 'team' && (
+          <>
+            <label style={lbl}>State
+              <select value={fState} onChange={(e) => setFState(e.target.value)} style={inp}>
+                <option value="">All states</option>
+                {opts.states.map((s2) => <option key={s2} value={s2}>{s2}</option>)}
+              </select>
+            </label>
+            <label style={lbl}>Department
+              <select value={fDept} onChange={(e) => setFDept(e.target.value)} style={inp}>
+                <option value="">All departments</option>
+                {opts.departments.map((d2) => <option key={d2} value={d2}>{d2}</option>)}
+              </select>
+            </label>
+            {(fState || fDept) && (
+              <button onClick={() => { setFState(''); setFDept(''); }} style={clearBtn}>
+                Clear
+              </button>
+            )}
+          </>
+        )}
 
         {showExport && mode === 'team' && (
           <span style={{ display: 'flex', gap: 8, marginLeft: 'auto' }}>
@@ -176,7 +223,9 @@ export default function BiometricMyTeam({ endpoint = 'team' }) {
 
       {error && <div style={errBox}>{error}</div>}
 
-      {mode === 'team' && data && <TeamView data={data} depts={depts} />}
+      {mode === 'team' && data && (
+        <TeamView data={data} meta={meta} fDept={fDept} fState={fState} />
+      )}
       {mode === 'self' && data && <SelfView data={data} />}
     </div>
   );
@@ -240,10 +289,19 @@ function SelfView({ data }) {
 }
 
 /* ---------------- Manager's team (expandable, day-wise) ---------------- */
-function TeamView({ data, depts }) {
+function TeamView({ data, meta, fDept, fState }) {
   const t = data.team_totals || {};
   const [open, setOpen] = useState(null);
-  const dmap = depts || {};
+  const mmap = meta || {};
+  const infoFor = (code) => mmap[code] || {};
+  const all = data.employees || [];
+  const employees = all.filter((e) => {
+    const m = infoFor(e.emp_code);
+    if (fDept && String(m.department || '') !== fDept) return false;
+    if (fState && String(m.state || '') !== fState) return false;
+    return true;
+  });
+  const filtered = employees.length !== all.length;
   return (
     <>
       <div style={cardRow}>
@@ -252,34 +310,50 @@ function TeamView({ data, depts }) {
         <Stat label="Absent Today" value={t.absent_today} color="#c62828" />
         <Stat label="Late (range)" value={t.late_days} color="#b26a00" />
       </div>
+      {filtered && (
+        <div style={{ fontSize: 13, color: '#0d5e5a', marginBottom: 8 }}>
+          Showing <strong>{employees.length}</strong> of {all.length} employees
+          {fState ? ` · ${fState}` : ''}{fDept ? ` · ${fDept}` : ''}
+          {' '}— the download will contain exactly this selection.
+        </div>
+      )}
       <div style={{ overflowX: 'auto' }}>
         <table style={tbl}>
           <thead><tr>
-            <th style={th}></th><th style={{ ...th, textAlign: 'left' }}>Emp Name</th><th style={th}>Emp Code</th>
-            <th style={{ ...th, textAlign: 'left' }}>Department</th>
+            <th style={th}></th><th style={th}>Emp Name</th><th style={th}>Emp Code</th>
+            <th style={th}>State</th>
+            <th style={th}>Department</th>
             <th style={th}>Present</th><th style={th}>Absent</th><th style={th}>Late</th>
           </tr></thead>
           <tbody>
-            {data.employees.length === 0 && <tr><td colSpan={7} style={empty}>No team records.</td></tr>}
-            {data.employees.map((e, i) => (
+            {employees.length === 0 && (
+              <tr><td colSpan={8} style={empty}>
+                {all.length ? 'No employees match these filters.' : 'No team records.'}
+              </td></tr>
+            )}
+            {employees.map((e, i) => (
               <React.Fragment key={i}>
                 <tr style={{ background: open === i ? '#eef4ff' : (i % 2 ? '#fafbfc' : '#fff'), cursor: 'pointer' }}
                     onClick={() => setOpen(open === i ? null : i)}>
                   <td style={{ ...td, width: 30 }}>{open === i ? '▾' : '▸'}</td>
-                  <td style={{ ...td, textAlign: 'left', fontWeight: 600 }}>{e.emp_name}</td>
+                  <td style={{ ...td, fontWeight: 600 }}>{e.emp_name}</td>
                   <td style={td}>{e.emp_code}</td>
-                  <td style={{ ...td, textAlign: 'left' }}>
-                    {dmap[e.emp_code] || <span style={{ color: '#bbb' }}>—</span>}
+                  <td style={td}>
+                    {infoFor(e.emp_code).state || <span style={{ color: '#bbb' }}>—</span>}
+                  </td>
+                  <td style={td}>
+                    {infoFor(e.emp_code).department || <span style={{ color: '#bbb' }}>—</span>}
                   </td>
                   <td style={{ ...td, color: '#2e7d32', fontWeight: 600 }}>{e.present_days}</td>
                   <td style={{ ...td, color: '#c62828', fontWeight: 600 }}>{e.absent_days}</td>
                   <td style={{ ...td, color: '#b26a00', fontWeight: 600 }}>{e.late_days}</td>
                 </tr>
                 {open === i && (
-                  <tr><td colSpan={7} style={{ padding: 12, background: '#f7f9fc' }}>
+                  <tr><td colSpan={8} style={{ padding: 12, background: '#f7f9fc' }}>
                     <div style={{ fontWeight: 600, margin: '2px 0 8px' }}>
                       Detailed report — {e.emp_name} ({e.emp_code})
-                      {dmap[e.emp_code] ? ` · ${dmap[e.emp_code]}` : ''}
+                      {infoFor(e.emp_code).department ? ` · ${infoFor(e.emp_code).department}` : ''}
+                      {infoFor(e.emp_code).state ? ` · ${infoFor(e.emp_code).state}` : ''}
                     </div>
                     <DayTable days={e.days || []} />
                   </td></tr>
@@ -312,6 +386,8 @@ function Stat({ label, value, color }) {
 const lbl = { fontSize: 13, color: '#555', display: 'flex', gap: 6, alignItems: 'center' };
 const inp = { padding: 8, borderRadius: 6, border: '1px solid #ccc' };
 const btn = { padding: '8px 14px', borderRadius: 6, border: 'none', background: '#2e7d32', color: '#fff', cursor: 'pointer' };
+const clearBtn = { padding: '8px 12px', borderRadius: 6, border: '1px solid #ccc',
+                   background: '#fff', color: '#555', cursor: 'pointer', fontSize: 13 };
 const xlsBtn = { padding: '8px 14px', borderRadius: 6, border: '1px solid #1b7a43',
                  background: '#1b7a43', color: '#fff', cursor: 'pointer', fontWeight: 600 };
 const pdfBtn = { padding: '8px 14px', borderRadius: 6, border: '1px solid #b3352b',

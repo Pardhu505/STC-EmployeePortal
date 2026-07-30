@@ -525,20 +525,39 @@ async def team_attendance(from_date: str = Query(None), to_date: str = Query(Non
         raise HTTPException(400, "No employee code found on your profile.")
     details = await find_manager_details_by_code(emp_code, stc_db)
     team = details.get("team") or []
-    codes = [str(t.get("empCode") or t.get("Emp code") or "").strip()
-             for t in team if (t.get("empCode") or t.get("Emp code"))]
-    codes = [c for c in codes if c]
-    if not codes:
-        raise HTTPException(403, "No team found for your account.")
+    report_codes = [str(t.get("empCode") or t.get("Emp code") or "").strip()
+                    for t in team if (t.get("empCode") or t.get("Emp code"))]
+    # de-dupe, drop blanks, and drop the manager if they list themselves
+    seen = set()
+    report_codes = [c for c in report_codes
+                    if c and c != emp_code and not (c in seen or seen.add(c))]
+
+    # The manager's own row must be in the result. Previously `codes` held
+    # reportees only, so a reporting manager could never see their own
+    # attendance. Their own code goes first so it renders at the top.
+    codes = [emp_code] + report_codes
+
+    # No 403 any more: a user with no reportees simply gets their own records,
+    # which is what the auto-detecting frontend view expects.
     data = await _attendance_for(codes, from_date, to_date, want_days=True)
-    tp = sum(e["present_days"] for e in data["employees"])
-    ta = sum(e["absent_days"] for e in data["employees"])
-    tl = sum(e["late_days"] for e in data["employees"])
-    present_today = sum(1 for e in data["employees"] if e.get("today"))
+    def _code_of(e):
+        return str(e.get("empCode") or e.get("emp_code")
+                   or e.get("code") or "").strip()
+
+    # Totals describe the REPORTEES, so the numbers keep meaning what they
+    # meant before this change -- the manager's own row is extra, not counted.
+    reportees = [e for e in data["employees"] if _code_of(e) != emp_code]
+    tp = sum(e["present_days"] for e in reportees)
+    ta = sum(e["absent_days"] for e in reportees)
+    tl = sum(e["late_days"] for e in reportees)
+    present_today = sum(1 for e in reportees if e.get("today"))
     data["manager"] = details.get("managerName")
-    data["team_totals"] = {"members": len(codes), "present_days": tp, "absent_days": ta,
-                           "late_days": tl, "present_today": present_today,
-                           "absent_today": len(codes) - present_today}
+    data["self_code"] = emp_code            # lets the UI pin/label their row
+    data["is_manager"] = bool(report_codes)
+    data["team_totals"] = {"members": len(reportees), "present_days": tp,
+                           "absent_days": ta, "late_days": tl,
+                           "present_today": present_today,
+                           "absent_today": len(reportees) - present_today}
     return data
 
 

@@ -3,6 +3,10 @@
 // Matches the portal: uses useAuth() for the user, sends the same
 // Authorization: Bearer btoa(JSON.stringify(user)) header your other admin
 // calls use, and reads API_BASE_URL from ../config/api.
+//
+// Adds: Department column, and Excel/PDF download for EXPORT_EMAILS only.
+// NOTE: the server enforces the same allow-list on /api/biometric/export --
+// hiding these buttons is only cosmetic, the real gate is backend-side.
 
 import React, { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
@@ -12,20 +16,33 @@ import { hasFullBiometricAccess } from '../config/biometricAccess';
 
 const POLL_MS = 10000;
 
+const EXPORT_EMAILS = [
+  'pardhasaradhi@showtimeconsulting.in',
+  'admin@showtimeconsulting.in',
+];
+
+function canExport(user) {
+  const email = String((user && user.email) || '').trim().toLowerCase();
+  return EXPORT_EMAILS.indexOf(email) !== -1;
+}
+
 export default function BiometricLiveLogs() {
   const { user, isAdmin } = useAuth();
   const today = new Date().toISOString().slice(0, 10);
 
   const [date, setDate] = useState(today);
   const [summary, setSummary] = useState([]);
+  const [depts, setDepts] = useState({});
   const [devices, setDevices] = useState([]);
   const [stats, setStats] = useState(null);
   const [count, setCount] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [exporting, setExporting] = useState('');
   const [error, setError] = useState('');
   const [updated, setUpdated] = useState(null);
 
   const isToday = date === today;
+  const showExport = canExport(user);
 
   const authHeader = useCallback(() => ({
     'Authorization': `Bearer ${btoa(JSON.stringify(user))}`,
@@ -50,6 +67,21 @@ export default function BiometricLiveLogs() {
       setStats(s.stats || null);
       setCount(emps.reduce((n, e) => n + (e.punch_count || 0), 0));
       setUpdated(new Date());
+
+      // Department lookup (separate endpoint so /summary stays untouched).
+      // Non-fatal: the table still renders if this fails.
+      const codes = emps.map((e) => e.user_id).filter(Boolean);
+      if (codes.length) {
+        try {
+          const dres = await fetchWithRetry(
+            `${API_BASE_URL}/api/biometric/departments?codes=${encodeURIComponent(codes.join(','))}`,
+            { headers: authHeader() }
+          );
+          if (dres.ok) setDepts(await dres.json());
+        } catch (err) {
+          /* department column just shows a dash */
+        }
+      }
     } catch (e) {
       setError(e.message);
     } finally {
@@ -64,6 +96,33 @@ export default function BiometricLiveLogs() {
     return () => clearInterval(id);
   }, [load, isToday]);
 
+  const download = useCallback(async (fmt) => {
+    setExporting(fmt); setError('');
+    try {
+      const res = await fetch(
+        `${API_BASE_URL}/api/biometric/export?format=${fmt}&date=${date}`,
+        { headers: authHeader() }
+      );
+      if (!res.ok) {
+        const e = await res.json().catch(() => ({}));
+        throw new Error(e.detail || `Export failed (${res.status})`);
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `attendance_${date}.${fmt}`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setExporting('');
+    }
+  }, [date, authHeader]);
+
   const allowedFull = hasFullBiometricAccess(user, isAdmin);
   if (!allowedFull) {
     return (
@@ -74,7 +133,7 @@ export default function BiometricLiveLogs() {
   }
 
   return (
-    <div style={{ padding: 24, maxWidth: 1000, margin: '0 auto' }}>
+    <div style={{ padding: 24, maxWidth: 1200, margin: '0 auto' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
         <h2 style={{ margin: 0 }}>Biometric Attendance (eSSL)</h2>
         <span style={{ background: '#e8f5e9', color: '#2e7d32', padding: '2px 10px',
@@ -89,6 +148,24 @@ export default function BiometricLiveLogs() {
         <button onClick={load} disabled={loading} style={btn}>
           {loading ? 'Loading…' : 'Refresh'}
         </button>
+
+        {showExport && (
+          <span style={{ display: 'flex', gap: 8, marginLeft: 'auto' }}>
+            <button onClick={() => download('xlsx')}
+                    disabled={!!exporting || loading || summary.length === 0}
+                    title="Download this table as an Excel file"
+                    style={xlsBtn}>
+              {exporting === 'xlsx' ? 'Preparing…' : '⭳ Excel'}
+            </button>
+            <button onClick={() => download('pdf')}
+                    disabled={!!exporting || loading || summary.length === 0}
+                    title="Download this table as a PDF"
+                    style={pdfBtn}>
+              {exporting === 'pdf' ? 'Preparing…' : '⭳ PDF'}
+            </button>
+          </span>
+        )}
+
         {updated && <span style={{ fontSize: 12, color: '#888' }}>
           updated {updated.toLocaleTimeString('en-IN')}</span>}
       </div>
@@ -122,6 +199,7 @@ export default function BiometricLiveLogs() {
           <tr>
             <th style={th}>Emp ID</th>
             <th style={th}>Emp Name</th>
+            <th style={th}>Department</th>
             <th style={th}>1st Punch-in</th>
             <th style={th}>Last Punch-out</th>
             <th style={th}>Breaks (other punches)</th>
@@ -131,12 +209,15 @@ export default function BiometricLiveLogs() {
         </thead>
         <tbody>
           {summary.length === 0 && (
-            <tr><td colSpan={7} style={empty}>No records for this date.</td></tr>
+            <tr><td colSpan={8} style={empty}>No records for this date.</td></tr>
           )}
           {summary.map((e, i) => (
             <tr key={i} style={{ ...trow, background: i % 2 ? '#fafbfc' : '#fff' }}>
               <td style={td}>{e.user_id}</td>
               <td style={{ ...td, textAlign: 'left' }}>{e.emp_name}</td>
+              <td style={{ ...td, textAlign: 'left' }}>
+                {depts[e.user_id] || <span style={{ color: '#bbb' }}>—</span>}
+              </td>
               <td style={td}>
                 {e.first_in}
                 {e.first_in_device && <span style={devTag}>{e.first_in_device}</span>}
@@ -212,6 +293,10 @@ export function humanBreak(hhmm) {
 
 const btn = { padding: '8px 14px', borderRadius: 6, border: 'none',
               background: '#2e7d32', color: '#fff', cursor: 'pointer' };
+const xlsBtn = { padding: '8px 14px', borderRadius: 6, border: '1px solid #1b7a43',
+                 background: '#1b7a43', color: '#fff', cursor: 'pointer', fontWeight: 600 };
+const pdfBtn = { padding: '8px 14px', borderRadius: 6, border: '1px solid #b3352b',
+                 background: '#b3352b', color: '#fff', cursor: 'pointer', fontWeight: 600 };
 const tbl = { width: '100%', borderCollapse: 'collapse', fontSize: 14,
               border: '1px solid #d7dce1' };
 const th = { textAlign: 'center', verticalAlign: 'middle', padding: '11px 10px',

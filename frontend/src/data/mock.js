@@ -993,7 +993,10 @@ export const PORTAL_DATA = [
     icon: "▶️",
     gradient: "from-red-500 to-red-700",
     category: "Analytics • Social Media",
-    managerOnly: true
+    managerOnly: true,
+    // Non-managers explicitly granted THIS portal only.
+    // Add further emails here; it does not affect any other portal.
+    extraEmails: ["eekshitha@showtimeconsulting.in"]
   },
   {
     id: 5,

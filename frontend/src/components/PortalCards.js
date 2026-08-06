@@ -27,9 +27,17 @@ const PortalCards = ({ onViewerChange }) => {
     return () => { if (onViewerChange) onViewerChange(false); };
   }, [onViewerChange]);
 
+  // Emails explicitly granted a SINGLE restricted portal, via that portal's
+  // optional `extraEmails` list in mock.js. This is deliberately per-portal:
+  // being granted one restricted portal must not unlock the others.
+  const userEmail = (user?.email || '').trim().toLowerCase();
+  const isNamedOnPortal = (portal) =>
+    Array.isArray(portal.extraEmails) &&
+    portal.extraEmails.some(e => String(e).trim().toLowerCase() === userEmail);
+
   const visiblePortals = PORTAL_DATA.filter(portal => {
     if (portal.managerOnly) {
-      return hasElevatedAccess;
+      return hasElevatedAccess || isNamedOnPortal(portal);
     }
     return true;
   });

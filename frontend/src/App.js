@@ -10,6 +10,7 @@ import Signup from "./components/signup";
 import ForgotPassword from "./components/ForgotPassword";
 import ResetPassword from "./components/ResetPassword";
 import GaneshChaturthi from "./components/GaneshChaturthi";
+import MooshikaCursor from "./components/MooshikaCursor";
 import LoadingSpinner from "./LoadingSpinner";
 import PrivacyPolicy from "./components/PrivacyPolicy";
 import TermsAndConditions from "./components/TermsAndConditions";
@@ -98,6 +99,7 @@ function App() {
 
             </Routes>
             <GaneshChaturthi />
+            <MooshikaCursor />
           </BrowserRouter>
           <Toaster />
         </div>

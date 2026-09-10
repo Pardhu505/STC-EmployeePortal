@@ -9,6 +9,7 @@ import Dashboard from "./components/Dashboard";
 import Signup from "./components/signup";
 import ForgotPassword from "./components/ForgotPassword";
 import ResetPassword from "./components/ResetPassword";
+import GaneshChaturthi from "./components/GaneshChaturthi";
 import LoadingSpinner from "./LoadingSpinner";
 import PrivacyPolicy from "./components/PrivacyPolicy";
 import TermsAndConditions from "./components/TermsAndConditions";
@@ -96,6 +97,7 @@ function App() {
               <Route path="/" element={<Navigate to="/dashboard" />} />
 
             </Routes>
+            <GaneshChaturthi />
           </BrowserRouter>
           <Toaster />
         </div>

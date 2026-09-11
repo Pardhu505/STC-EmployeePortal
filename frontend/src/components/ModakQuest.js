@@ -12,6 +12,8 @@
 //   game_bg.jpg, mooshika_game.png
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { useAuth } from '../contexts/AuthContext';
+import { API_BASE_URL } from '../config/api';
 
 const FRAME_W = 139, FRAME_H = 150, FRAME_COUNT = 12;
 const BEST_KEY = 'modakQuestBest';
@@ -22,9 +24,44 @@ export default function ModakQuest({ onClose }) {
   const stateRef = useRef(null);
   const rafRef = useRef(null);
 
+  const { user } = useAuth();
   const [phase, setPhase] = useState('start');   // start | playing | paused | over
   const [hud, setHud] = useState({ score: 0, modaks: 0, level: 1 });
   const [best, setBest] = useState(0);
+  const [board, setBoard] = useState([]);
+  const [myRank, setMyRank] = useState(null);
+  const [boardState, setBoardState] = useState('idle'); // idle | loading | ok | err
+
+  const authHeader = useCallback(() => ({
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${btoa(JSON.stringify(user))}`,
+  }), [user]);
+
+  const loadBoard = useCallback(async () => {
+    if (!user) return;
+    setBoardState('loading');
+    try {
+      const r = await fetch(`${API_BASE_URL}/api/game/leaderboard?limit=10`, { headers: authHeader() });
+      if (!r.ok) throw new Error('failed');
+      const d = await r.json();
+      setBoard(d.leaderboard || []);
+      setMyRank(d.my_rank || null);
+      if (d.my_best && d.my_best > 0) setBest(d.my_best);
+      setBoardState('ok');
+    } catch (e) { setBoardState('err'); }
+  }, [user, authHeader]);
+
+  const submitScore = useCallback(async (score, modaks) => {
+    if (!user) return;
+    try {
+      await fetch(`${API_BASE_URL}/api/game/score`, {
+        method: 'POST', headers: authHeader(),
+        body: JSON.stringify({ score, modaks }),
+      });
+    } catch (e) { /* offline is fine - local best still shows */ }
+  }, [user, authHeader]);
+
+  useEffect(() => { loadBoard(); }, [loadBoard]);
 
   useEffect(() => {
     try { setBest(parseInt(localStorage.getItem(BEST_KEY) || '0', 10) || 0); } catch (e) {}
@@ -354,7 +391,43 @@ export default function ModakQuest({ onClose }) {
     return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
   }, [phase, makeState]);
 
+  useEffect(() => {
+    if (phase !== 'over') return;
+    (async () => {
+      await submitScore(hud.score, hud.modaks);
+      await loadBoard();
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase]);
+
   const start = () => { stateRef.current = makeState(); resize(); setPhase('playing'); };
+
+  const Leaderboard = ({ compact }) => (
+    <div className="mq-lb">
+      <div className="mq-lb-h">🏆 Leaderboard</div>
+      {boardState === 'loading' && <div className="mq-lb-msg">Loading…</div>}
+      {boardState === 'err' && <div className="mq-lb-msg">Couldn't load scores right now.</div>}
+      {boardState === 'ok' && board.length === 0 && (
+        <div className="mq-lb-msg">No scores yet — be the first! 🎉</div>
+      )}
+      {board.length > 0 && (
+        <table className="mq-lb-t">
+          <thead><tr><th>#</th><th>Player</th><th>Modaks</th><th>Score</th></tr></thead>
+          <tbody>
+            {(compact ? board.slice(0, 5) : board).map((r) => (
+              <tr key={r.rank} className={r.me ? 'mq-me' : ''}>
+                <td>{r.rank <= 3 ? ['🥇','🥈','🥉'][r.rank-1] : r.rank}</td>
+                <td className="mq-nm">{r.name}{r.me && <span className="mq-you">you</span>}</td>
+                <td>{r.modaks}</td>
+                <td><b>{r.score}</b></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      {myRank && <div className="mq-lb-me">Your rank: <b>#{myRank}</b></div>}
+    </div>
+  );
 
   return (
     <div className="mq-root">
@@ -389,7 +462,8 @@ export default function ModakQuest({ onClose }) {
               <div className="mq-keys">
                 <span><b>SPACE / ↑</b> Jump ×3</span><span><b>↓</b> Slide</span><span><b>P</b> Pause</span>
               </div>
-              {best > 0 && <div className="mq-best">🏆 Best Score: {best}</div>}
+              {best > 0 && <div className="mq-best">🏆 Your Best: {best}</div>}
+              <Leaderboard />
               <button className="mq-btn" onClick={start}>🎮 Start the Celebration</button>
               <button className="mq-link" onClick={onClose}>Back to Portal</button>
             </div>
@@ -418,6 +492,7 @@ export default function ModakQuest({ onClose }) {
                 <div><span>{hud.score}</span><small>Score</small></div>
                 <div><span>{best}</span><small>Best</small></div>
               </div>
+              <Leaderboard compact />
               <p className="mq-p">Every modak collected is a wish for a happier tomorrow. 🙏</p>
               <button className="mq-btn" onClick={start}>↻ Play Again</button>
               <button className="mq-link" onClick={onClose}>Back to Portal</button>
@@ -462,6 +537,24 @@ const CSS = `
 .mq-scoreRow div{display:flex;flex-direction:column;}
 .mq-scoreRow span{font-size:30px;font-weight:800;color:#a8321f;line-height:1;}
 .mq-scoreRow small{font-size:11px;color:#8a5a1f;text-transform:uppercase;letter-spacing:.6px;margin-top:4px;}
+.mq-lb{margin:16px auto 4px;max-width:420px;text-align:left;
+  background:rgba(255,255,255,.55);border:1px solid #e8c58d;border-radius:14px;padding:12px 14px;}
+.mq-lb-h{font-size:13px;font-weight:800;color:#a8321f;text-transform:uppercase;
+  letter-spacing:.6px;text-align:center;margin-bottom:8px;}
+.mq-lb-msg{font-size:12.5px;color:#8a5a1f;text-align:center;padding:6px 0;}
+.mq-lb-t{width:100%;border-collapse:collapse;font-size:13px;color:#6b4a16;}
+.mq-lb-t th{font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;color:#b58438;
+  font-weight:700;padding:4px 6px;border-bottom:1px solid #e8c58d;text-align:left;}
+.mq-lb-t th:first-child,.mq-lb-t td:first-child{width:34px;text-align:center;}
+.mq-lb-t th:nth-child(3),.mq-lb-t td:nth-child(3),
+.mq-lb-t th:last-child,.mq-lb-t td:last-child{text-align:right;width:62px;}
+.mq-lb-t td{padding:5px 6px;border-bottom:1px solid rgba(232,197,141,.45);}
+.mq-lb-t tr:last-child td{border-bottom:none;}
+.mq-lb-t .mq-nm{font-weight:600;}
+.mq-lb-t tr.mq-me{background:rgba(232,163,61,.22);}
+.mq-you{margin-left:6px;font-size:9.5px;background:#c0392b;color:#fff;
+  padding:1px 6px;border-radius:999px;vertical-align:middle;}
+.mq-lb-me{margin-top:8px;text-align:center;font-size:12px;color:#a8321f;}
 .mq-btn{margin-top:14px;cursor:pointer;border:none;border-radius:999px;padding:13px 34px;
   font-size:16px;font-weight:800;color:#fff;background:linear-gradient(135deg,#c0392b,#e8a33d);
   box-shadow:0 8px 20px rgba(0,0,0,.28);}

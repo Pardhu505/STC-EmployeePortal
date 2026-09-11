@@ -29,6 +29,7 @@ from download_file import router as download_router
 from youtube import router as youtube_api_router
 from facebook import router as facebook_router
 from biometric import router as biometric_router, ensure_indexes as ensure_biometric_indexes
+from game import router as game_router, ensure_game_indexes
 
 # --- Allowed Origins for CORS ---
 ALLOWED_ORIGINS = [
@@ -139,6 +140,7 @@ api_router.include_router(sheets_router, tags=["Google Sheets"])
 api_router.include_router(youtube_api_router, prefix="/youtube", tags=["YouTube"])
 api_router.include_router(facebook_router, prefix="/facebook", tags=["Facebook"])
 api_router.include_router(biometric_router, tags=["Biometric / eSSL"])
+api_router.include_router(game_router, tags=["Game"])
 # The WebSocket endpoint is now part of the chat_router
 
 app.include_router(api_router)
@@ -204,6 +206,7 @@ async def startup_event():
         await setup_chat_indexes()
         await setup_ap_mapping_indexes()
         await ensure_biometric_indexes()
+        await ensure_game_indexes()
 
         asyncio.create_task(check_scheduled_announcements())
         await populate_chat_employees() # Run the script on startup

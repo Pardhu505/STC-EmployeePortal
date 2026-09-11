@@ -33,8 +33,8 @@ export default function ModakQuest({ onClose }) {
   /* ---------------- game world ---------------- */
   const makeState = useCallback(() => ({
     t: 0, speed: 6.2, score: 0, modaks: 0, level: 1,
-    groundFrac: 0.80,
-    g: { x: 0, y: 0, vy: 0, w: 96, h: 138, onGround: true, sliding: false, slideT: 0, frame: 0, frameT: 0 },
+    groundFrac: 0.655,
+    g: { x: 0, y: 0, vy: 0, w: 104, h: 150, onGround: true, sliding: false, slideT: 0, frame: 0, frameT: 0 },
     mk: { x: -260, y: 0, w: 62, h: 62, bob: 0 },
     items: [], obstacles: [], parts: [], petals: [], dust: [],
     bgX: 0, spawnT: 0, obsT: 90, over: false, flash: 0,
@@ -139,7 +139,7 @@ export default function ModakQuest({ onClose }) {
 
       // frame animation, faster with speed; freeze mid-air
       if (g.onGround && !g.sliding) {
-        g.frameT += s.speed * 0.16;
+        g.frameT += s.speed * 0.022;
         if (g.frameT >= 1) { g.frameT = 0; g.frame = (g.frame + 1) % FRAME_COUNT; }
       } else if (!g.onGround) {
         g.frame = 3;                    // airborne pose
@@ -223,8 +223,15 @@ export default function ModakQuest({ onClose }) {
       // parallax background (cover, tiled horizontally)
       if (I.bg) {
         const bh = H, bw = I.bg.width * (H / I.bg.height);
-        let off = s.bgX % bw; if (off > 0) off -= bw;
-        for (let x = off; x < W; x += bw) ctx.drawImage(I.bg, x, 0, bw, bh);
+        let off = s.bgX % (bw * 2); if (off > 0) off -= bw * 2;
+        // draw pairs: normal + horizontally mirrored, so tile edges always match
+        for (let x = off, i = 0; x < W; x += bw, i++) {
+          const flip = i % 2 === 1;
+          ctx.save();
+          if (flip) { ctx.translate(x + bw, 0); ctx.scale(-1, 1); ctx.drawImage(I.bg, 0, 0, bw, bh); }
+          else { ctx.drawImage(I.bg, x, 0, bw, bh); }
+          ctx.restore();
+        }
       } else {
         const grd = ctx.createLinearGradient(0, 0, 0, H);
         grd.addColorStop(0, '#ffd9a0'); grd.addColorStop(1, '#8fd3e8');

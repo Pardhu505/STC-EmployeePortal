@@ -17,6 +17,7 @@ import { API_BASE_URL } from '../config/api';
 
 const FRAME_W = 139, FRAME_H = 150, FRAME_COUNT = 12;
 const BEST_KEY = 'modakQuestBest';
+const BUILD = 'lb-v2';   // console marker: confirms this build is deployed
 
 export default function ModakQuest({ onClose }) {
   const canvasRef = useRef(null);
@@ -30,7 +31,8 @@ export default function ModakQuest({ onClose }) {
   const [best, setBest] = useState(0);
   const [board, setBoard] = useState([]);
   const [myRank, setMyRank] = useState(null);
-  const [boardState, setBoardState] = useState('idle'); // idle | loading | ok | err
+  const [boardState, setBoardState] = useState('idle'); // idle|loading|ok|err|noauth
+  const [boardErr, setBoardErr] = useState('');
 
   const authHeader = useCallback(() => ({
     'Content-Type': 'application/json',
@@ -38,17 +40,28 @@ export default function ModakQuest({ onClose }) {
   }), [user]);
 
   const loadBoard = useCallback(async () => {
-    if (!user) return;
+    if (!user) { setBoardState('noauth'); return; }
     setBoardState('loading');
     try {
-      const r = await fetch(`${API_BASE_URL}/api/game/leaderboard?limit=10`, { headers: authHeader() });
-      if (!r.ok) throw new Error('failed');
+      const url = `${API_BASE_URL}/api/game/leaderboard?limit=10`;
+      const r = await fetch(url, { headers: authHeader() });
+      if (!r.ok) {
+        const txt = await r.text().catch(() => '');
+        console.error('[ModakQuest] leaderboard HTTP', r.status, url, txt.slice(0, 200));
+        setBoardErr(`HTTP ${r.status}`);
+        setBoardState('err');
+        return;
+      }
       const d = await r.json();
-      setBoard(d.leaderboard || []);
+      setBoard(Array.isArray(d.leaderboard) ? d.leaderboard : []);
       setMyRank(d.my_rank || null);
       if (d.my_best && d.my_best > 0) setBest(d.my_best);
       setBoardState('ok');
-    } catch (e) { setBoardState('err'); }
+    } catch (e) {
+      console.error('[ModakQuest] leaderboard fetch failed:', e);
+      setBoardErr(e.message || 'network error');
+      setBoardState('err');
+    }
   }, [user, authHeader]);
 
   const submitScore = useCallback(async (score, modaks) => {
@@ -61,6 +74,7 @@ export default function ModakQuest({ onClose }) {
     } catch (e) { /* offline is fine - local best still shows */ }
   }, [user, authHeader]);
 
+  useEffect(() => { console.log('[ModakQuest] build', BUILD, 'user?', !!user); }, [user]);
   useEffect(() => { loadBoard(); }, [loadBoard]);
 
   useEffect(() => {
@@ -405,8 +419,14 @@ export default function ModakQuest({ onClose }) {
   const Leaderboard = ({ compact }) => (
     <div className="mq-lb">
       <div className="mq-lb-h">🏆 Leaderboard</div>
-      {boardState === 'loading' && <div className="mq-lb-msg">Loading…</div>}
-      {boardState === 'err' && <div className="mq-lb-msg">Couldn't load scores right now.</div>}
+      {(boardState === 'idle' || boardState === 'loading') && <div className="mq-lb-msg">Loading scores…</div>}
+      {boardState === 'noauth' && <div className="mq-lb-msg">Sign in to see the leaderboard.</div>}
+      {boardState === 'err' && (
+        <div className="mq-lb-msg">
+          Couldn't load scores{boardErr ? ` (${boardErr})` : ''}.
+          <button className="mq-lb-retry" onClick={loadBoard}>Retry</button>
+        </div>
+      )}
       {boardState === 'ok' && board.length === 0 && (
         <div className="mq-lb-msg">No scores yet — be the first! 🎉</div>
       )}
@@ -554,6 +574,8 @@ const CSS = `
 .mq-lb-t tr.mq-me{background:rgba(232,163,61,.22);}
 .mq-you{margin-left:6px;font-size:9.5px;background:#c0392b;color:#fff;
   padding:1px 6px;border-radius:999px;vertical-align:middle;}
+.mq-lb-retry{margin-left:8px;cursor:pointer;border:1px solid #c0392b;background:#fff;
+  color:#c0392b;border-radius:999px;padding:2px 12px;font-size:11px;font-weight:700;}
 .mq-lb-me{margin-top:8px;text-align:center;font-size:12px;color:#a8321f;}
 .mq-btn{margin-top:14px;cursor:pointer;border:none;border-radius:999px;padding:13px 34px;
   font-size:16px;font-weight:800;color:#fff;background:linear-gradient(135deg,#c0392b,#e8a33d);

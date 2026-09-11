@@ -15,7 +15,8 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { API_BASE_URL } from '../config/api';
 
-const FRAME_W = 139, FRAME_H = 150, FRAME_COUNT = 12;
+const FRAME_W = 151, FRAME_H = 150, FRAME_COUNT = 12;  // 0-11 walk cycle
+const SLIDE_FRAME = 12;                                  // crouched pose
 const BEST_KEY = 'modakQuestBest';
 const BUILD = 'lb-v2';   // console marker: confirms this build is deployed
 
@@ -85,7 +86,7 @@ export default function ModakQuest({ onClose }) {
   const makeState = useCallback(() => ({
     t: 0, speed: 6.2, score: 0, modaks: 0, level: 1,
     groundFrac: 0.655,
-    g: { x: 0, y: 0, vy: 0, w: 133, h: 144, onGround: true, sliding: false, slideT: 0, frame: 0, frameT: 0, jumps: 0 },
+    g: { x: 0, y: 0, vy: 0, w: 145, h: 144, onGround: true, sliding: false, slideT: 0, frame: 0, frameT: 0, jumps: 0 },
     mk: { x: -260, y: 0, w: 62, h: 62, bob: 0 },
     items: [], obstacles: [], parts: [], petals: [], dust: [],
     bgX: 0, spawnT: 0, obsT: 90, over: false, flash: 0,
@@ -208,11 +209,13 @@ export default function ModakQuest({ onClose }) {
       if (g.sliding && --g.slideT <= 0) g.sliding = false;
 
       // frame animation, faster with speed; freeze mid-air
-      if (g.onGround && !g.sliding) {
+      if (g.sliding) {
+        g.frame = SLIDE_FRAME;          // dedicated crouched/sliding pose
+      } else if (g.onGround) {
         g.frameT += s.speed * 0.022;
         if (g.frameT >= 1) { g.frameT = 0; g.frame = (g.frame + 1) % FRAME_COUNT; }
-      } else if (!g.onGround) {
-        g.frame = 3;                    // airborne pose
+      } else {
+        g.frame = 6;                    // mid-stride pose while airborne
       }
 
       const gx = W * 0.17;
@@ -363,7 +366,6 @@ export default function ModakQuest({ onClose }) {
       // ganesha
       if (I.strip) {
         ctx.save();
-        if (g.sliding) { ctx.translate(gx, gy + gh); ctx.rotate(-0.42); ctx.translate(-gx, -(gy + gh)); }
         ctx.drawImage(I.strip, g.frame * FRAME_W, 0, FRAME_W, FRAME_H, gx - gw / 2, gy, gw, gh);
         ctx.restore();
       } else {

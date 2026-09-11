@@ -9,7 +9,7 @@ else's name). Only a player's BEST score is kept.
 
 Endpoints
     POST /api/game/score        { score, modaks }  -> records/updates the best
-    GET  /api/game/leaderboard?limit=10            -> top players, rank order
+    GET  /api/game/leaderboard?limit=500           -> all players, rank order
 """
 import logging
 from datetime import datetime, timezone
@@ -73,8 +73,8 @@ async def submit_score(body: ScoreIn, user=Depends(get_current_user)):
 
 
 @router.get("/game/leaderboard")
-async def leaderboard(limit: int = Query(10, ge=1, le=50), user=Depends(get_current_user)):
-    """Top players in rank order, plus where the current user stands."""
+async def leaderboard(limit: int = Query(500, ge=1, le=2000), user=Depends(get_current_user)):
+    """All players in rank order (paged by limit), plus where the caller stands."""
     top = []
     cur = scores.find({"score": {"$gt": 0}}, {"_id": 0, "name": 1, "score": 1, "modaks": 1, "email": 1}) \
                 .sort("score", -1).limit(limit)
@@ -95,4 +95,5 @@ async def leaderboard(limit: int = Query(10, ge=1, le=50), user=Depends(get_curr
             "modaks": int(d.get("modaks", 0)),
             "me": (d.get("email") or "").lower() == me_email,
         })
-    return {"leaderboard": out, "my_best": my_best, "my_rank": my_rank}
+    total = await scores.count_documents({"score": {"$gt": 0}})
+    return {"leaderboard": out, "my_best": my_best, "my_rank": my_rank, "total": total}

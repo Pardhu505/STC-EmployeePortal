@@ -8,7 +8,6 @@ import ModakQuest from './ModakQuest';
 
 const FESTIVAL_DATE = new Date('2026-09-14T00:00:00+05:30');
 const SHOW_WITHIN_DAYS = 15;           // show in the run-up and on the day
-const SEEN_KEY = 'modakMastiSeen';     // stores the date it was last shown
 
 function daysUntil(target) {
   const now = new Date();
@@ -16,36 +15,46 @@ function daysUntil(target) {
   const b = new Date(target.getFullYear(), target.getMonth(), target.getDate());
   return Math.round((b - a) / 86400000);
 }
-const todayKey = () => new Date().toISOString().slice(0, 10);
 
 export default function ModakMastiPopup() {
+  const [inWindow, setInWindow] = useState(false);
   const [show, setShow] = useState(false);
   const [playing, setPlaying] = useState(false);
 
   useEffect(() => {
     const d = daysUntil(FESTIVAL_DATE);
     if (d < 0 || d > SHOW_WITHIN_DAYS) return;
-    let seen = null;
-    try { seen = localStorage.getItem(SEEN_KEY); } catch (e) {}
-    if (seen !== todayKey()) {
-      const t = setTimeout(() => setShow(true), 700);   // let the dashboard paint first
-      return () => clearTimeout(t);
-    }
+    setInWindow(true);
+    // greet on EVERY page load / refresh during the festival window
+    const t = setTimeout(() => setShow(true), 700);
+    return () => clearTimeout(t);
   }, []);
 
-  const dismiss = () => {
-    try { localStorage.setItem(SEEN_KEY, todayKey()); } catch (e) {}
-    setShow(false);
-  };
-  const play = () => {
-    try { localStorage.setItem(SEEN_KEY, todayKey()); } catch (e) {}
-    setShow(false); setPlaying(true);
-  };
+  const dismiss = () => setShow(false);
+  const play = () => { setShow(false); setPlaying(true); };
 
+  if (!inWindow) return null;
   if (playing) return <ModakQuest onClose={() => setPlaying(false)} />;
-  if (!show) return null;
 
   const days = daysUntil(FESTIVAL_DATE);
+
+  // once dismissed, keep a always-available launcher on the portal
+  if (!show) {
+    return (
+      <>
+        <style>{CSS}</style>
+        <button className="mm-launcher" onClick={() => setPlaying(true)}
+                title="Play Modak Masti">
+          <span className="mm-launcher-ico">🎮</span>
+          <span className="mm-launcher-txt">
+            Play <b>Modak Masti</b>
+            {days > 0 && <small>Ganesh Chaturthi in {days} {days === 1 ? 'day' : 'days'}</small>}
+            {days === 0 && <small>Happy Ganesh Chaturthi! 🙏</small>}
+          </span>
+        </button>
+      </>
+    );
+  }
 
   return (
     <div className="mm-overlay" role="dialog" aria-label="Modak Masti invitation">
@@ -136,7 +145,22 @@ const CSS = `
 .mm-confetti i{position:absolute;top:-14px;width:9px;height:14px;border-radius:2px;opacity:.9;
   animation-name:mmFall;animation-timing-function:linear;animation-iteration-count:infinite;}
 @keyframes mmFall{0%{transform:translateY(-20px) rotate(0)}100%{transform:translateY(105vh) rotate(680deg)}}
-@media(max-width:640px){.mm-banner{height:150px}.mm-body{padding:4px 16px 20px}}
+.mm-launcher{position:fixed;right:18px;bottom:120px;z-index:9990;display:flex;align-items:center;gap:10px;
+  cursor:pointer;border:2px solid rgba(255,255,255,.6);border-radius:999px;padding:10px 18px 10px 12px;
+  background:linear-gradient(135deg,#c0392b,#e8a33d);color:#fff;
+  box-shadow:0 10px 24px rgba(0,0,0,.32);font-family:'Inter','Segoe UI',Tahoma,sans-serif;
+  animation:mmPulse 2.6s ease-in-out infinite;}
+.mm-launcher:hover{filter:brightness(1.08);}
+.mm-launcher-ico{font-size:20px;}
+.mm-launcher-txt{display:flex;flex-direction:column;align-items:flex-start;line-height:1.15;
+  font-size:14px;font-weight:700;text-align:left;}
+.mm-launcher-txt b{font-weight:800;}
+.mm-launcher-txt small{font-size:10.5px;opacity:.92;font-weight:600;}
+@media(max-width:640px){
+  .mm-banner{height:150px}.mm-body{padding:4px 16px 20px}
+  .mm-launcher{right:12px;bottom:104px;padding:9px 14px 9px 10px;}
+  .mm-launcher-txt{font-size:12px;} .mm-launcher-txt small{display:none;}
+}
 @media(prefers-reduced-motion:reduce){
   .mm-card,.mm-play,.mm-banner img{animation:none!important}
   .mm-confetti{display:none}

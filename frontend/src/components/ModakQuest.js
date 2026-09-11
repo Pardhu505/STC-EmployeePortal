@@ -13,7 +13,7 @@
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 
-const FRAME_W = 105, FRAME_H = 150, FRAME_COUNT = 12;
+const FRAME_W = 139, FRAME_H = 150, FRAME_COUNT = 12;
 const BEST_KEY = 'modakQuestBest';
 
 export default function ModakQuest({ onClose }) {
@@ -34,7 +34,7 @@ export default function ModakQuest({ onClose }) {
   const makeState = useCallback(() => ({
     t: 0, speed: 6.2, score: 0, modaks: 0, level: 1,
     groundFrac: 0.655,
-    g: { x: 0, y: 0, vy: 0, w: 104, h: 150, onGround: true, sliding: false, slideT: 0, frame: 0, frameT: 0 },
+    g: { x: 0, y: 0, vy: 0, w: 133, h: 144, onGround: true, sliding: false, slideT: 0, frame: 0, frameT: 0, jumps: 0 },
     mk: { x: -260, y: 0, w: 62, h: 62, bob: 0 },
     items: [], obstacles: [], parts: [], petals: [], dust: [],
     bgX: 0, spawnT: 0, obsT: 90, over: false, flash: 0,
@@ -58,9 +58,28 @@ export default function ModakQuest({ onClose }) {
   }, [resize]);
 
   /* ---------------- input ---------------- */
+  const MAX_JUMPS = 3;                     // ground jump + double + triple
   const jump = useCallback(() => {
     const s = stateRef.current; if (!s || s.over) return;
-    if (s.g.onGround) { s.g.vy = -15.4; s.g.onGround = false; s.g.sliding = false; }
+    const g = s.g;
+    if (g.jumps >= MAX_JUMPS) return;
+    // each extra jump is slightly gentler so the chain stays controllable
+    const power = [-15.4, -13.2, -11.6][g.jumps] || -11.6;
+    g.vy = power;
+    g.jumps++;
+    g.onGround = false;
+    g.sliding = false;
+    // puff of dust at each mid-air jump
+    if (g.jumps > 1) {
+      const W = canvasRef.current ? canvasRef.current.clientWidth : 800;
+      const gy0 = 0;
+      for (let k = 0; k < 8; k++) {
+        const a = Math.random() * Math.PI * 2;
+        s.parts.push({ x: W * 0.17, y: (canvasRef.current ? canvasRef.current.clientHeight : 500) * s.groundFrac + g.y - 20,
+                       vx: Math.cos(a) * 2, vy: Math.sin(a) * 2 + 1, a: .9, r: 2 + Math.random() * 3 });
+      }
+      void gy0;
+    }
   }, []);
   const slide = useCallback(() => {
     const s = stateRef.current; if (!s || s.over) return;
@@ -134,7 +153,7 @@ export default function ModakQuest({ onClose }) {
       const g = s.g;
       g.vy += 0.78;                     // gravity
       g.y += g.vy;
-      if (g.y >= 0) { g.y = 0; g.vy = 0; g.onGround = true; }
+      if (g.y >= 0) { g.y = 0; g.vy = 0; g.onGround = true; g.jumps = 0; }
       if (g.sliding && --g.slideT <= 0) g.sliding = false;
 
       // frame animation, faster with speed; freeze mid-air
@@ -355,7 +374,7 @@ export default function ModakQuest({ onClose }) {
               <button className="mq-icon" onClick={() => setPhase('paused')}>❚❚</button>
               <button className="mq-icon" onClick={onClose}>✕</button>
             </div>
-            <div className="mq-help">SPACE / ↑ jump &nbsp;·&nbsp; ↓ slide &nbsp;·&nbsp; tap to jump, swipe down to slide</div>
+            <div className="mq-help">SPACE / ↑ jump (tap up to 3× for double &amp; triple jump) &nbsp;·&nbsp; ↓ slide &nbsp;·&nbsp; tap / swipe down on mobile</div>
           </>
         )}
 
@@ -368,7 +387,7 @@ export default function ModakQuest({ onClose }) {
               <p className="mq-p">Help little Ganesha collect modaks, dodge obstacles,
                  and see how high you can score this Ganesh Chaturthi!</p>
               <div className="mq-keys">
-                <span><b>SPACE / ↑</b> Jump</span><span><b>↓</b> Slide</span><span><b>P</b> Pause</span>
+                <span><b>SPACE / ↑</b> Jump ×3</span><span><b>↓</b> Slide</span><span><b>P</b> Pause</span>
               </div>
               {best > 0 && <div className="mq-best">🏆 Best Score: {best}</div>}
               <button className="mq-btn" onClick={start}>🎮 Start the Celebration</button>

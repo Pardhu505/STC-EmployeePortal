@@ -43,14 +43,23 @@ export default function ModakMastiPopup() {
     return (
       <>
         <style>{CSS}</style>
-        <button className="mm-launcher" onClick={() => setPlaying(true)}
+        <div className="mm-hang" aria-hidden="true">
+          <span className="mm-cord mm-cord-l" />
+          <span className="mm-cord mm-cord-r" />
+        </div>
+        <button className="mm-banner-top" onClick={() => setPlaying(true)}
                 title="Play Modak Masti">
-          <span className="mm-launcher-ico">🎮</span>
-          <span className="mm-launcher-txt">
-            Play <b>Modak Masti</b>
-            {days > 0 && <small>Ganesh Chaturthi in {days} {days === 1 ? 'day' : 'days'}</small>}
-            {days === 0 && <small>Happy Ganesh Chaturthi! 🙏</small>}
+          <span className="mm-shimmer" />
+          <span className="mm-bt-ico">🪔</span>
+          <span className="mm-bt-txt">
+            <b>Play Modak&nbsp;Masti</b>
+            <small>
+              {days > 0
+                ? `Ganesh Chaturthi in ${days} ${days === 1 ? 'day' : 'days'} · tap to play`
+                : 'Happy Ganesh Chaturthi! · tap to play'}
+            </small>
           </span>
+          <span className="mm-bt-ico">🎮</span>
         </button>
       </>
     );
@@ -145,24 +154,47 @@ const CSS = `
 .mm-confetti i{position:absolute;top:-14px;width:9px;height:14px;border-radius:2px;opacity:.9;
   animation-name:mmFall;animation-timing-function:linear;animation-iteration-count:infinite;}
 @keyframes mmFall{0%{transform:translateY(-20px) rotate(0)}100%{transform:translateY(105vh) rotate(680deg)}}
-.mm-launcher{position:fixed;right:18px;bottom:120px;z-index:9990;display:flex;align-items:center;gap:10px;
-  cursor:pointer;border:2px solid rgba(255,255,255,.6);border-radius:999px;padding:10px 18px 10px 12px;
-  background:linear-gradient(135deg,#c0392b,#e8a33d);color:#fff;
-  box-shadow:0 10px 24px rgba(0,0,0,.32);font-family:'Inter','Segoe UI',Tahoma,sans-serif;
-  animation:mmPulse 2.6s ease-in-out infinite;}
-.mm-launcher:hover{filter:brightness(1.08);}
-.mm-launcher-ico{font-size:20px;}
-.mm-launcher-txt{display:flex;flex-direction:column;align-items:flex-start;line-height:1.15;
-  font-size:14px;font-weight:700;text-align:left;}
-.mm-launcher-txt b{font-weight:800;}
-.mm-launcher-txt small{font-size:10.5px;opacity:.92;font-weight:600;}
+.mm-hang{position:fixed;top:0;left:50%;transform:translateX(-50%);z-index:9990;
+  width:330px;height:26px;pointer-events:none;}
+.mm-cord{position:absolute;top:0;width:2px;height:26px;
+  background:linear-gradient(#e8a33d,rgba(232,163,61,.25));}
+.mm-cord-l{left:58px;} .mm-cord-r{right:58px;}
+
+.mm-banner-top{position:fixed;top:24px;left:50%;z-index:9991;cursor:pointer;
+  display:flex;align-items:center;gap:12px;padding:10px 22px;
+  border-radius:0 0 18px 18px;border:1px solid rgba(255,215,150,.55);border-top:none;
+  background:linear-gradient(135deg,rgba(192,57,43,.62),rgba(232,163,61,.62));
+  backdrop-filter:blur(9px);-webkit-backdrop-filter:blur(9px);
+  color:#fff;font-family:'Inter','Segoe UI',Tahoma,sans-serif;overflow:hidden;
+  box-shadow:0 10px 26px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.35);
+  transform-origin:50% 0;
+  animation:mmSwing 4.6s ease-in-out infinite;}
+.mm-banner-top:hover{filter:brightness(1.1);}
+.mm-bt-ico{font-size:19px;line-height:1;}
+.mm-bt-txt{display:flex;flex-direction:column;align-items:center;line-height:1.2;}
+.mm-bt-txt b{font-size:14.5px;font-weight:800;letter-spacing:.2px;
+  text-shadow:0 1px 3px rgba(0,0,0,.35);}
+.mm-bt-txt small{font-size:10.5px;font-weight:600;opacity:.95;
+  text-shadow:0 1px 2px rgba(0,0,0,.3);}
+/* light sweep across the banner */
+.mm-shimmer{position:absolute;top:0;left:-60%;width:45%;height:100%;pointer-events:none;
+  background:linear-gradient(100deg,transparent,rgba(255,255,255,.42),transparent);
+  animation:mmSweep 3.6s ease-in-out infinite;}
+@keyframes mmSweep{0%{left:-60%}55%{left:115%}100%{left:115%}}
+/* gentle hanging swing from the cords */
+@keyframes mmSwing{
+  0%,100%{transform:translateX(-50%) rotate(-1.1deg)}
+  50%    {transform:translateX(-50%) rotate(1.1deg)}
+}
+
 @media(max-width:640px){
   .mm-banner{height:150px}.mm-body{padding:4px 16px 20px}
-  .mm-launcher{right:12px;bottom:104px;padding:9px 14px 9px 10px;}
-  .mm-launcher-txt{font-size:12px;} .mm-launcher-txt small{display:none;}
+  .mm-banner-top{top:18px;padding:8px 14px;gap:8px;}
+  .mm-bt-txt b{font-size:12.5px;} .mm-bt-txt small{font-size:9px;}
+  .mm-hang{width:250px;} .mm-cord-l{left:40px;} .mm-cord-r{right:40px;}
 }
 @media(prefers-reduced-motion:reduce){
-  .mm-card,.mm-play,.mm-banner img{animation:none!important}
+  .mm-card,.mm-play,.mm-banner img,.mm-banner-top,.mm-shimmer{animation:none!important}
   .mm-confetti{display:none}
 }
 `;

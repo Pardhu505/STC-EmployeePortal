@@ -577,23 +577,24 @@ const CSS = `
 .mq-help{position:absolute;bottom:12px;left:50%;transform:translateX(-50%);
   background:rgba(30,15,5,.55);color:#ffe9b8;font-size:12px;padding:7px 16px;border-radius:999px;
   border:1px solid rgba(255,210,120,.3);white-space:nowrap;}
-.mq-start{padding:0;background:#1b0e05;}
-.mq-start .mq-card{position:relative;z-index:3;margin-left:clamp(8px,4vw,60px);}
+.mq-start{padding:0;background:#1b0e05;justify-content:flex-start;align-items:center;}
+.mq-start .mq-card{position:relative;z-index:3;margin-left:clamp(12px,4.5vw,84px);
+  width:min(500px,44vw);max-height:92vh;overflow:auto;}
 .mq-scene{position:absolute;inset:0;overflow:hidden;}
-.mq-scene-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;
+.mq-scene-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:72% center;
   animation:mqKen 26s ease-in-out infinite alternate;}
-@keyframes mqKen{from{transform:scale(1.04) translateX(0)}to{transform:scale(1.12) translateX(-1.5%)}}
+@keyframes mqKen{from{transform:scale(1.03)}to{transform:scale(1.09)}}
 /* warm glow + vignette so the card stays readable */
 .mq-scene::after{content:'';position:absolute;inset:0;z-index:2;
   background:radial-gradient(120% 90% at 78% 45%, rgba(255,190,90,.20), transparent 55%),
-             linear-gradient(90deg, rgba(20,8,0,.88) 0%, rgba(20,8,0,.55) 38%, rgba(20,8,0,.10) 60%, rgba(20,8,0,.25) 100%);}
+             linear-gradient(90deg, rgba(20,8,0,.92) 0%, rgba(20,8,0,.80) 30%, rgba(20,8,0,.30) 48%, rgba(20,8,0,0) 62%, rgba(20,8,0,.18) 100%);}
 .mq-sparkles{position:absolute;inset:0;z-index:2;pointer-events:none;}
 .mq-sparkles i{position:absolute;width:6px;height:6px;border-radius:50%;
   background:radial-gradient(circle,#fff6cf,rgba(255,214,120,0));
   animation-name:mqTwinkle;animation-iteration-count:infinite;animation-timing-function:ease-in-out;}
 @keyframes mqTwinkle{0%,100%{opacity:0;transform:scale(.5)}50%{opacity:.95;transform:scale(1.5)}}
 /* winner nameplate - sits over the carved plaque in the artwork */
-.mq-plaque{position:absolute;z-index:3;left:58%;top:66%;width:30%;
+.mq-plaque{position:absolute;z-index:3;left:62%;top:64%;width:30%;max-width:360px;
   animation:mqPlaque 3.4s ease-in-out infinite;}
 @keyframes mqPlaque{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
 .mq-plaque-in{display:flex;flex-direction:column;align-items:center;text-align:center;
@@ -605,9 +606,10 @@ const CSS = `
   line-height:1.15;margin:2px 0 4px;text-shadow:0 2px 6px rgba(0,0,0,.6);}
 .mq-plaque-sub{font-size:10.5px;color:#e6c79a;font-style:italic;line-height:1.35;}
 .mq-plaque-score{margin-top:6px;font-size:11px;font-weight:700;color:#ffd27a;}
-@media(max-width:820px){
+@media(max-width:1100px){
+  .mq-start{justify-content:center;}
   .mq-plaque{display:none}
-  .mq-start .mq-card{margin:0 auto}
+  .mq-start .mq-card{margin:0 auto;width:min(520px,94vw);}
   .mq-scene::after{background:linear-gradient(180deg,rgba(20,8,0,.55),rgba(20,8,0,.85))}
 }
 .mq-overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;

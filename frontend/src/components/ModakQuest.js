@@ -24,11 +24,16 @@ const START_LIVES = 3;
 
 // Each stage: distance to clear, pace, spawn gaps and a colour grade.
 const STAGES = [
-  { name: 'Riverside Ghats',  dist: 900,  speed: 6.0, obs: 105, tint: null },
-  { name: 'Festival Bazaar',  dist: 1100, speed: 6.9, obs: 96,  tint: 'rgba(255,170,60,.10)' },
-  { name: 'Sunset Bridge',    dist: 1300, speed: 7.7, obs: 88,  tint: 'rgba(255,110,80,.16)' },
-  { name: 'Twilight Ghats',   dist: 1500, speed: 8.5, obs: 80,  tint: 'rgba(90,70,160,.22)' },
-  { name: 'Mandapa Approach', dist: 1700, speed: 9.2, obs: 74,  tint: 'rgba(25,35,85,.26)' },
+  { name: 'Riverside Ghats',   dist: 1000, speed: 6.0, obs: 108, sky: null,
+    types: ['ground','fly'] },
+  { name: 'Festival Bazaar',   dist: 1350, speed: 7.0, obs: 96,
+    sky: 'linear|rgba(255,186,80,.22)|rgba(255,126,60,.10)', types: ['ground','fly','mover'] },
+  { name: 'Sunset Bridge',     dist: 1750, speed: 8.0, obs: 86,
+    sky: 'linear|rgba(255,120,70,.30)|rgba(120,60,120,.18)', types: ['ground','fly','fire'] },
+  { name: 'Twilight Ghats',    dist: 2200, speed: 9.0, obs: 78,
+    sky: 'linear|rgba(80,60,160,.34)|rgba(30,30,90,.26)', types: ['ground','fly','mover','fire'] },
+  { name: 'Mandapa Approach',  dist: 2700, speed: 10.0, obs: 70,
+    sky: 'linear|rgba(18,24,70,.44)|rgba(40,20,70,.34)', types: ['ground','fly','mover','fire'] },
 ];
 const GATE_LEAD = 520;            // how early the Mandapa appears at the end
 
@@ -101,7 +106,7 @@ export default function ModakQuest({ onClose }) {
     const st = STAGES[stageIdx];
     return {
       t: 0, stage: stageIdx, dist: 0, goal: st.dist,
-      speed: st.speed, tint: st.tint,
+      speed: st.speed, sky: st.sky,
       score: carry ? carry.score : 0,
       modaks: carry ? carry.modaks : 0,
       lives: carry ? carry.lives : START_LIVES,
@@ -170,8 +175,8 @@ export default function ModakQuest({ onClose }) {
       const i = new Image(); i.onload = () => res(i); i.onerror = () => res(null); i.src = src;
     });
     Promise.all([load('/festive/ganesha_run_strip.png'), load('/festive/game_bg.jpg'),
-                 load('/festive/mooshika_game.png')])
-      .then(([strip, bg, mk]) => { imgs.current = { strip, bg, mk }; });
+                 load('/festive/mooshika_game.png'), load('/festive/mandapam.png')])
+      .then(([strip, bg, mk, mandapam]) => { imgs.current = { strip, bg, mk, mandapam }; });
   }, []);
 
   /* ------------------------- loop ------------------------- */
@@ -234,10 +239,17 @@ export default function ModakQuest({ onClose }) {
         }
         if (--s.obsT <= 0) {
           s.obsT = STAGES[s.stage].obs + Math.random()*70;
-          const flying = Math.random() < .32;
-          s.obstacles.push(flying
-            ? { x: W+40, y: groundY-132, w: 54, h: 44, fly: true }
-            : { x: W+40, y: groundY-52,  w: 46, h: 52, fly: false });
+          const types = STAGES[s.stage].types;
+          const kind = types[Math.floor(Math.random()*types.length)];
+          if (kind === 'fly')
+            s.obstacles.push({ kind, x: W+40, y: groundY-132, w: 54, h: 44 });
+          else if (kind === 'fire')
+            s.obstacles.push({ kind, x: W+40, y: groundY-62, w: 44, h: 62, ph: Math.random()*6 });
+          else if (kind === 'mover')
+            s.obstacles.push({ kind, x: W+40, y: groundY-150, w: 52, h: 52,
+                               base: groundY-150, amp: 62, ph: Math.random()*6 });
+          else
+            s.obstacles.push({ kind: 'ground', x: W+40, y: groundY-52, w: 46, h: 52 });
         }
       }
 
@@ -259,6 +271,7 @@ export default function ModakQuest({ onClose }) {
 
       for (const o of s.obstacles) {
         o.x -= s.speed;
+        if (o.kind === 'mover') o.y = o.base + Math.sin(s.t/26 + o.ph) * o.amp;
         if (g.inv > 0) continue;
         const ob = { x:o.x-o.w/2, y:o.y, w:o.w, h:o.h };
         if (hb.x < ob.x+ob.w && hb.x+hb.w > ob.x && hb.y < ob.y+ob.h && hb.y+hb.h > ob.y) {
@@ -287,7 +300,12 @@ export default function ModakQuest({ onClose }) {
           ctx.restore();
         }
       } else { ctx.fillStyle = '#8fd3e8'; ctx.fillRect(0,0,W,H); }
-      if (s.tint) { ctx.fillStyle = s.tint; ctx.fillRect(0,0,W,H); }
+      if (s.sky) {
+        const [, c1, c2] = s.sky.split('|');
+        const sg = ctx.createLinearGradient(0,0,0,H);
+        sg.addColorStop(0, c1); sg.addColorStop(1, c2);
+        ctx.fillStyle = sg; ctx.fillRect(0,0,W,H);
+      }
 
       for (const p of s.petals) { ctx.globalAlpha=.8; ctx.fillStyle='#ff8fb1';
         ctx.beginPath(); ctx.ellipse(p.x,p.y,p.r,p.r*.6,p.x/40,0,7); ctx.fill(); }
@@ -297,7 +315,15 @@ export default function ModakQuest({ onClose }) {
       ctx.globalAlpha = 1;
 
       /* ---- the Mandapa gate ---- */
-      if (s.gate) drawMandapa(ctx, s.gate.x, groundY, H);
+      if (s.gate) {
+        if (I.mandapam) {
+          const mh = Math.min(groundY*1.02, H*0.86);
+          const mw = I.mandapam.width * (mh / I.mandapam.height);
+          ctx.save(); ctx.shadowColor='rgba(255,200,90,.55)'; ctx.shadowBlur=40;
+          ctx.drawImage(I.mandapam, s.gate.x, groundY - mh + 12, mw, mh);
+          ctx.restore();
+        } else drawMandapa(ctx, s.gate.x, groundY, H);
+      }
 
       if (I.mk) ctx.drawImage(I.mk, s.mk.x, groundY-58+Math.sin(s.mk.bob)*3, 58, 58);
 
@@ -309,11 +335,41 @@ export default function ModakQuest({ onClose }) {
         ctx.restore();
       }
       for (const o of s.obstacles) {
-        ctx.save(); ctx.fillStyle = o.fly ? '#c0392b' : '#7c6a55';
-        ctx.strokeStyle='rgba(255,255,255,.35)'; ctx.lineWidth=2;
-        const x = o.x-o.w/2;
-        ctx.beginPath(); ctx.roundRect(x,o.y,o.w,o.h,8); ctx.fill(); ctx.stroke();
-        ctx.fillStyle='rgba(255,215,120,.75)'; ctx.fillRect(x+6,o.y+o.h/2-3,o.w-12,6);
+        const x = o.x - o.w/2;
+        ctx.save();
+        if (o.kind === 'fire') {
+          // animated flame
+          const fl = 1 + Math.sin(s.t/5 + o.ph)*0.18;
+          ctx.shadowColor = '#ff7a18'; ctx.shadowBlur = 26;
+          ctx.fillStyle = '#e8511a';
+          ctx.beginPath();
+          ctx.moveTo(x+o.w/2, o.y - 10*fl);
+          ctx.quadraticCurveTo(x+o.w, o.y+o.h*0.45, x+o.w*0.72, o.y+o.h);
+          ctx.lineTo(x+o.w*0.28, o.y+o.h);
+          ctx.quadraticCurveTo(x, o.y+o.h*0.45, x+o.w/2, o.y-10*fl);
+          ctx.closePath(); ctx.fill();
+          ctx.fillStyle = '#ffb300';
+          ctx.beginPath();
+          ctx.moveTo(x+o.w/2, o.y + o.h*0.18*fl);
+          ctx.quadraticCurveTo(x+o.w*0.82, o.y+o.h*0.62, x+o.w*0.62, o.y+o.h);
+          ctx.lineTo(x+o.w*0.38, o.y+o.h);
+          ctx.quadraticCurveTo(x+o.w*0.18, o.y+o.h*0.62, x+o.w/2, o.y+o.h*0.18*fl);
+          ctx.closePath(); ctx.fill();
+          ctx.fillStyle = '#ffe082';
+          ctx.beginPath(); ctx.ellipse(x+o.w/2, o.y+o.h*0.78, o.w*0.16, o.h*0.16, 0,0,7); ctx.fill();
+        } else if (o.kind === 'mover') {
+          ctx.shadowColor = 'rgba(0,0,0,.35)'; ctx.shadowBlur = 10;
+          ctx.fillStyle = '#6d4c41';
+          ctx.beginPath(); ctx.roundRect(x,o.y,o.w,o.h,10); ctx.fill();
+          ctx.strokeStyle='#ffd54f'; ctx.lineWidth=3; ctx.stroke();
+          ctx.fillStyle='#ffd54f';
+          ctx.beginPath(); ctx.arc(x+o.w/2,o.y+o.h/2,7,0,7); ctx.fill();
+        } else {
+          ctx.fillStyle = o.kind === 'fly' ? '#c0392b' : '#7c6a55';
+          ctx.strokeStyle='rgba(255,255,255,.35)'; ctx.lineWidth=2;
+          ctx.beginPath(); ctx.roundRect(x,o.y,o.w,o.h,8); ctx.fill(); ctx.stroke();
+          ctx.fillStyle='rgba(255,215,120,.75)'; ctx.fillRect(x+6,o.y+o.h/2-3,o.w-12,6);
+        }
         ctx.restore();
       }
 
@@ -332,7 +388,7 @@ export default function ModakQuest({ onClose }) {
         stage: s.stage, lives: s.lives, prog: Math.min(1, s.dist/s.goal) });
 
       /* ---- reached the Mandapa? ---- */
-      if (s.gate && s.gate.x <= gx && !s.done) {
+      if (s.gate && s.gate.x + 150 <= gx && !s.done) {
         s.done = true;
         s.score += 250 + s.lives * 100;                 // clear + life bonus
         setHud(h => ({ ...h, score: Math.floor(s.score) }));

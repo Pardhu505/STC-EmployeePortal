@@ -47,6 +47,9 @@ async def submit_score(body: ScoreIn, user=Depends(get_current_user)):
         raise HTTPException(400, "Invalid score.")
 
     name = user.get("name") or email.split("@")[0]
+    # gender drives which devotee appears in the winner scene; default male
+    g = str(user.get("gender") or user.get("Gender") or "").strip().lower()
+    gender = "female" if g in ("f", "female", "woman", "girl") else "male"
     now = datetime.now(timezone.utc)
 
     existing = await scores.find_one({"email": email})
@@ -56,7 +59,7 @@ async def submit_score(body: ScoreIn, user=Depends(get_current_user)):
         await scores.update_one(
             {"email": email},
             {"$set": {"email": email, "name": name, "score": int(body.score),
-                      "modaks": int(body.modaks), "updated_at": now},
+                      "modaks": int(body.modaks), "gender": gender, "updated_at": now},
              "$setOnInsert": {"created_at": now}},
             upsert=True,
         )
@@ -65,7 +68,7 @@ async def submit_score(body: ScoreIn, user=Depends(get_current_user)):
     else:
         # still refresh the display name / last played
         await scores.update_one({"email": email},
-                                {"$set": {"name": name, "last_played": now}}, upsert=True)
+                                {"$set": {"name": name, "gender": gender, "last_played": now}}, upsert=True)
         improved = False
 
     rank = await scores.count_documents({"score": {"$gt": best}}) + 1
@@ -76,7 +79,7 @@ async def submit_score(body: ScoreIn, user=Depends(get_current_user)):
 async def leaderboard(limit: int = Query(500, ge=1, le=2000), user=Depends(get_current_user)):
     """All players in rank order (paged by limit), plus where the caller stands."""
     top = []
-    cur = scores.find({"score": {"$gt": 0}}, {"_id": 0, "name": 1, "score": 1, "modaks": 1, "email": 1}) \
+    cur = scores.find({"score": {"$gt": 0}}, {"_id": 0, "name": 1, "score": 1, "modaks": 1, "email": 1, "gender": 1}) \
                 .sort("score", -1).limit(limit)
     async for d in cur:
         top.append(d)
@@ -96,4 +99,12 @@ async def leaderboard(limit: int = Query(500, ge=1, le=2000), user=Depends(get_c
             "me": (d.get("email") or "").lower() == me_email,
         })
     total = await scores.count_documents({"score": {"$gt": 0}})
-    return {"leaderboard": out, "my_best": my_best, "my_rank": my_rank, "total": total}
+    champion = None
+    if top:
+        c = top[0]
+        champion = {"name": c.get("name") or "—",
+                    "score": int(c.get("score", 0)),
+                    "modaks": int(c.get("modaks", 0)),
+                    "gender": (c.get("gender") or "male").lower()}
+    return {"leaderboard": out, "my_best": my_best, "my_rank": my_rank,
+            "total": total, "champion": champion}

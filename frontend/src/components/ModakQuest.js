@@ -599,7 +599,7 @@ const CSS = `
   animation-name:mqTwinkle;animation-iteration-count:infinite;animation-timing-function:ease-in-out;}
 @keyframes mqTwinkle{0%,100%{opacity:0;transform:scale(.5)}50%{opacity:.95;transform:scale(1.5)}}
 /* winner nameplate - sits over the carved plaque in the artwork */
-.mq-plaque{position:absolute;z-index:3;left:62%;top:64%;width:30%;max-width:360px;
+.mq-plaque{position:absolute;z-index:3;left:41%;top:60%;width:21%;min-width:210px;max-width:290px;
   animation:mqPlaque 3.4s ease-in-out infinite;}
 @keyframes mqPlaque{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
 .mq-plaque-in{display:flex;flex-direction:column;align-items:center;text-align:center;
@@ -607,9 +607,9 @@ const CSS = `
   background:linear-gradient(160deg,rgba(60,28,10,.94),rgba(38,17,6,.96));
   box-shadow:0 10px 26px rgba(0,0,0,.5), inset 0 0 0 1px rgba(255,215,140,.25);}
 .mq-plaque-top{font-size:12px;color:#f0c987;letter-spacing:.5px;}
-.mq-plaque-name{font-size:clamp(16px,2.1vw,24px);font-weight:800;color:#ffdf9e;
+.mq-plaque-name{font-size:clamp(15px,1.7vw,21px);font-weight:800;color:#ffdf9e;
   line-height:1.15;margin:2px 0 4px;text-shadow:0 2px 6px rgba(0,0,0,.6);}
-.mq-plaque-sub{font-size:10.5px;color:#e6c79a;font-style:italic;line-height:1.35;}
+.mq-plaque-sub{font-size:10px;color:#e6c79a;font-style:italic;line-height:1.35;}
 .mq-plaque-score{margin-top:6px;font-size:11px;font-weight:700;color:#ffd27a;}
 @media(max-width:1100px){
   .mq-overlay.mq-start{justify-content:center;}

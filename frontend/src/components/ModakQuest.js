@@ -599,7 +599,7 @@ const CSS = `
   animation-name:mqTwinkle;animation-iteration-count:infinite;animation-timing-function:ease-in-out;}
 @keyframes mqTwinkle{0%,100%{opacity:0;transform:scale(.5)}50%{opacity:.95;transform:scale(1.5)}}
 /* winner nameplate - sits over the carved plaque in the artwork */
-.mq-plaque{position:absolute;z-index:3;left:41%;top:60%;width:21%;min-width:210px;max-width:290px;
+.mq-plaque{position:absolute;z-index:3;left:41%;top:26%;width:21%;min-width:210px;max-width:300px;
   animation:mqPlaque 3.4s ease-in-out infinite;}
 @keyframes mqPlaque{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
 .mq-plaque-in{display:flex;flex-direction:column;align-items:center;text-align:center;

@@ -32,6 +32,7 @@ export default function ModakQuest({ onClose }) {
   const [best, setBest] = useState(0);
   const [board, setBoard] = useState([]);
   const [myRank, setMyRank] = useState(null);
+  const [totalPlayers, setTotalPlayers] = useState(0);
   const [boardState, setBoardState] = useState('idle'); // idle|loading|ok|err|noauth
   const [boardErr, setBoardErr] = useState('');
 
@@ -44,7 +45,7 @@ export default function ModakQuest({ onClose }) {
     if (!user) { setBoardState('noauth'); return; }
     setBoardState('loading');
     try {
-      const url = `${API_BASE_URL}/api/game/leaderboard?limit=10`;
+      const url = `${API_BASE_URL}/api/game/leaderboard?limit=500`;
       const r = await fetch(url, { headers: authHeader() });
       if (!r.ok) {
         const txt = await r.text().catch(() => '');
@@ -56,6 +57,7 @@ export default function ModakQuest({ onClose }) {
       const d = await r.json();
       setBoard(Array.isArray(d.leaderboard) ? d.leaderboard : []);
       setMyRank(d.my_rank || null);
+      setTotalPlayers(d.total || 0);
       if (d.my_best && d.my_best > 0) setBest(d.my_best);
       setBoardState('ok');
     } catch (e) {
@@ -420,7 +422,7 @@ export default function ModakQuest({ onClose }) {
 
   const Leaderboard = ({ compact }) => (
     <div className="mq-lb">
-      <div className="mq-lb-h">🏆 Leaderboard</div>
+      <div className="mq-lb-h">🏆 Leaderboard{totalPlayers > 0 && <span className="mq-lb-n"> · {totalPlayers} players</span>}</div>
       {(boardState === 'idle' || boardState === 'loading') && <div className="mq-lb-msg">Loading scores…</div>}
       {boardState === 'noauth' && <div className="mq-lb-msg">Sign in to see the leaderboard.</div>}
       {boardState === 'err' && (
@@ -433,6 +435,7 @@ export default function ModakQuest({ onClose }) {
         <div className="mq-lb-msg">No scores yet — be the first! 🎉</div>
       )}
       {board.length > 0 && (
+        <div className={compact ? "" : "mq-lb-scroll"}>
         <table className="mq-lb-t">
           <thead><tr><th>#</th><th>Player</th><th>Modaks</th><th>Score</th></tr></thead>
           <tbody>
@@ -446,8 +449,9 @@ export default function ModakQuest({ onClose }) {
             ))}
           </tbody>
         </table>
+        </div>
       )}
-      {myRank && <div className="mq-lb-me">Your rank: <b>#{myRank}</b></div>}
+      {myRank && <div className="mq-lb-me">Your rank: <b>#{myRank}</b>{totalPlayers > 0 && ` of ${totalPlayers}`}</div>}
     </div>
   );
 
@@ -564,6 +568,11 @@ const CSS = `
 .mq-lb-h{font-size:13px;font-weight:800;color:#a8321f;text-transform:uppercase;
   letter-spacing:.6px;text-align:center;margin-bottom:8px;}
 .mq-lb-msg{font-size:12.5px;color:#8a5a1f;text-align:center;padding:6px 0;}
+.mq-lb-scroll{max-height:230px;overflow-y:auto;overflow-x:hidden;}
+.mq-lb-scroll::-webkit-scrollbar{width:7px}
+.mq-lb-scroll::-webkit-scrollbar-thumb{background:#e8a33d;border-radius:99px}
+.mq-lb-n{font-weight:600;color:#b58438;text-transform:none;letter-spacing:0;font-size:11px;}
+.mq-lb-t thead th{position:sticky;top:0;background:#fdf1dc;z-index:1;}
 .mq-lb-t{width:100%;border-collapse:collapse;font-size:13px;color:#6b4a16;}
 .mq-lb-t th{font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;color:#b58438;
   font-weight:700;padding:4px 6px;border-bottom:1px solid #e8c58d;text-align:left;}

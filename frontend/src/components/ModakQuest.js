@@ -481,7 +481,8 @@ export default function ModakQuest({ onClose }) {
 
         {/* START */}
         {phase === 'start' && (
-          <div className="mq-overlay mq-start">
+          <div className="mq-overlay mq-start"
+               style={{ justifyContent: 'flex-start', alignItems: 'center', padding: 0 }}>
             <div className="mq-scene">
               <img
                 className="mq-scene-img"
@@ -512,7 +513,11 @@ export default function ModakQuest({ onClose }) {
                 </div>
               )}
             </div>
-            <div className="mq-card">
+            <div className="mq-card"
+                 style={{ position: 'relative', zIndex: 3,
+                          marginLeft: 'clamp(12px,4.5vw,84px)',
+                          width: 'min(500px,44vw)', maxWidth: '500px',
+                          maxHeight: '92vh', overflowY: 'auto' }}>
               <div className="mq-title">Modak Quest</div>
               <div className="mq-sub">Run • Collect • Spread Happiness</div>
               <p className="mq-p">Help little Ganesha collect modaks, dodge obstacles,
@@ -577,9 +582,9 @@ const CSS = `
 .mq-help{position:absolute;bottom:12px;left:50%;transform:translateX(-50%);
   background:rgba(30,15,5,.55);color:#ffe9b8;font-size:12px;padding:7px 16px;border-radius:999px;
   border:1px solid rgba(255,210,120,.3);white-space:nowrap;}
-.mq-start{padding:0;background:#1b0e05;justify-content:flex-start;align-items:center;}
-.mq-start .mq-card{position:relative;z-index:3;margin-left:clamp(12px,4.5vw,84px);
-  width:min(500px,44vw);max-height:92vh;overflow:auto;}
+.mq-overlay.mq-start{padding:0;background:#1b0e05;justify-content:flex-start;align-items:center;}
+.mq-overlay.mq-start .mq-card{position:relative;z-index:3;margin-left:clamp(12px,4.5vw,84px);
+  width:min(500px,44vw);max-width:500px;max-height:92vh;overflow-y:auto;}
 .mq-scene{position:absolute;inset:0;overflow:hidden;}
 .mq-scene-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:72% center;
   animation:mqKen 26s ease-in-out infinite alternate;}
@@ -607,7 +612,7 @@ const CSS = `
 .mq-plaque-sub{font-size:10.5px;color:#e6c79a;font-style:italic;line-height:1.35;}
 .mq-plaque-score{margin-top:6px;font-size:11px;font-weight:700;color:#ffd27a;}
 @media(max-width:1100px){
-  .mq-start{justify-content:center;}
+  .mq-overlay.mq-start{justify-content:center;}
   .mq-plaque{display:none}
   .mq-start .mq-card{margin:0 auto;width:min(520px,94vw);}
   .mq-scene::after{background:linear-gradient(180deg,rgba(20,8,0,.55),rgba(20,8,0,.85))}

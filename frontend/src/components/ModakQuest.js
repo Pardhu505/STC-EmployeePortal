@@ -117,6 +117,7 @@ export default function ModakQuest({ onClose }) {
       items: [], obstacles: [], parts: [], petals: [], dust: [],
       bgX: 0, spawnT: 30, obsT: 90, flash: 0,
       gate: null, done: false, dead: false,
+      cut: null,   // entry cutscene: { t, gx, sitting }
     };
   }, []);
 
@@ -206,13 +207,14 @@ export default function ModakQuest({ onClose }) {
       if (g.sliding && --g.slideT <= 0) g.sliding = false;
       if (g.inv > 0) g.inv--;
 
-      if (g.sliding) g.frame = SLIDE_FRAME;
+      if (s.cut && s.cut.sitting) g.frame = SLIDE_FRAME;   // seated inside the Mandapam
+      else if (g.sliding) g.frame = SLIDE_FRAME;
       else if (g.onGround) {
         g.frameT += s.speed * 0.022;
         if (g.frameT >= 1) { g.frameT = 0; g.frame = (g.frame + 1) % FRAME_COUNT; }
       } else g.frame = 6;
 
-      const gx = W * 0.17;
+      const gx = s.cut ? W*0.17 + Math.min(1, s.cut.t/70) * (W*0.16) : W * 0.17;
       const gh = g.sliding ? g.h * 0.62 : g.h;
       const gw = g.sliding ? g.w * 1.12 : g.w;
       const gy = groundY - gh + g.y;
@@ -228,7 +230,7 @@ export default function ModakQuest({ onClose }) {
                                         return p.x > -30 && p.y < H+20; });
 
       /* ---- spawning (stops once the gate is in view) ---- */
-      if (!s.gate) {
+      if (!s.gate && !s.cut) {
         if (--s.spawnT <= 0) {
           s.spawnT = 46 + Math.random()*40;
           const n = 1 + Math.floor(Math.random()*4);
@@ -272,7 +274,7 @@ export default function ModakQuest({ onClose }) {
       for (const o of s.obstacles) {
         o.x -= s.speed;
         if (o.kind === 'mover') o.y = o.base + Math.sin(s.t/26 + o.ph) * o.amp;
-        if (g.inv > 0) continue;
+        if (g.inv > 0 || s.cut) continue;
         const ob = { x:o.x-o.w/2, y:o.y, w:o.w, h:o.h };
         if (hb.x < ob.x+ob.w && hb.x+hb.w > ob.x && hb.y < ob.y+ob.h && hb.y+hb.h > ob.y) {
           s.lives--; g.inv = 95; s.flash = 18;
@@ -381,6 +383,20 @@ export default function ModakQuest({ onClose }) {
       for (const p of s.parts) { ctx.globalAlpha=p.a; ctx.fillStyle='#ffd970';
         ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,7); ctx.fill(); }
       ctx.globalAlpha = 1;
+      if (s.cut && s.cut.sitting) {
+        const k = Math.min(1, (s.cut.t-0)/40);
+        const cgr = ctx.createRadialGradient(gx+30, groundY-80, 8, gx+30, groundY-80, 210);
+        cgr.addColorStop(0, `rgba(255,220,130,${0.34*k})`);
+        cgr.addColorStop(1, 'rgba(255,220,130,0)');
+        ctx.fillStyle = cgr; ctx.fillRect(gx-190, groundY-290, 440, 330);
+        ctx.globalAlpha = k; ctx.textAlign = 'center';
+        ctx.font = 'bold 22px Inter, sans-serif'; ctx.fillStyle = '#fff3d6';
+        ctx.shadowColor = 'rgba(0,0,0,.7)'; ctx.shadowBlur = 10;
+        ctx.fillText('गणपति बाप्पा मोरया!', W/2, groundY + 56);
+        ctx.font = '600 14px Inter, sans-serif';
+        ctx.fillText('Ganesha is seated in the Mandapam', W/2, groundY + 80);
+        ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+      }
       if (s.flash > 0) { ctx.globalAlpha=s.flash/18*.45; ctx.fillStyle='#fff';
         ctx.fillRect(0,0,W,H); ctx.globalAlpha=1; s.flash--; }
 
@@ -388,12 +404,31 @@ export default function ModakQuest({ onClose }) {
         stage: s.stage, lives: s.lives, prog: Math.min(1, s.dist/s.goal) });
 
       /* ---- reached the Mandapa? ---- */
-      if (s.gate && s.gate.x + 150 <= gx && !s.done) {
-        s.done = true;
+      if (s.gate && s.gate.x + 150 <= gx && !s.cut) {
+        s.cut = { t: 0, sitting: false };
         s.score += 250 + s.lives * 100;                 // clear + life bonus
         setHud(h => ({ ...h, score: Math.floor(s.score) }));
-        setPhase(s.stage >= STAGES.length - 1 ? 'win' : 'stage');
-        return;
+      }
+      if (s.cut) {
+        s.cut.t++;
+        // step 1 - glide the world to a halt so he settles inside the Mandapam
+        s.speed *= 0.955;
+        if (s.speed < 0.35) s.speed = 0;
+        // step 2 - once still, he sits down
+        if (s.speed === 0 && !s.cut.sitting) {
+          s.cut.sitting = true;
+          for (let k = 0; k < 40; k++) {                 // blessing sparkles
+            const a = Math.random()*Math.PI*2, sp = 1+Math.random()*4;
+            s.parts.push({ x: gx+40, y: groundY-70, vx: Math.cos(a)*sp,
+                           vy: Math.sin(a)*sp-1, a: 1, r: 2+Math.random()*4 });
+          }
+        }
+        // step 3 - hold a beat on the seated pose, then show the card
+        if (s.cut.sitting && s.cut.t > 150 && !s.done) {
+          s.done = true;
+          setPhase(s.stage >= STAGES.length - 1 ? 'win' : 'stage');
+          return;
+        }
       }
       if (s.dead) {
         setHud({ score: Math.floor(s.score), modaks: s.modaks, stage: s.stage, lives: 0, prog: s.dist/s.goal });

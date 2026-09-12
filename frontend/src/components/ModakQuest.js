@@ -33,6 +33,7 @@ export default function ModakQuest({ onClose }) {
   const [board, setBoard] = useState([]);
   const [myRank, setMyRank] = useState(null);
   const [totalPlayers, setTotalPlayers] = useState(0);
+  const [champion, setChampion] = useState(null);
   const [boardState, setBoardState] = useState('idle'); // idle|loading|ok|err|noauth
   const [boardErr, setBoardErr] = useState('');
 
@@ -58,6 +59,7 @@ export default function ModakQuest({ onClose }) {
       setBoard(Array.isArray(d.leaderboard) ? d.leaderboard : []);
       setMyRank(d.my_rank || null);
       setTotalPlayers(d.total || 0);
+      setChampion(d.champion || null);
       if (d.my_best && d.my_best > 0) setBest(d.my_best);
       setBoardState('ok');
     } catch (e) {
@@ -479,7 +481,37 @@ export default function ModakQuest({ onClose }) {
 
         {/* START */}
         {phase === 'start' && (
-          <div className="mq-overlay">
+          <div className="mq-overlay mq-start">
+            <div className="mq-scene">
+              <img
+                className="mq-scene-img"
+                src={`/festive/scene_${champion && champion.gender === 'female' ? 'female' : 'male'}.jpg`}
+                alt=""
+                onError={(e) => { e.currentTarget.style.display = 'none'; }}
+              />
+              <div className="mq-sparkles" aria-hidden="true">
+                {Array.from({ length: 18 }).map((_, i) => (
+                  <i key={i} style={{
+                    left: `${52 + (i * 2.7) % 46}%`,
+                    top: `${18 + (i * 4.3) % 62}%`,
+                    animationDelay: `${(i % 7) * 0.5}s`,
+                    animationDuration: `${2.6 + (i % 4) * 0.7}s`,
+                  }} />
+                ))}
+              </div>
+              {champion && (
+                <div className="mq-plaque">
+                  <div className="mq-plaque-in">
+                    <span className="mq-plaque-top">👑 Congratulations</span>
+                    <span className="mq-plaque-name">{champion.name}!</span>
+                    <span className="mq-plaque-sub">
+                      May Bappa bless you with happiness, success and prosperity!
+                    </span>
+                    <span className="mq-plaque-score">🍬 {champion.modaks} · ⭐ {champion.score}</span>
+                  </div>
+                </div>
+              )}
+            </div>
             <div className="mq-card">
               <div className="mq-title">Modak Quest</div>
               <div className="mq-sub">Run • Collect • Spread Happiness</div>
@@ -545,6 +577,39 @@ const CSS = `
 .mq-help{position:absolute;bottom:12px;left:50%;transform:translateX(-50%);
   background:rgba(30,15,5,.55);color:#ffe9b8;font-size:12px;padding:7px 16px;border-radius:999px;
   border:1px solid rgba(255,210,120,.3);white-space:nowrap;}
+.mq-start{padding:0;background:#1b0e05;}
+.mq-start .mq-card{position:relative;z-index:3;margin-left:clamp(8px,4vw,60px);}
+.mq-scene{position:absolute;inset:0;overflow:hidden;}
+.mq-scene-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;
+  animation:mqKen 26s ease-in-out infinite alternate;}
+@keyframes mqKen{from{transform:scale(1.04) translateX(0)}to{transform:scale(1.12) translateX(-1.5%)}}
+/* warm glow + vignette so the card stays readable */
+.mq-scene::after{content:'';position:absolute;inset:0;z-index:2;
+  background:radial-gradient(120% 90% at 78% 45%, rgba(255,190,90,.20), transparent 55%),
+             linear-gradient(90deg, rgba(20,8,0,.88) 0%, rgba(20,8,0,.55) 38%, rgba(20,8,0,.10) 60%, rgba(20,8,0,.25) 100%);}
+.mq-sparkles{position:absolute;inset:0;z-index:2;pointer-events:none;}
+.mq-sparkles i{position:absolute;width:6px;height:6px;border-radius:50%;
+  background:radial-gradient(circle,#fff6cf,rgba(255,214,120,0));
+  animation-name:mqTwinkle;animation-iteration-count:infinite;animation-timing-function:ease-in-out;}
+@keyframes mqTwinkle{0%,100%{opacity:0;transform:scale(.5)}50%{opacity:.95;transform:scale(1.5)}}
+/* winner nameplate - sits over the carved plaque in the artwork */
+.mq-plaque{position:absolute;z-index:3;left:58%;top:66%;width:30%;
+  animation:mqPlaque 3.4s ease-in-out infinite;}
+@keyframes mqPlaque{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+.mq-plaque-in{display:flex;flex-direction:column;align-items:center;text-align:center;
+  padding:12px 16px;border-radius:12px;border:2px solid #d9a441;
+  background:linear-gradient(160deg,rgba(60,28,10,.94),rgba(38,17,6,.96));
+  box-shadow:0 10px 26px rgba(0,0,0,.5), inset 0 0 0 1px rgba(255,215,140,.25);}
+.mq-plaque-top{font-size:12px;color:#f0c987;letter-spacing:.5px;}
+.mq-plaque-name{font-size:clamp(16px,2.1vw,24px);font-weight:800;color:#ffdf9e;
+  line-height:1.15;margin:2px 0 4px;text-shadow:0 2px 6px rgba(0,0,0,.6);}
+.mq-plaque-sub{font-size:10.5px;color:#e6c79a;font-style:italic;line-height:1.35;}
+.mq-plaque-score{margin-top:6px;font-size:11px;font-weight:700;color:#ffd27a;}
+@media(max-width:820px){
+  .mq-plaque{display:none}
+  .mq-start .mq-card{margin:0 auto}
+  .mq-scene::after{background:linear-gradient(180deg,rgba(20,8,0,.55),rgba(20,8,0,.85))}
+}
 .mq-overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
   background:rgba(20,8,0,.66);backdrop-filter:blur(5px);padding:16px;}
 .mq-card{width:min(520px,94vw);text-align:center;padding:28px 24px;border-radius:22px;

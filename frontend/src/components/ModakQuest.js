@@ -37,7 +37,6 @@ const STAGES = [
   { name: 'Mandapa Approach',  mins: 40, speed: 10.0, obs: 70, modak: 30, cluster: 8,
     sky: 'linear|rgba(18,24,70,.44)|rgba(40,20,70,.34)', types: ['ground','fly','mover','fire'] },
 ].map(st => ({ ...st, dist: Math.round(st.mins * 300 * st.speed) }));
-const GATE_LEAD = 520;            // how early the Mandapa appears at the end
 
 export default function ModakQuest({ onClose }) {
   const canvasRef = useRef(null);

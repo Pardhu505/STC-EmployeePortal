@@ -23,18 +23,20 @@ const MAX_JUMPS = 3;
 const START_LIVES = 3;
 
 // Each stage: distance to clear, pace, spawn gaps and a colour grade.
+// Stage length is set in MINUTES and converted to distance below.
+// dist advances at (5 x speed) units per second, so dist = minutes * 300 * speed.
 const STAGES = [
-  { name: 'Riverside Ghats',   dist: 1000, speed: 6.0, obs: 108, sky: null,
-    types: ['ground','fly'] },
-  { name: 'Festival Bazaar',   dist: 1350, speed: 7.0, obs: 96,
+  { name: 'Riverside Ghats',   mins: 10, speed: 6.0, obs: 108, modak: 46, cluster: 4,
+    sky: null, types: ['ground','fly'] },
+  { name: 'Festival Bazaar',   mins: 20, speed: 7.0, obs: 96,  modak: 42, cluster: 5,
     sky: 'linear|rgba(255,186,80,.22)|rgba(255,126,60,.10)', types: ['ground','fly','mover'] },
-  { name: 'Sunset Bridge',     dist: 1750, speed: 8.0, obs: 86,
+  { name: 'Sunset Bridge',     mins: 25, speed: 8.0, obs: 86,  modak: 38, cluster: 6,
     sky: 'linear|rgba(255,120,70,.30)|rgba(120,60,120,.18)', types: ['ground','fly','fire'] },
-  { name: 'Twilight Ghats',    dist: 2200, speed: 9.0, obs: 78,
+  { name: 'Twilight Ghats',    mins: 30, speed: 9.0, obs: 78,  modak: 34, cluster: 7,
     sky: 'linear|rgba(80,60,160,.34)|rgba(30,30,90,.26)', types: ['ground','fly','mover','fire'] },
-  { name: 'Mandapa Approach',  dist: 2700, speed: 10.0, obs: 70,
+  { name: 'Mandapa Approach',  mins: 40, speed: 10.0, obs: 70, modak: 30, cluster: 8,
     sky: 'linear|rgba(18,24,70,.44)|rgba(40,20,70,.34)', types: ['ground','fly','mover','fire'] },
-];
+].map(st => ({ ...st, dist: Math.round(st.mins * 300 * st.speed) }));
 const GATE_LEAD = 520;            // how early the Mandapa appears at the end
 
 export default function ModakQuest({ onClose }) {
@@ -45,7 +47,7 @@ export default function ModakQuest({ onClose }) {
 
   const { user } = useAuth();
   const [phase, setPhase] = useState('start');  // start|playing|paused|stage|over|win
-  const [hud, setHud] = useState({ score: 0, modaks: 0, stage: 0, lives: START_LIVES, prog: 0 });
+  const [hud, setHud] = useState({ score: 0, modaks: 0, stage: 0, lives: START_LIVES, prog: 0, left: null });
   const [best, setBest] = useState(0);
   const [board, setBoard] = useState([]);
   const [myRank, setMyRank] = useState(null);
@@ -109,7 +111,7 @@ export default function ModakQuest({ onClose }) {
       speed: st.speed, sky: st.sky,
       score: carry ? carry.score : 0,
       modaks: carry ? carry.modaks : 0,
-      lives: carry ? carry.lives : START_LIVES,
+      lives: START_LIVES,        // full hearts each stage - long stages need it
       groundFrac: 0.655,
       g: { y: 0, vy: 0, w: 145, h: 144, onGround: true, sliding: false, slideT: 0,
            frame: 0, frameT: 0, jumps: 0, inv: 0 },
@@ -195,7 +197,7 @@ export default function ModakQuest({ onClose }) {
       s.dist += s.speed / 12;                       // "metres" travelled
 
       /* ---- the Mandapa appears near the end of every stage ---- */
-      if (!s.gate && s.dist >= s.goal - GATE_LEAD / 12) {
+      if (!s.gate && s.dist >= s.goal - 30 * STAGES[s.stage].speed) {
         s.gate = { x: W + 160 };
       }
       if (s.gate) s.gate.x -= s.speed;
@@ -232,8 +234,8 @@ export default function ModakQuest({ onClose }) {
       /* ---- spawning (stops once the gate is in view) ---- */
       if (!s.gate && !s.cut) {
         if (--s.spawnT <= 0) {
-          s.spawnT = 46 + Math.random()*40;
-          const n = 1 + Math.floor(Math.random()*4);
+          s.spawnT = STAGES[s.stage].modak + Math.random()*30;
+          const n = 2 + Math.floor(Math.random()*STAGES[s.stage].cluster);
           const high = Math.random() < .4;
           for (let i = 0; i < n; i++)
             s.items.push({ x: W+40+i*46, y: groundY-(high?150+Math.random()*40:60),
@@ -400,8 +402,12 @@ export default function ModakQuest({ onClose }) {
       if (s.flash > 0) { ctx.globalAlpha=s.flash/18*.45; ctx.fillStyle='#fff';
         ctx.fillRect(0,0,W,H); ctx.globalAlpha=1; s.flash--; }
 
-      if (s.t % 5 === 0) setHud({ score: Math.floor(s.score), modaks: s.modaks,
-        stage: s.stage, lives: s.lives, prog: Math.min(1, s.dist/s.goal) });
+      if (s.t % 15 === 0) {
+        const secsLeft = Math.max(0, Math.round((s.goal - s.dist) / (5 * STAGES[s.stage].speed)));
+        const mm = Math.floor(secsLeft/60), ss = String(secsLeft%60).padStart(2,'0');
+        setHud({ score: Math.floor(s.score), modaks: s.modaks, stage: s.stage,
+                 lives: s.lives, prog: Math.min(1, s.dist/s.goal), left: `${mm}:${ss}` });
+      }
 
       /* ---- reached the Mandapa? ---- */
       if (s.gate && s.gate.x + 150 <= gx && !s.cut) {
@@ -489,10 +495,20 @@ export default function ModakQuest({ onClose }) {
 
   /* ------------------------- controls ------------------------- */
   const startGame = () => { stateRef.current = makeState(0); resize(); setPhase('playing'); };
+  const retryStage = () => {
+    const s = stateRef.current;
+    // keep the score banked from earlier stages, restart just this one
+    const banked = s.bankedScore || 0;
+    stateRef.current = makeState(s.stage, { score: banked, modaks: s.bankedModaks || 0 });
+    stateRef.current.bankedScore = banked;
+    stateRef.current.bankedModaks = s.bankedModaks || 0;
+    resize(); setPhase('playing');
+  };
   const nextStage = () => {
     const s = stateRef.current;
-    stateRef.current = makeState(s.stage + 1,
-      { score: s.score, modaks: s.modaks, lives: s.lives });
+    stateRef.current = makeState(s.stage + 1, { score: s.score, modaks: s.modaks });
+    stateRef.current.bankedScore = s.score;       // checkpoint for retries
+    stateRef.current.bankedModaks = s.modaks;
     resize(); setPhase('playing');
   };
 
@@ -546,7 +562,7 @@ export default function ModakQuest({ onClose }) {
             <div className="mq-prog">
               <div className="mq-prog-top">
                 <span>Stage {hud.stage+1}/{STAGES.length} · {STAGES[hud.stage].name}</span>
-                <span>🛕 Mandapa</span>
+                <span>{hud.left != null ? `${hud.left} left` : ''} 🛕</span>
               </div>
               <div className="mq-prog-bar"><i style={{ width: `${hud.prog*100}%` }} /></div>
             </div>
@@ -649,7 +665,8 @@ export default function ModakQuest({ onClose }) {
             </div>
             <Leaderboard compact />
             <p className="mq-p">Every modak collected is a wish for a happier tomorrow. 🙏</p>
-            <button className="mq-btn" onClick={startGame}>↻ Try Again</button>
+            <button className="mq-btn" onClick={retryStage}>↻ Retry Stage {hud.stage+1}</button>
+            <button className="mq-link" onClick={startGame}>Start again from Stage 1</button>
             <button className="mq-link" onClick={onClose}>Back to Portal</button>
           </div></div>
         )}

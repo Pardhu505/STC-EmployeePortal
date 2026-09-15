@@ -93,7 +93,7 @@ const STYLES = `
 
   /* ===== festival-day greeting card ===== */
   #gc-greet {
-    position: fixed; inset: 0; z-index: 10000;
+    position: fixed; inset: 0; z-index: 10060;
     background: rgba(20,8,0,.62); backdrop-filter: blur(4px);
     display: flex; align-items: center; justify-content: center; padding: 16px;
     animation: gcFade .5s ease-out both;

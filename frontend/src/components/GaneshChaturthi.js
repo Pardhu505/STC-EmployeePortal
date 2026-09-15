@@ -11,7 +11,10 @@
 import React, { useEffect, useState } from 'react';
 
 const FESTIVAL_DATE = new Date('2026-09-14T00:00:00+05:30'); // Ganesh Chaturthi 2026 (IST)
-const SHOW_WITHIN_DAYS = 15;
+const SHOW_WITHIN_DAYS = 15;   // start the countdown this many days before
+// Celebrations run for 10 days, up to Anant Chaturdashi (Visarjan), so the
+// greeting stays up after the main day rather than vanishing overnight.
+const CELEBRATE_DAYS_AFTER = 10;
 
 function daysUntil(target) {
   const now = new Date();
@@ -174,10 +177,10 @@ export default function GaneshChaturthi() {
     return () => clearInterval(id);
   }, []);
 
-  if (days < 0 || days > SHOW_WITHIN_DAYS) return null;
+  if (days < -CELEBRATE_DAYS_AFTER || days > SHOW_WITHIN_DAYS) return null;
 
   /* ---------- festival day: greeting card ---------- */
-  if (days === 0) {
+  if (days <= 0) {
     if (dismissed) return null;
     return (
       <>
@@ -189,6 +192,13 @@ export default function GaneshChaturthi() {
             <img src="/festive/ganesha_walking.png" alt="Lord Ganesha" className="gc-greetimg"
                  onError={(e) => { e.currentTarget.style.display = 'none'; }} />
             <div className="gc-title">Happy Ganesh Chaturthi!</div>
+            {days < 0 && (
+              <div className="gc-sub" style={{ marginTop: 2 }}>
+                {-days >= CELEBRATE_DAYS_AFTER
+                  ? 'Anant Chaturdashi · Ganpati Visarjan 🙏'
+                  : `Day ${1 - days} of the celebrations 🎊`}
+              </div>
+            )}
             <div className="gc-sub">गणपति बाप्पा मोरया! 🙏</div>
             <div className="gc-shloka">
               वक्रतुण्ड महाकाय सूर्यकोटि समप्रभ।<br />

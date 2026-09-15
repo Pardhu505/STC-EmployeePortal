@@ -102,9 +102,10 @@ const STYLES = `
     animation: gcFade .5s ease-out both;
   }
   .gc-card {
-    position: relative; width: min(560px, 96vw);
+    position: relative; width: min(620px, 96vw);
+    max-height: 94vh; overflow-y: auto;
     background: linear-gradient(160deg,#fff6e6 0%,#ffe9c7 55%,#ffdca8 100%);
-    border-radius: 22px; padding: 30px 24px 22px; text-align: center;
+    border-radius: 22px; padding: 0 24px 22px; text-align: center;
     box-shadow: 0 24px 60px rgba(0,0,0,.45);
     border: 3px solid #e8a33d; overflow: hidden;
     animation: gcPop .55s cubic-bezier(.2,1.1,.35,1) both;
@@ -114,7 +115,17 @@ const STYLES = `
     position:absolute; top:0; left:0; right:0; height:16px;
     background: repeating-linear-gradient(90deg,#e8a33d 0 10px,#c0392b 10px 20px);
   }
-  .gc-om { font-size: 30px; color:#c0392b; margin-top:6px; }
+  /* video hero, blended into the card */
+  .gc-video { position: relative; margin: 0 -24px 2px; overflow: hidden;
+    border-radius: 19px 19px 0 0; line-height: 0; background:#2b1608; }
+  .gc-vid { width: 100%; height: clamp(170px, 30vh, 260px); object-fit: cover; display: block; }
+  .gc-vid-fade { position: absolute; inset: auto 0 0 0; height: 64px; pointer-events: none;
+    background: linear-gradient(transparent, #fff6e6 92%); }
+  .gc-sound { position: absolute; top: 10px; right: 10px; width: 34px; height: 34px;
+    border-radius: 50%; border: 1px solid rgba(255,255,255,.55); cursor: pointer;
+    background: rgba(30,15,5,.55); color: #ffe9b8; font-size: 14px; backdrop-filter: blur(4px); }
+  .gc-sound:hover { background: rgba(60,30,10,.75); }
+  .gc-om { font-size: 26px; color:#c0392b; margin-top:2px; }
   .gc-title {
     font-size: clamp(22px,5vw,32px); font-weight: 800; color:#a8321f;
     margin: 6px 0 2px; letter-spacing:.3px;
@@ -171,6 +182,7 @@ function Deepam() {
 export default function GaneshChaturthi() {
   const [days, setDays] = useState(() => daysUntil(FESTIVAL_DATE));
   const [dismissed, setDismissed] = useState(false);
+  const [muted, setMuted] = useState(true);   // browsers require muted autoplay
 
   useEffect(() => {
     const id = setInterval(() => setDays(daysUntil(FESTIVAL_DATE)), 60 * 60 * 1000);
@@ -188,9 +200,21 @@ export default function GaneshChaturthi() {
         <div id="gc-greet" role="dialog" aria-label="Ganesh Chaturthi greetings">
           <div className="gc-card">
             <div className="gc-toran" />
+            <div className="gc-video">
+              <video
+                className="gc-vid"
+                src="/festive/ganesh_greeting.mp4"
+                poster="/festive/ganesh_greeting_poster.jpg"
+                autoPlay loop playsInline muted={muted}
+                onError={(e) => { e.currentTarget.parentNode.style.display = 'none'; }}
+              />
+              <div className="gc-vid-fade" />
+              <button className="gc-sound" onClick={() => setMuted(m => !m)}
+                      aria-label={muted ? 'Unmute' : 'Mute'}>
+                {muted ? '🔇' : '🔊'}
+              </button>
+            </div>
             <div className="gc-om">॥ ॐ ॥</div>
-            <img src="/festive/ganesha_walking.png" alt="Lord Ganesha" className="gc-greetimg"
-                 onError={(e) => { e.currentTarget.style.display = 'none'; }} />
             <div className="gc-title">Happy Ganesh Chaturthi!</div>
             {days < 0 && (
               <div className="gc-sub" style={{ marginTop: 2 }}>

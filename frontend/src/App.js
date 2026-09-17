@@ -9,7 +9,6 @@ import Dashboard from "./components/Dashboard";
 import Signup from "./components/signup";
 import ForgotPassword from "./components/ForgotPassword";
 import ResetPassword from "./components/ResetPassword";
-import GaneshChaturthi from "./components/GaneshChaturthi";
 import VisarjanAnnouncement from "./components/VisarjanAnnouncement";
 import LoadingSpinner from "./LoadingSpinner";
 import PrivacyPolicy from "./components/PrivacyPolicy";
@@ -98,7 +97,6 @@ function App() {
               <Route path="/" element={<Navigate to="/dashboard" />} />
 
             </Routes>
-            <GaneshChaturthi />
             <VisarjanAnnouncement />
           </BrowserRouter>
           <Toaster />

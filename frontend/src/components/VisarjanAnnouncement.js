@@ -8,8 +8,9 @@
 import React, { useEffect, useState } from 'react';
 
 // The day of the Visarjan celebrations at the office.
-const VISARJAN_DATE = new Date('2026-09-18T00:00:00+05:30');
+const VISARJAN_DATE = new Date('2026-09-17T00:00:00+05:30');
 const SHOW_FROM_DAYS_BEFORE = 3;     // start inviting this many days ahead
+const KEEP_SHOWING_AFTER = 1;        // stay up for the rest of the celebration day
 
 function daysUntil(target) {
   const now = new Date();
@@ -28,9 +29,9 @@ export default function VisarjanAnnouncement() {
     return () => clearInterval(id);
   }, []);
 
-  if (days < 0 || days > SHOW_FROM_DAYS_BEFORE) return null;
+  if (days < -KEEP_SHOWING_AFTER || days > SHOW_FROM_DAYS_BEFORE) return null;
 
-  const whenLabel = days === 0 ? 'Today' : days === 1 ? 'Tomorrow' : `In ${days} days`;
+  const whenLabel = days <= 0 ? 'Today' : days === 1 ? 'Tomorrow' : `In ${days} days`;
 
   if (closed) {
     return (

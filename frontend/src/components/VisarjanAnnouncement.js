@@ -62,17 +62,18 @@ export default function VisarjanAnnouncement() {
         <div className="vs-toran" />
         <button className="vs-x" onClick={() => setClosed(true)} aria-label="Close">✕</button>
 
-        {/* full 16:9 video - contained, never cropped */}
-        <div className="vs-video">
+        {/* LEFT - the video at full size, blurred fill behind the letterbox */}
+        <div className="vs-left">
+          <div className="vs-blur" />
           <video className="vs-vid" src="/festive/visarjan.mp4"
                  poster="/festive/visarjan_poster.jpg"
                  autoPlay loop playsInline muted={muted}
-                 onError={(e) => { e.currentTarget.parentNode.style.display = 'none'; }} />
+                 onError={(e) => { e.currentTarget.style.display = 'none'; }} />
           <button className="vs-sound" onClick={() => setMuted(m => !m)}
                   aria-label={muted ? 'Unmute' : 'Mute'}>{muted ? '🔇' : '🔊'}</button>
-          <div className="vs-vfade" />
         </div>
 
+        {/* RIGHT - the animated announcement */}
         <div className="vs-body">
           <div className="vs-om vs-a" style={{ animationDelay: '.05s' }}>॥ ॐ ॥</div>
           <h2 className="vs-title vs-a" style={{ animationDelay: '.15s' }}>
@@ -125,28 +126,33 @@ const CSS = `
   background:rgba(18,8,0,.74);backdrop-filter:blur(6px);
   font-family:'Inter','Segoe UI',Tahoma,sans-serif;animation:vsFade .45s ease-out both;}
 @keyframes vsFade{from{opacity:0}to{opacity:1}}
-.vs-card{position:relative;margin:auto;width:min(760px,96vw);border-radius:22px;overflow:hidden;
+.vs-card{position:relative;margin:auto;width:min(1180px,97vw);max-height:92vh;
+  display:flex;align-items:stretch;border-radius:22px;overflow:hidden;
   background:linear-gradient(170deg,#fff7ea 0%,#ffe9c7 58%,#ffdca8 100%);
   border:3px solid #e8a33d;box-shadow:0 26px 70px rgba(0,0,0,.6);
   animation:vsPop .6s cubic-bezier(.2,1.1,.35,1) both;}
 @keyframes vsPop{from{opacity:0;transform:scale(.9) translateY(20px)}to{opacity:1;transform:none}}
-.vs-toran{position:absolute;top:0;left:0;right:0;height:14px;z-index:3;
+.vs-toran{position:absolute;top:0;left:0;right:0;height:12px;z-index:5;
   background:repeating-linear-gradient(90deg,#e8a33d 0 10px,#c0392b 10px 20px);}
 .vs-x{position:absolute;top:16px;right:14px;z-index:4;width:34px;height:34px;border-radius:50%;
   border:2px solid rgba(255,255,255,.8);background:rgba(160,40,25,.85);color:#fff;
   font-size:14px;font-weight:700;cursor:pointer;}
 .vs-x:hover{background:#c0392b;}
 
-/* the whole 16:9 frame, contained so nothing is cut off */
-.vs-video{position:relative;width:100%;aspect-ratio:16/9;background:#1d0e04;line-height:0;}
-.vs-vid{width:100%;height:100%;object-fit:contain;display:block;}
-.vs-vfade{position:absolute;inset:auto 0 0 0;height:56px;pointer-events:none;
-  background:linear-gradient(transparent,#fff7ea 94%);}
+/* LEFT: video shown whole (contain); a blurred copy fills the side bars */
+.vs-left{position:relative;flex:1 1 57%;min-width:0;background:#1d0e04;overflow:hidden;
+  display:flex;align-items:center;justify-content:center;}
+.vs-blur{position:absolute;inset:-30px;background-image:url('/festive/visarjan_poster.jpg');
+  background-size:cover;background-position:center;filter:blur(26px) brightness(.55) saturate(1.1);
+  transform:scale(1.12);}
+.vs-vid{position:relative;z-index:2;max-width:100%;max-height:92vh;width:auto;height:auto;
+  object-fit:contain;display:block;}
 .vs-sound{position:absolute;bottom:12px;right:12px;z-index:3;width:34px;height:34px;border-radius:50%;
   border:1px solid rgba(255,255,255,.55);background:rgba(30,15,5,.6);color:#ffe9b8;
   font-size:14px;cursor:pointer;backdrop-filter:blur(4px);}
 
-.vs-body{padding:2px 26px 24px;text-align:center;}
+.vs-body{flex:1 1 43%;min-width:0;padding:26px 24px 22px;text-align:center;
+  overflow-y:auto;display:flex;flex-direction:column;justify-content:center;}
 .vs-a{opacity:0;animation:vsUp .6s cubic-bezier(.2,1,.3,1) forwards;}
 @keyframes vsUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
 .vs-om{font-size:24px;color:#c0392b;}
@@ -163,21 +169,21 @@ const CSS = `
   padding:6px 18px;border-radius:999px;border:2px solid rgba(255,255,255,.6);
   box-shadow:0 6px 16px rgba(0,0,0,.25);animation:vsPulse 2.2s ease-in-out infinite;}
 @keyframes vsPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}
-.vs-lead{margin:14px auto 0;max-width:560px;color:#6b4a16;font-size:14.5px;line-height:1.6;}
+.vs-lead{margin:12px auto 0;max-width:560px;color:#6b4a16;font-size:14.5px;line-height:1.6;}
 .vs-lead b{color:#a8321f;}
-.vs-sched{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin:16px 0 4px;}
-.vs-slot{display:flex;flex-direction:column;align-items:center;gap:2px;min-width:200px;
-  padding:12px 18px;border-radius:14px;border:2px solid #e8c58d;
+.vs-sched{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin:14px 0 2px;}
+.vs-slot{display:flex;flex-direction:column;align-items:center;gap:2px;flex:1 1 150px;min-width:140px;
+  padding:11px 14px;border-radius:14px;border:2px solid #e8c58d;
   background:rgba(255,255,255,.62);box-shadow:0 6px 16px rgba(0,0,0,.10);}
 .vs-slot:hover{transform:translateY(-3px);transition:transform .2s;}
 .vs-ico{font-size:22px;}
 .vs-time{font-size:16px;font-weight:900;color:#a8321f;}
 .vs-what{font-size:12px;font-weight:700;color:#8a5a1f;text-transform:uppercase;letter-spacing:.7px;}
-.vs-bless{margin:14px auto 0;max-width:580px;color:#6b4a16;font-size:13.5px;line-height:1.65;}
+.vs-bless{margin:12px auto 0;max-width:580px;color:#6b4a16;font-size:13.5px;line-height:1.65;}
 .vs-bless b{color:#a8321f;}
-.vs-morya{margin-top:14px;font-size:clamp(16px,2.4vw,21px);font-weight:900;color:#c0392b;}
+.vs-morya{margin-top:12px;font-size:clamp(16px,2.4vw,21px);font-weight:900;color:#c0392b;}
 .vs-from{margin-top:6px;font-size:12px;font-weight:700;color:#8a5a1f;}
-.vs-close{margin-top:16px;cursor:pointer;border:none;border-radius:999px;padding:12px 32px;
+.vs-close{margin-top:14px;cursor:pointer;border:none;border-radius:999px;padding:12px 32px;
   font-size:15px;font-weight:800;color:#fff;background:linear-gradient(135deg,#c0392b,#e8a33d);
   box-shadow:0 10px 24px rgba(0,0,0,.28);}
 .vs-close:hover{filter:brightness(1.08);}
@@ -196,10 +202,16 @@ const CSS = `
 .vs-reopen b{font-weight:800;} .vs-reopen small{opacity:.9;font-size:10.5px;}
 .vs-reopen:hover{filter:brightness(1.1);}
 
+@media(max-width:900px){
+  .vs-card{flex-direction:column;max-height:94vh;overflow-y:auto;}
+  .vs-left{flex:none;aspect-ratio:16/9;}
+  .vs-vid{max-height:none;width:100%;height:100%;}
+  .vs-body{flex:none;padding:16px 18px 20px;}
+}
 @media(max-width:640px){
-  .vs-body{padding:2px 16px 20px;}
-  .vs-slot{min-width:0;width:100%;}
-  .vs-lead,.vs-bless{font-size:13px;}
+  .vs-slot{min-width:0;flex:1 1 100%;}
+  .vs-lead,.vs-bless{font-size:12.5px;}
+  .vs-title{font-size:clamp(19px,5.4vw,26px);}
 }
 @media(prefers-reduced-motion:reduce){
   .vs-card,.vs-a,.vs-pill,.vs-title span{animation:none!important;opacity:1!important;}

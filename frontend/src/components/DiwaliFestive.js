@@ -19,8 +19,39 @@ const DIWALI_DATE = new Date('2026-11-08T00:00:00+05:30');
 const SHOW_WITHIN_DAYS = 21;   // festive layer switches on this many days before
 const SHOW_AFTER_DAYS = 2;     // ...and lingers for Govardhan Puja / Bhai Dooj
 
+const SHAPES = ['circle', 'star', 'diamond', 'square', 'star'];
 const SPARK_COLORS = ['#ffd54f', '#ff9800', '#ff5252', '#e040fb', '#40c4ff', '#69f0ae', '#fff176'];
 const BULB_COLORS = ['#ff5252', '#ffd54f', '#69f0ae', '#40c4ff', '#e040fb', '#ff9800'];
+
+// draw one spark in its shape
+function drawSpark(ctx, p) {
+  ctx.save();
+  ctx.translate(p.x, p.y);
+  ctx.rotate(p.rot || 0);
+  ctx.fillStyle = p.c;
+  ctx.shadowColor = p.c;
+  ctx.shadowBlur = 8;
+  const r = p.r;
+  if (p.shape === 'star') {
+    ctx.beginPath();
+    for (let i = 0; i < 10; i++) {
+      const rad = i % 2 === 0 ? r * 1.55 : r * 0.62;
+      const a = (Math.PI / 5) * i - Math.PI / 2;
+      i === 0 ? ctx.moveTo(Math.cos(a) * rad, Math.sin(a) * rad)
+              : ctx.lineTo(Math.cos(a) * rad, Math.sin(a) * rad);
+    }
+    ctx.closePath(); ctx.fill();
+  } else if (p.shape === 'diamond') {
+    ctx.beginPath();
+    ctx.moveTo(0, -r * 1.4); ctx.lineTo(r, 0); ctx.lineTo(0, r * 1.4); ctx.lineTo(-r, 0);
+    ctx.closePath(); ctx.fill();
+  } else if (p.shape === 'square') {
+    ctx.fillRect(-r * 0.85, -r * 0.85, r * 1.7, r * 1.7);
+  } else {
+    ctx.beginPath(); ctx.arc(0, 0, r, 0, 7); ctx.fill();
+  }
+  ctx.restore();
+}
 
 function daysUntil(target) {
   const now = new Date();
@@ -51,7 +82,7 @@ export default function DiwaliFestive() {
     window.addEventListener('resize', onR);
     return () => window.removeEventListener('resize', onR);
   }, []);
-  const GAP = 26;                                   // px between bulb centres
+  const GAP = 22;                                   // px between bulb centres
   const hCount = Math.max(12, Math.floor(vp.w / GAP));
   const vCount = Math.max(8, Math.floor(vp.h / GAP));
 
@@ -113,21 +144,23 @@ export default function DiwaliFestive() {
 
       /* --- sparkler trail at the pointer --- */
       if (s.mx > -100) {
-        for (let i = 0; i < 7; i++) {           // denser shower
-          const a = Math.random() * Math.PI * 2, sp = 1.1 + Math.random() * 4.2;
+        for (let i = 0; i < 6; i++) {
+          const a = Math.random() * Math.PI * 2, sp = 1 + Math.random() * 3.4;
           s.sparks.push({
-            x: s.mx, y: s.my, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 0.8,
-            life: 1, r: 1.4 + Math.random() * 2.8,     // thicker sparks
-            c: Math.random() < 0.72 ? '#ffd76a' : (Math.random() < 0.5 ? '#fff6cf' : '#ffb300'),
+            x: s.mx, y: s.my, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 0.7,
+            life: 1, r: 1.2 + Math.random() * 2.2,
+            c: SPARK_COLORS[(Math.random() * SPARK_COLORS.length) | 0],
+            shape: SHAPES[(Math.random() * SHAPES.length) | 0],
+            rot: Math.random() * Math.PI, spin: (Math.random() - 0.5) * 0.3,
           });
         }
       }
       s.sparks = s.sparks.filter(p => {
-        p.x += p.vx; p.y += p.vy; p.vy += 0.08; p.vx *= 0.97; p.life -= 0.032;
+        p.x += p.vx; p.y += p.vy; p.vy += 0.08; p.vx *= 0.97; p.life -= 0.034;
+        p.rot = (p.rot || 0) + (p.spin || 0);
         if (p.life <= 0) return false;
         ctx.globalAlpha = Math.max(0, p.life);
-        ctx.fillStyle = p.c;
-        ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, 7); ctx.fill();
+        drawSpark(ctx, p);
         return true;
       });
       ctx.globalAlpha = 1;
@@ -137,26 +170,26 @@ export default function DiwaliFestive() {
         // long thick wire, angled down-right like a held sparkler
         ctx.save();
         ctx.lineCap = 'round';
-        ctx.strokeStyle = 'rgba(70,45,18,.9)'; ctx.lineWidth = 4.2;
-        ctx.beginPath(); ctx.moveTo(s.mx + 4, s.my + 6); ctx.lineTo(s.mx + 34, s.my + 44); ctx.stroke();
-        ctx.strokeStyle = 'rgba(190,150,80,.75)'; ctx.lineWidth = 1.6;
-        ctx.beginPath(); ctx.moveTo(s.mx + 4, s.my + 6); ctx.lineTo(s.mx + 34, s.my + 44); ctx.stroke();
+        ctx.strokeStyle = 'rgba(70,45,18,.9)'; ctx.lineWidth = 3.1;
+        ctx.beginPath(); ctx.moveTo(s.mx + 3, s.my + 5); ctx.lineTo(s.mx + 25, s.my + 33); ctx.stroke();
+        ctx.strokeStyle = 'rgba(190,150,80,.75)'; ctx.lineWidth = 1.2;
+        ctx.beginPath(); ctx.moveTo(s.mx + 3, s.my + 5); ctx.lineTo(s.mx + 25, s.my + 33); ctx.stroke();
         // burning head: outer halo, body, white-hot core
         const pulse = 1 + Math.sin(s.t / 2.6) * 0.16;
-        ctx.shadowColor = '#ffb300'; ctx.shadowBlur = 42;
+        ctx.shadowColor = '#ffb300'; ctx.shadowBlur = 30;
         ctx.fillStyle = 'rgba(255,183,0,.55)';
-        ctx.beginPath(); ctx.arc(s.mx, s.my, 13 * pulse, 0, 7); ctx.fill();
-        ctx.shadowBlur = 26; ctx.fillStyle = '#ffd76a';
-        ctx.beginPath(); ctx.arc(s.mx, s.my, 7.5 * pulse, 0, 7); ctx.fill();
-        ctx.shadowBlur = 14; ctx.fillStyle = '#fffbe8';
-        ctx.beginPath(); ctx.arc(s.mx, s.my, 3.6 * pulse, 0, 7); ctx.fill();
+        ctx.beginPath(); ctx.arc(s.mx, s.my, 9 * pulse, 0, 7); ctx.fill();
+        ctx.shadowBlur = 18; ctx.fillStyle = '#ffd76a';
+        ctx.beginPath(); ctx.arc(s.mx, s.my, 5.2 * pulse, 0, 7); ctx.fill();
+        ctx.shadowBlur = 10; ctx.fillStyle = '#fffbe8';
+        ctx.beginPath(); ctx.arc(s.mx, s.my, 2.5 * pulse, 0, 7); ctx.fill();
         // radiating needles
-        ctx.strokeStyle = 'rgba(255,235,160,.75)'; ctx.lineWidth = 1.5;
+        ctx.strokeStyle = 'rgba(255,235,160,.75)'; ctx.lineWidth = 1.1;
         for (let i = 0; i < 8; i++) {
           const a = (s.t / 14) + i * Math.PI / 4;
-          const L = 11 + Math.sin(s.t / 5 + i) * 5;
+          const L = 8 + Math.sin(s.t / 5 + i) * 3.5;
           ctx.beginPath();
-          ctx.moveTo(s.mx + Math.cos(a) * 5, s.my + Math.sin(a) * 5);
+          ctx.moveTo(s.mx + Math.cos(a) * 3.6, s.my + Math.sin(a) * 3.6);
           ctx.lineTo(s.mx + Math.cos(a) * L, s.my + Math.sin(a) * L);
           ctx.stroke();
         }
@@ -332,34 +365,34 @@ body.dw-nocursor, body.dw-nocursor * { cursor: none !important; }
 /* ---------- LED strings ---------- */
 .dw-lights{position:fixed;inset:0;z-index:10020;pointer-events:none;}
 .dw-strip{position:absolute;display:flex;justify-content:space-between;align-items:center;}
-.dw-bulb{position:relative;display:block;width:11px;height:15px;
+.dw-bulb{position:relative;display:block;width:7px;height:10px;
   border-radius:50% 50% 46% 46% / 42% 42% 58% 58%;
   background:radial-gradient(circle at 34% 30%, #fff 0 12%, var(--c) 45%, rgba(0,0,0,.35) 100%);
-  box-shadow:0 0 10px 3px var(--c), 0 0 22px 6px color-mix(in srgb, var(--c) 55%, transparent),
-             inset 0 -3px 5px rgba(0,0,0,.3);
+  box-shadow:0 0 6px 2px var(--c), 0 0 13px 4px color-mix(in srgb, var(--c) 45%, transparent),
+             inset 0 -2px 3px rgba(0,0,0,.3);
   animation:dwGlow 2.4s ease-in-out infinite;}
 /* brass screw cap where the bulb meets the wire */
-.dw-bulb::before{content:'';position:absolute;top:-4px;left:50%;transform:translateX(-50%);
-  width:6px;height:5px;border-radius:2px 2px 1px 1px;
+.dw-bulb::before{content:'';position:absolute;top:-3px;left:50%;transform:translateX(-50%);
+  width:4px;height:3.5px;border-radius:2px 2px 1px 1px;
   background:linear-gradient(180deg,#d6b25e,#8a6c2c);
   box-shadow:inset 0 1px 0 rgba(255,255,255,.5);}
 /* glass highlight */
-.dw-bulb::after{content:'';position:absolute;top:3px;left:2.5px;width:3px;height:4px;
+.dw-bulb::after{content:'';position:absolute;top:2px;left:1.6px;width:2px;height:2.6px;
   border-radius:50%;background:rgba(255,255,255,.8);}
 @keyframes dwGlow{0%,100%{filter:brightness(1.15)}50%{filter:brightness(.55)}}
 .dw-left .dw-bulb,.dw-right .dw-bulb{transform:rotate(-90deg);}
-.dw-top{top:4px;left:0;right:0;height:20px;align-items:flex-start;}
-.dw-bottom{bottom:4px;left:0;right:0;height:20px;align-items:flex-end;}
-.dw-left{left:6px;top:0;bottom:0;width:20px;flex-direction:column;}
-.dw-right{right:6px;top:0;bottom:0;width:20px;flex-direction:column;}
+.dw-top{top:3px;left:0;right:0;height:14px;align-items:flex-start;}
+.dw-bottom{bottom:3px;left:0;right:0;height:14px;align-items:flex-end;}
+.dw-left{left:4px;top:0;bottom:0;width:14px;flex-direction:column;}
+.dw-right{right:4px;top:0;bottom:0;width:14px;flex-direction:column;}
 /* the wire the bulbs hang from */
-.dw-top::before{content:'';position:absolute;left:0;right:0;top:1px;height:2.5px;
+.dw-top::before{content:'';position:absolute;left:0;right:0;top:1px;height:1.8px;
   background:linear-gradient(90deg,#4a3115,#6b4a1f,#4a3115);border-radius:2px;}
-.dw-bottom::before{content:'';position:absolute;left:0;right:0;bottom:1px;height:2.5px;
+.dw-bottom::before{content:'';position:absolute;left:0;right:0;bottom:1px;height:1.8px;
   background:linear-gradient(90deg,#4a3115,#6b4a1f,#4a3115);border-radius:2px;}
-.dw-left::before{content:'';position:absolute;top:0;bottom:0;left:1px;width:2.5px;
+.dw-left::before{content:'';position:absolute;top:0;bottom:0;left:1px;width:1.8px;
   background:linear-gradient(180deg,#4a3115,#6b4a1f,#4a3115);border-radius:2px;}
-.dw-right::before{content:'';position:absolute;top:0;bottom:0;right:1px;width:2.5px;
+.dw-right::before{content:'';position:absolute;top:0;bottom:0;right:1px;width:1.8px;
   background:linear-gradient(180deg,#4a3115,#6b4a1f,#4a3115);border-radius:2px;}
 
 /* ---------- the rocket ---------- */
@@ -416,6 +449,6 @@ body.dw-nocursor, body.dw-nocursor * { cursor: none !important; }
   body.dw-nocursor, body.dw-nocursor *{cursor:auto !important;}
   .dw-rocket{left:14px;bottom:16px;}
   .dw-rk-hint{display:none;}
-  .dw-bulb{width:9px;height:12px;}
+  .dw-bulb{width:6px;height:8px;}
 }
 `;

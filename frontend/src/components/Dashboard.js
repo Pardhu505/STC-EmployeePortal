@@ -27,6 +27,7 @@ import HRAttendance from './HRAttendance';
 import BiometricPanel from './BiometricPanel';
 import { hasFullBiometricAccess } from '../config/biometricAccess';
 import FestivalQuests from './FestivalQuests';
+import StcCrackersBox from './StcCrackersBox';
 import BiometricMyTeam from './BiometricMyTeam';
 
 import { fetchEmployeesWorkDetails } from '../api'; // Import the centralized fetch function
@@ -400,6 +401,7 @@ const Dashboard = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 relative overflow-hidden">
       <FestivalQuests />
+      <StcCrackersBox />
       {/* ... (rest of the component is unchanged) ... */}
       <div className="absolute inset-0 opacity-10">
         <img 

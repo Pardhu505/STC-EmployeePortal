@@ -45,6 +45,15 @@ export default function DiwaliFestive() {
   const [active, setActive] = useState(false);
   const [showCard, setShowCard] = useState(false);
   const [cardDismissed, setCardDismissed] = useState(false);
+  const [vp, setVp] = useState(() => ({ w: window.innerWidth, h: window.innerHeight }));
+  useEffect(() => {
+    const onR = () => setVp({ w: window.innerWidth, h: window.innerHeight });
+    window.addEventListener('resize', onR);
+    return () => window.removeEventListener('resize', onR);
+  }, []);
+  const GAP = 26;                                   // px between bulb centres
+  const hCount = Math.max(12, Math.floor(vp.w / GAP));
+  const vCount = Math.max(8, Math.floor(vp.h / GAP));
 
   /* ---------- is the festive layer on? ---------- */
   useEffect(() => {
@@ -104,17 +113,17 @@ export default function DiwaliFestive() {
 
       /* --- sparkler trail at the pointer --- */
       if (s.mx > -100) {
-        for (let i = 0; i < 3; i++) {
-          const a = Math.random() * Math.PI * 2, sp = 0.6 + Math.random() * 2.4;
+        for (let i = 0; i < 7; i++) {           // denser shower
+          const a = Math.random() * Math.PI * 2, sp = 1.1 + Math.random() * 4.2;
           s.sparks.push({
-            x: s.mx, y: s.my, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 0.5,
-            life: 1, r: 0.8 + Math.random() * 1.6,
-            c: Math.random() < 0.78 ? '#ffd76a' : '#fff6cf',
+            x: s.mx, y: s.my, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 0.8,
+            life: 1, r: 1.4 + Math.random() * 2.8,     // thicker sparks
+            c: Math.random() < 0.72 ? '#ffd76a' : (Math.random() < 0.5 ? '#fff6cf' : '#ffb300'),
           });
         }
       }
       s.sparks = s.sparks.filter(p => {
-        p.x += p.vx; p.y += p.vy; p.vy += 0.08; p.vx *= 0.97; p.life -= 0.045;
+        p.x += p.vx; p.y += p.vy; p.vy += 0.08; p.vx *= 0.97; p.life -= 0.032;
         if (p.life <= 0) return false;
         ctx.globalAlpha = Math.max(0, p.life);
         ctx.fillStyle = p.c;
@@ -125,14 +134,33 @@ export default function DiwaliFestive() {
 
       // the sparkler itself: glowing tip exactly at the pointer so clicks stay precise
       if (s.mx > -100) {
+        // long thick wire, angled down-right like a held sparkler
         ctx.save();
-        ctx.shadowColor = '#ffcf4d'; ctx.shadowBlur = 18;
-        ctx.fillStyle = '#fff3c4';
-        ctx.beginPath(); ctx.arc(s.mx, s.my, 3.4 + Math.sin(s.t / 3) * 0.8, 0, 7); ctx.fill();
+        ctx.lineCap = 'round';
+        ctx.strokeStyle = 'rgba(70,45,18,.9)'; ctx.lineWidth = 4.2;
+        ctx.beginPath(); ctx.moveTo(s.mx + 4, s.my + 6); ctx.lineTo(s.mx + 34, s.my + 44); ctx.stroke();
+        ctx.strokeStyle = 'rgba(190,150,80,.75)'; ctx.lineWidth = 1.6;
+        ctx.beginPath(); ctx.moveTo(s.mx + 4, s.my + 6); ctx.lineTo(s.mx + 34, s.my + 44); ctx.stroke();
+        // burning head: outer halo, body, white-hot core
+        const pulse = 1 + Math.sin(s.t / 2.6) * 0.16;
+        ctx.shadowColor = '#ffb300'; ctx.shadowBlur = 42;
+        ctx.fillStyle = 'rgba(255,183,0,.55)';
+        ctx.beginPath(); ctx.arc(s.mx, s.my, 13 * pulse, 0, 7); ctx.fill();
+        ctx.shadowBlur = 26; ctx.fillStyle = '#ffd76a';
+        ctx.beginPath(); ctx.arc(s.mx, s.my, 7.5 * pulse, 0, 7); ctx.fill();
+        ctx.shadowBlur = 14; ctx.fillStyle = '#fffbe8';
+        ctx.beginPath(); ctx.arc(s.mx, s.my, 3.6 * pulse, 0, 7); ctx.fill();
+        // radiating needles
+        ctx.strokeStyle = 'rgba(255,235,160,.75)'; ctx.lineWidth = 1.5;
+        for (let i = 0; i < 8; i++) {
+          const a = (s.t / 14) + i * Math.PI / 4;
+          const L = 11 + Math.sin(s.t / 5 + i) * 5;
+          ctx.beginPath();
+          ctx.moveTo(s.mx + Math.cos(a) * 5, s.my + Math.sin(a) * 5);
+          ctx.lineTo(s.mx + Math.cos(a) * L, s.my + Math.sin(a) * L);
+          ctx.stroke();
+        }
         ctx.restore();
-        // little stick, angled down-right like a held sparkler
-        ctx.strokeStyle = 'rgba(120,80,30,.85)'; ctx.lineWidth = 2.2;
-        ctx.beginPath(); ctx.moveTo(s.mx + 2, s.my + 3); ctx.lineTo(s.mx + 13, s.my + 17); ctx.stroke();
       }
 
       /* --- rocket in flight --- */
@@ -225,13 +253,16 @@ export default function DiwaliFestive() {
 
   if (!active) return null;
 
-  const bulbs = (n) => Array.from({ length: n }).map((_, i) => (
-    <i key={i} style={{
-      background: BULB_COLORS[i % BULB_COLORS.length],
-      boxShadow: `0 0 9px 2px ${BULB_COLORS[i % BULB_COLORS.length]}`,
-      animationDelay: `${(i % 6) * 0.28}s`,
-    }} />
-  ));
+  // one bulb every ~26px so the string reads as a real strip, not dots
+  const bulbs = (n) => Array.from({ length: n }).map((_, i) => {
+    const c = BULB_COLORS[i % BULB_COLORS.length];
+    return (
+      <i key={i} className="dw-bulb" style={{
+        '--c': c,
+        animationDelay: `${(i % 5) * 0.3}s`,
+      }} />
+    );
+  });
 
   return (
     <>
@@ -239,10 +270,10 @@ export default function DiwaliFestive() {
 
       {/* LED strings on every edge */}
       <div className="dw-lights" aria-hidden="true">
-        <div className="dw-strip dw-top">{bulbs(30)}</div>
-        <div className="dw-strip dw-bottom">{bulbs(30)}</div>
-        <div className="dw-strip dw-left">{bulbs(18)}</div>
-        <div className="dw-strip dw-right">{bulbs(18)}</div>
+        <div className="dw-strip dw-top">{bulbs(hCount)}</div>
+        <div className="dw-strip dw-bottom">{bulbs(hCount)}</div>
+        <div className="dw-strip dw-left">{bulbs(vCount)}</div>
+        <div className="dw-strip dw-right">{bulbs(vCount)}</div>
       </div>
 
       {/* sparks + rocket canvas */}
@@ -301,18 +332,35 @@ body.dw-nocursor, body.dw-nocursor * { cursor: none !important; }
 /* ---------- LED strings ---------- */
 .dw-lights{position:fixed;inset:0;z-index:10020;pointer-events:none;}
 .dw-strip{position:absolute;display:flex;justify-content:space-between;align-items:center;}
-.dw-strip i{display:block;width:9px;height:9px;border-radius:50%;
-  animation:dwBlink 1.6s ease-in-out infinite;}
-@keyframes dwBlink{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.25;transform:scale(.78)}}
-.dw-top{top:3px;left:0;right:0;height:12px;}
-.dw-bottom{bottom:3px;left:0;right:0;height:12px;}
-.dw-left{left:3px;top:0;bottom:0;width:12px;flex-direction:column;}
-.dw-right{right:3px;top:0;bottom:0;width:12px;flex-direction:column;}
+.dw-bulb{position:relative;display:block;width:11px;height:15px;
+  border-radius:50% 50% 46% 46% / 42% 42% 58% 58%;
+  background:radial-gradient(circle at 34% 30%, #fff 0 12%, var(--c) 45%, rgba(0,0,0,.35) 100%);
+  box-shadow:0 0 10px 3px var(--c), 0 0 22px 6px color-mix(in srgb, var(--c) 55%, transparent),
+             inset 0 -3px 5px rgba(0,0,0,.3);
+  animation:dwGlow 2.4s ease-in-out infinite;}
+/* brass screw cap where the bulb meets the wire */
+.dw-bulb::before{content:'';position:absolute;top:-4px;left:50%;transform:translateX(-50%);
+  width:6px;height:5px;border-radius:2px 2px 1px 1px;
+  background:linear-gradient(180deg,#d6b25e,#8a6c2c);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.5);}
+/* glass highlight */
+.dw-bulb::after{content:'';position:absolute;top:3px;left:2.5px;width:3px;height:4px;
+  border-radius:50%;background:rgba(255,255,255,.8);}
+@keyframes dwGlow{0%,100%{filter:brightness(1.15)}50%{filter:brightness(.55)}}
+.dw-left .dw-bulb,.dw-right .dw-bulb{transform:rotate(-90deg);}
+.dw-top{top:4px;left:0;right:0;height:20px;align-items:flex-start;}
+.dw-bottom{bottom:4px;left:0;right:0;height:20px;align-items:flex-end;}
+.dw-left{left:6px;top:0;bottom:0;width:20px;flex-direction:column;}
+.dw-right{right:6px;top:0;bottom:0;width:20px;flex-direction:column;}
 /* the wire the bulbs hang from */
-.dw-top::before,.dw-bottom::before{content:'';position:absolute;left:0;right:0;top:50%;
-  height:2px;background:linear-gradient(90deg,rgba(90,60,20,.55),rgba(90,60,20,.2));}
-.dw-left::before,.dw-right::before{content:'';position:absolute;top:0;bottom:0;left:50%;
-  width:2px;background:linear-gradient(180deg,rgba(90,60,20,.55),rgba(90,60,20,.2));}
+.dw-top::before{content:'';position:absolute;left:0;right:0;top:1px;height:2.5px;
+  background:linear-gradient(90deg,#4a3115,#6b4a1f,#4a3115);border-radius:2px;}
+.dw-bottom::before{content:'';position:absolute;left:0;right:0;bottom:1px;height:2.5px;
+  background:linear-gradient(90deg,#4a3115,#6b4a1f,#4a3115);border-radius:2px;}
+.dw-left::before{content:'';position:absolute;top:0;bottom:0;left:1px;width:2.5px;
+  background:linear-gradient(180deg,#4a3115,#6b4a1f,#4a3115);border-radius:2px;}
+.dw-right::before{content:'';position:absolute;top:0;bottom:0;right:1px;width:2.5px;
+  background:linear-gradient(180deg,#4a3115,#6b4a1f,#4a3115);border-radius:2px;}
 
 /* ---------- the rocket ---------- */
 .dw-rocket{position:fixed;left:40px;bottom:28px;z-index:10025;cursor:pointer;
@@ -368,6 +416,6 @@ body.dw-nocursor, body.dw-nocursor * { cursor: none !important; }
   body.dw-nocursor, body.dw-nocursor *{cursor:auto !important;}
   .dw-rocket{left:14px;bottom:16px;}
   .dw-rk-hint{display:none;}
-  .dw-strip i{width:7px;height:7px;}
+  .dw-bulb{width:9px;height:12px;}
 }
 `;

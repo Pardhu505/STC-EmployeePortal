@@ -23,34 +23,59 @@ const SHAPES = ['circle', 'star', 'diamond', 'square', 'star'];
 const SPARK_COLORS = ['#ffd54f', '#ff9800', '#ff5252', '#e040fb', '#40c4ff', '#69f0ae', '#fff176'];
 const BULB_COLORS = ['#ff5252', '#ffd54f', '#69f0ae', '#40c4ff', '#e040fb', '#ff9800'];
 
+// Sprites are rendered ONCE into small offscreen canvases, then blitted with
+// drawImage. Per-particle shadowBlur was costing more than everything else
+// combined, so the glow is baked into the sprite instead.
+const SPRITES = {};
+function sprite(color, shape) {
+  const key = color + shape;
+  if (SPRITES[key]) return SPRITES[key];
+  const S = 26, c = document.createElement('canvas');
+  c.width = c.height = S;
+  const g = c.getContext('2d');
+  g.translate(S / 2, S / 2);
+  // baked glow
+  const rg = g.createRadialGradient(0, 0, 0, 0, 0, S / 2);
+  rg.addColorStop(0, color);
+  rg.addColorStop(0.35, color + 'aa');
+  rg.addColorStop(1, color + '00');
+  g.fillStyle = rg;
+  g.beginPath(); g.arc(0, 0, S / 2, 0, 7); g.fill();
+  // solid core, in the shape of this particle
+  g.fillStyle = '#fff';
+  const r = 4.2;
+  if (shape === 'star') {
+    g.beginPath();
+    for (let i = 0; i < 10; i++) {
+      const rad = i % 2 === 0 ? r * 1.5 : r * 0.6;
+      const a = (Math.PI / 5) * i - Math.PI / 2;
+      i === 0 ? g.moveTo(Math.cos(a) * rad, Math.sin(a) * rad)
+              : g.lineTo(Math.cos(a) * rad, Math.sin(a) * rad);
+    }
+    g.closePath(); g.fill();
+  } else if (shape === 'diamond') {
+    g.beginPath(); g.moveTo(0, -r * 1.4); g.lineTo(r, 0); g.lineTo(0, r * 1.4); g.lineTo(-r, 0);
+    g.closePath(); g.fill();
+  } else if (shape === 'square') {
+    g.fillRect(-r * 0.8, -r * 0.8, r * 1.6, r * 1.6);
+  } else {
+    g.beginPath(); g.arc(0, 0, r, 0, 7); g.fill();
+  }
+  SPRITES[key] = c;
+  return c;
+}
+
 // draw one spark in its shape
 function drawSpark(ctx, p) {
-  ctx.save();
-  ctx.translate(p.x, p.y);
-  ctx.rotate(p.rot || 0);
-  ctx.fillStyle = p.c;
-  ctx.shadowColor = p.c;
-  ctx.shadowBlur = 8;
-  const r = p.r;
-  if (p.shape === 'star') {
-    ctx.beginPath();
-    for (let i = 0; i < 10; i++) {
-      const rad = i % 2 === 0 ? r * 1.55 : r * 0.62;
-      const a = (Math.PI / 5) * i - Math.PI / 2;
-      i === 0 ? ctx.moveTo(Math.cos(a) * rad, Math.sin(a) * rad)
-              : ctx.lineTo(Math.cos(a) * rad, Math.sin(a) * rad);
-    }
-    ctx.closePath(); ctx.fill();
-  } else if (p.shape === 'diamond') {
-    ctx.beginPath();
-    ctx.moveTo(0, -r * 1.4); ctx.lineTo(r, 0); ctx.lineTo(0, r * 1.4); ctx.lineTo(-r, 0);
-    ctx.closePath(); ctx.fill();
-  } else if (p.shape === 'square') {
-    ctx.fillRect(-r * 0.85, -r * 0.85, r * 1.7, r * 1.7);
+  const img = sprite(p.c, p.shape || 'circle');
+  const d = p.r * 3.4;
+  if (p.rot) {
+    ctx.translate(p.x, p.y); ctx.rotate(p.rot);
+    ctx.drawImage(img, -d / 2, -d / 2, d, d);
+    ctx.setTransform(ctx._dpr, 0, 0, ctx._dpr, 0, 0);
   } else {
-    ctx.beginPath(); ctx.arc(0, 0, r, 0, 7); ctx.fill();
+    ctx.drawImage(img, p.x - d / 2, p.y - d / 2, d, d);
   }
-  ctx.restore();
 }
 
 function daysUntil(target) {
@@ -82,7 +107,7 @@ export default function DiwaliFestive() {
     window.addEventListener('resize', onR);
     return () => window.removeEventListener('resize', onR);
   }, []);
-  const GAP = 22;                                   // px between bulb centres
+  const GAP = 34;   // fewer DOM nodes; opacity-only animation keeps it smooth
   const hCount = Math.max(12, Math.floor(vp.w / GAP));
   const vCount = Math.max(8, Math.floor(vp.h / GAP));
 
@@ -128,10 +153,11 @@ export default function DiwaliFestive() {
     const ctx = cv.getContext('2d');
 
     const fit = () => {
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const dpr = Math.min(window.devicePixelRatio || 1, 1.5);   // 2x costs 78% more pixels
       cv.width = window.innerWidth * dpr; cv.height = window.innerHeight * dpr;
       cv.style.width = window.innerWidth + 'px'; cv.style.height = window.innerHeight + 'px';
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx._dpr = dpr;
     };
     fit();
     window.addEventListener('resize', fit);
@@ -141,10 +167,12 @@ export default function DiwaliFestive() {
       const W = cv.clientWidth, H = cv.clientHeight;
       s.t++;
       ctx.clearRect(0, 0, W, H);
+      ctx.globalCompositeOperation = 'lighter';   // glow adds up, no blur needed
 
       /* --- sparkler trail at the pointer --- */
       if (s.mx > -100) {
-        for (let i = 0; i < 6; i++) {
+        const room = s.sparks.length < 150;      // hard cap
+        for (let i = 0; room && i < 5; i++) {
           const a = Math.random() * Math.PI * 2, sp = 1 + Math.random() * 3.4;
           s.sparks.push({
             x: s.mx, y: s.my, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 0.7,
@@ -176,17 +204,16 @@ export default function DiwaliFestive() {
         ctx.beginPath(); ctx.moveTo(s.mx + 3, s.my + 5); ctx.lineTo(s.mx + 25, s.my + 33); ctx.stroke();
         // burning head: outer halo, body, white-hot core
         const pulse = 1 + Math.sin(s.t / 2.6) * 0.16;
-        ctx.shadowColor = '#ffb300'; ctx.shadowBlur = 30;
-        ctx.fillStyle = 'rgba(255,183,0,.55)';
-        ctx.beginPath(); ctx.arc(s.mx, s.my, 9 * pulse, 0, 7); ctx.fill();
-        ctx.shadowBlur = 18; ctx.fillStyle = '#ffd76a';
-        ctx.beginPath(); ctx.arc(s.mx, s.my, 5.2 * pulse, 0, 7); ctx.fill();
-        ctx.shadowBlur = 10; ctx.fillStyle = '#fffbe8';
+        // one baked-glow sprite instead of three blurred arcs
+        const head = sprite('#ffb300', 'circle');
+        const hd = 30 * pulse;
+        ctx.drawImage(head, s.mx - hd / 2, s.my - hd / 2, hd, hd);
+        ctx.fillStyle = '#fffbe8';
         ctx.beginPath(); ctx.arc(s.mx, s.my, 2.5 * pulse, 0, 7); ctx.fill();
         // radiating needles
         ctx.strokeStyle = 'rgba(255,235,160,.75)'; ctx.lineWidth = 1.1;
-        for (let i = 0; i < 8; i++) {
-          const a = (s.t / 14) + i * Math.PI / 4;
+        for (let i = 0; i < 5; i++) {
+          const a = (s.t / 14) + i * (Math.PI * 2 / 5);
           const L = 8 + Math.sin(s.t / 5 + i) * 3.5;
           ctx.beginPath();
           ctx.moveTo(s.mx + Math.cos(a) * 3.6, s.my + Math.sin(a) * 3.6);
@@ -206,7 +233,7 @@ export default function DiwaliFestive() {
         r.x = x0 + (r.tx - x0) * ease;
         r.y = y0 + (r.ty - y0) * ease - Math.sin(k * Math.PI) * 60;   // arc
         // colourful trail
-        for (let i = 0; i < 4; i++) {
+        for (let i = 0; i < 3 && s.sparks.length < 220; i++) {
           s.sparks.push({
             x: r.x + (Math.random() - 0.5) * 6, y: r.y + (Math.random() - 0.5) * 6,
             vx: (Math.random() - 0.5) * 1.6, vy: 0.6 + Math.random() * 1.6,
@@ -226,7 +253,7 @@ export default function DiwaliFestive() {
 
         if (k >= 1) {
           // BURST
-          for (let i = 0; i < 150; i++) {
+          for (let i = 0; i < 110; i++) {
             const a = Math.random() * Math.PI * 2, sp = 1.5 + Math.random() * 6.5;
             s.burst.push({
               x: r.x, y: r.y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
@@ -251,6 +278,8 @@ export default function DiwaliFestive() {
         return true;
       });
       ctx.globalAlpha = 1;
+
+      ctx.globalCompositeOperation = 'source-over';
 
       /* --- the announcement after the burst --- */
       if (s.banner > 0) {
@@ -277,9 +306,15 @@ export default function DiwaliFestive() {
 
       rafRef.current = requestAnimationFrame(step);
     };
+    const onVis = () => {
+      if (document.hidden) { if (rafRef.current) cancelAnimationFrame(rafRef.current); rafRef.current = null; }
+      else if (!rafRef.current) rafRef.current = requestAnimationFrame(step);
+    };
+    document.addEventListener('visibilitychange', onVis);
     rafRef.current = requestAnimationFrame(step);
     return () => {
       window.removeEventListener('resize', fit);
+      document.removeEventListener('visibilitychange', onVis);
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
     };
   }, [active, days]);
@@ -363,14 +398,13 @@ body.dw-nocursor, body.dw-nocursor * { cursor: none !important; }
 .dw-canvas{position:fixed;inset:0;z-index:10030;pointer-events:none;}
 
 /* ---------- LED strings ---------- */
-.dw-lights{position:fixed;inset:0;z-index:10020;pointer-events:none;}
+.dw-lights{position:fixed;inset:0;z-index:10020;pointer-events:none;contain:strict;}
 .dw-strip{position:absolute;display:flex;justify-content:space-between;align-items:center;}
 .dw-bulb{position:relative;display:block;width:7px;height:10px;
   border-radius:50% 50% 46% 46% / 42% 42% 58% 58%;
   background:radial-gradient(circle at 34% 30%, #fff 0 12%, var(--c) 45%, rgba(0,0,0,.35) 100%);
-  box-shadow:0 0 6px 2px var(--c), 0 0 13px 4px color-mix(in srgb, var(--c) 45%, transparent),
-             inset 0 -2px 3px rgba(0,0,0,.3);
-  animation:dwGlow 2.4s ease-in-out infinite;}
+  box-shadow:0 0 7px 2px var(--c);
+  will-change:opacity;animation:dwGlow 2.4s ease-in-out infinite;}
 /* brass screw cap where the bulb meets the wire */
 .dw-bulb::before{content:'';position:absolute;top:-3px;left:50%;transform:translateX(-50%);
   width:4px;height:3.5px;border-radius:2px 2px 1px 1px;
@@ -379,7 +413,7 @@ body.dw-nocursor, body.dw-nocursor * { cursor: none !important; }
 /* glass highlight */
 .dw-bulb::after{content:'';position:absolute;top:2px;left:1.6px;width:2px;height:2.6px;
   border-radius:50%;background:rgba(255,255,255,.8);}
-@keyframes dwGlow{0%,100%{filter:brightness(1.15)}50%{filter:brightness(.55)}}
+@keyframes dwGlow{0%,100%{opacity:1}50%{opacity:.42}}
 .dw-left .dw-bulb,.dw-right .dw-bulb{transform:rotate(-90deg);}
 .dw-top{top:3px;left:0;right:0;height:14px;align-items:flex-start;}
 .dw-bottom{bottom:3px;left:0;right:0;height:14px;align-items:flex-end;}

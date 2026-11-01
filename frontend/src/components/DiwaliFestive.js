@@ -42,7 +42,7 @@ function sprite(color, shape) {
   g.fillStyle = rg;
   g.beginPath(); g.arc(0, 0, S / 2, 0, 7); g.fill();
   // solid core, in the shape of this particle
-  g.fillStyle = '#fff';
+  g.fillStyle = color;
   const r = 4.2;
   if (shape === 'star') {
     g.beginPath();
@@ -107,7 +107,7 @@ export default function DiwaliFestive() {
     window.addEventListener('resize', onR);
     return () => window.removeEventListener('resize', onR);
   }, []);
-  const GAP = 34;   // fewer DOM nodes; opacity-only animation keeps it smooth
+  const GAP = 22;                                   // px between bulb centres
   const hCount = Math.max(12, Math.floor(vp.w / GAP));
   const vCount = Math.max(8, Math.floor(vp.h / GAP));
 
@@ -153,7 +153,7 @@ export default function DiwaliFestive() {
     const ctx = cv.getContext('2d');
 
     const fit = () => {
-      const dpr = Math.min(window.devicePixelRatio || 1, 1.5);   // 2x costs 78% more pixels
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
       cv.width = window.innerWidth * dpr; cv.height = window.innerHeight * dpr;
       cv.style.width = window.innerWidth + 'px'; cv.style.height = window.innerHeight + 'px';
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -167,12 +167,10 @@ export default function DiwaliFestive() {
       const W = cv.clientWidth, H = cv.clientHeight;
       s.t++;
       ctx.clearRect(0, 0, W, H);
-      ctx.globalCompositeOperation = 'lighter';   // glow adds up, no blur needed
 
       /* --- sparkler trail at the pointer --- */
       if (s.mx > -100) {
-        const room = s.sparks.length < 150;      // hard cap
-        for (let i = 0; room && i < 5; i++) {
+        for (let i = 0; i < 6; i++) {
           const a = Math.random() * Math.PI * 2, sp = 1 + Math.random() * 3.4;
           s.sparks.push({
             x: s.mx, y: s.my, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 0.7,
@@ -204,16 +202,17 @@ export default function DiwaliFestive() {
         ctx.beginPath(); ctx.moveTo(s.mx + 3, s.my + 5); ctx.lineTo(s.mx + 25, s.my + 33); ctx.stroke();
         // burning head: outer halo, body, white-hot core
         const pulse = 1 + Math.sin(s.t / 2.6) * 0.16;
-        // one baked-glow sprite instead of three blurred arcs
-        const head = sprite('#ffb300', 'circle');
-        const hd = 30 * pulse;
-        ctx.drawImage(head, s.mx - hd / 2, s.my - hd / 2, hd, hd);
-        ctx.fillStyle = '#fffbe8';
+        ctx.shadowColor = '#ffb300'; ctx.shadowBlur = 30;
+        ctx.fillStyle = 'rgba(255,183,0,.55)';
+        ctx.beginPath(); ctx.arc(s.mx, s.my, 9 * pulse, 0, 7); ctx.fill();
+        ctx.shadowBlur = 18; ctx.fillStyle = '#ffd76a';
+        ctx.beginPath(); ctx.arc(s.mx, s.my, 5.2 * pulse, 0, 7); ctx.fill();
+        ctx.shadowBlur = 10; ctx.fillStyle = '#fffbe8';
         ctx.beginPath(); ctx.arc(s.mx, s.my, 2.5 * pulse, 0, 7); ctx.fill();
         // radiating needles
         ctx.strokeStyle = 'rgba(255,235,160,.75)'; ctx.lineWidth = 1.1;
-        for (let i = 0; i < 5; i++) {
-          const a = (s.t / 14) + i * (Math.PI * 2 / 5);
+        for (let i = 0; i < 8; i++) {
+          const a = (s.t / 14) + i * Math.PI / 4;
           const L = 8 + Math.sin(s.t / 5 + i) * 3.5;
           ctx.beginPath();
           ctx.moveTo(s.mx + Math.cos(a) * 3.6, s.my + Math.sin(a) * 3.6);
@@ -233,7 +232,7 @@ export default function DiwaliFestive() {
         r.x = x0 + (r.tx - x0) * ease;
         r.y = y0 + (r.ty - y0) * ease - Math.sin(k * Math.PI) * 60;   // arc
         // colourful trail
-        for (let i = 0; i < 3 && s.sparks.length < 220; i++) {
+        for (let i = 0; i < 4; i++) {
           s.sparks.push({
             x: r.x + (Math.random() - 0.5) * 6, y: r.y + (Math.random() - 0.5) * 6,
             vx: (Math.random() - 0.5) * 1.6, vy: 0.6 + Math.random() * 1.6,
@@ -253,7 +252,7 @@ export default function DiwaliFestive() {
 
         if (k >= 1) {
           // BURST
-          for (let i = 0; i < 110; i++) {
+          for (let i = 0; i < 150; i++) {
             const a = Math.random() * Math.PI * 2, sp = 1.5 + Math.random() * 6.5;
             s.burst.push({
               x: r.x, y: r.y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
@@ -278,8 +277,6 @@ export default function DiwaliFestive() {
         return true;
       });
       ctx.globalAlpha = 1;
-
-      ctx.globalCompositeOperation = 'source-over';
 
       /* --- the announcement after the burst --- */
       if (s.banner > 0) {
@@ -403,8 +400,9 @@ body.dw-nocursor, body.dw-nocursor * { cursor: none !important; }
 .dw-bulb{position:relative;display:block;width:7px;height:10px;
   border-radius:50% 50% 46% 46% / 42% 42% 58% 58%;
   background:radial-gradient(circle at 34% 30%, #fff 0 12%, var(--c) 45%, rgba(0,0,0,.35) 100%);
-  box-shadow:0 0 7px 2px var(--c);
-  will-change:opacity;animation:dwGlow 2.4s ease-in-out infinite;}
+  box-shadow:0 0 6px 2px var(--c), 0 0 13px 4px color-mix(in srgb, var(--c) 45%, transparent),
+             inset 0 -2px 3px rgba(0,0,0,.3);
+  animation:dwGlow 2.4s ease-in-out infinite;}
 /* brass screw cap where the bulb meets the wire */
 .dw-bulb::before{content:'';position:absolute;top:-3px;left:50%;transform:translateX(-50%);
   width:4px;height:3.5px;border-radius:2px 2px 1px 1px;
@@ -413,7 +411,7 @@ body.dw-nocursor, body.dw-nocursor * { cursor: none !important; }
 /* glass highlight */
 .dw-bulb::after{content:'';position:absolute;top:2px;left:1.6px;width:2px;height:2.6px;
   border-radius:50%;background:rgba(255,255,255,.8);}
-@keyframes dwGlow{0%,100%{opacity:1}50%{opacity:.42}}
+@keyframes dwGlow{0%,100%{filter:brightness(1.15)}50%{filter:brightness(.55)}}
 .dw-left .dw-bulb,.dw-right .dw-bulb{transform:rotate(-90deg);}
 .dw-top{top:3px;left:0;right:0;height:14px;align-items:flex-start;}
 .dw-bottom{bottom:3px;left:0;right:0;height:14px;align-items:flex-end;}

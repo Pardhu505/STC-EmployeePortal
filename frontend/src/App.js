@@ -18,6 +18,7 @@ import ExcelDataViewer from "@/pages/ExcelDataViewer";
 import InhouseTracking from "@/components/InhouseTracking";
 import BiometricLiveLogs from "./components/BiometricLiveLogs";
 import DiwaliFestive from "./components/DiwaliFestive";
+import MarigoldToran from "./components/MarigoldToran";
 
 
 const ProtectedRoute = ({ children }) => {
@@ -98,6 +99,7 @@ function App() {
 
             </Routes>
             <DiwaliFestive />
+            <MarigoldToran />
           </BrowserRouter>
           <Toaster />
         </div>

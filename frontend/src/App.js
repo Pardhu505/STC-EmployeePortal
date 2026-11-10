@@ -17,8 +17,6 @@ import APMapping from "@/components/APMapping";
 import ExcelDataViewer from "@/pages/ExcelDataViewer";
 import InhouseTracking from "@/components/InhouseTracking";
 import BiometricLiveLogs from "./components/BiometricLiveLogs";
-import DiwaliFestive from "./components/DiwaliFestive";
-import MarigoldToran from "./components/MarigoldToran";
 
 
 const ProtectedRoute = ({ children }) => {
@@ -98,8 +96,6 @@ function App() {
               <Route path="/" element={<Navigate to="/dashboard" />} />
 
             </Routes>
-            <DiwaliFestive />
-            <MarigoldToran />
           </BrowserRouter>
           <Toaster />
         </div>
